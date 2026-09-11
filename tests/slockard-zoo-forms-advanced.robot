@@ -1,6 +1,7 @@
 *** Settings ***
 Resource                      ../resources/common.robot
 Resource                      ../resources/garzai_console.robot
+Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
@@ -10,7 +11,7 @@ Keyword form -- /lightning/n/Zoo_Forms_Advanced
     # Slockard -- the suite's own variables; values live in CRT, never in this file
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
-    GoTo    ${login_url}/lightning/n/Zoo_Forms_Advanced
+    Open Nav Tab    Zoo_Forms_Advanced
     # Account Name  (1 of 3 same-shape controls -- the same lines with the other label)
     TypeText    Account Name    GZREV Account Name
     # Industry  (1 of 4 same-shape controls -- the same lines with the other label)
@@ -31,7 +32,7 @@ XPath form -- /lightning/n/Zoo_Forms_Advanced
     # Slockard -- the suite's own variables; values live in CRT, never in this file
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
-    GoTo    ${login_url}/lightning/n/Zoo_Forms_Advanced
+    Open Nav Tab    Zoo_Forms_Advanced
     # Account Name  (1 of 3 same-shape controls -- the same lines with the other label)
     TypeText    xpath\=//input[@name\="Name"]    GZREV Account Name
     # Industry  (1 of 4 same-shape controls -- the same lines with the other label)

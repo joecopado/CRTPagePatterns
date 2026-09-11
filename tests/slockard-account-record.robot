@@ -1,6 +1,7 @@
 *** Settings ***
 Resource                      ../resources/common.robot
 Resource                      ../resources/garzai_console.robot
+Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
@@ -10,7 +11,7 @@ Keyword form -- /lightning/r/Account/{id}/view
     # Slockard -- the suite's own variables; values live in CRT, never in this file
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
-    GoTo    ${login_url}/lightning/r/Account/001d100000QciYwAAJ/view
+    Open Record Page    Account    Name    GZREC Northwind Logistics
     # Follow  (1 of 13 same-shape controls -- the same lines with the other label)
     ClickText    Follow    partial_match=False
     # Show more actions  (1 of 9 same-shape controls -- the same lines with the other label)
@@ -33,7 +34,7 @@ XPath form -- /lightning/r/Account/{id}/view
     # Slockard -- the suite's own variables; values live in CRT, never in this file
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
-    GoTo    ${login_url}/lightning/r/Account/001d100000QciYwAAJ/view
+    Open Record Page    Account    Name    GZREC Northwind Logistics
     # Follow  (1 of 13 same-shape controls -- the same lines with the other label)
     ClickElement    xpath\=(//*[normalize-space(text())\="More"]/following::button[normalize-space(.)\="Follow"])[1]
     # Show more actions  (1 of 9 same-shape controls -- the same lines with the other label)

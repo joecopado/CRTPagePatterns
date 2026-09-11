@@ -6,6 +6,7 @@ LIVE-PROBED Salesforce pages, then dropped into this project's own conventions. 
     files/                          (data tables, none yet)
     resources/common.robot          your resource (Setup Browser, Login, Login As, Fill MFA, Home ...)
     resources/garzai_console.robot  two console keywords CRT/QForce does not ship -- see "New keywords"
+    resources/garzai_navigation.robot  URL-first navigation that resolves the instance, the app and the record at run time
     tests/salesforceTests.robot     your suite (the per-org JwtAuthenticate / JwtLogin lines)
     tests/<page>.robot              one suite per reviewed page, two test cases each:
                                     "Keyword form" (what a person sees: label / heading / index) and
@@ -13,14 +14,30 @@ LIVE-PROBED Salesforce pages, then dropped into this project's own conventions. 
 
 ## Variables CRT must define (project or robot variables -- values never live in this repo)
 
-    ${login_url}                                        the org's Lightning base URL (the suites GoTo ${login_url}/lightning/...)
     ${client_iddev1}   ${usernamedev1}   ${private_keydev1}     Dev1 - SDO (sandbox=true)
     ${client_idSlock}  ${usernameSlock}  ${private_keySlock}    Slockard
     ${client_idCICD}   ${usernameCICD}   ${private_keyCICD}     SECICD
     ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}      FSC (fsc7f)      -- values: ~/crt-jwt-credentials/fsc7f/credentials.txt
     ${client_idHC}     ${usernameHC}     ${private_keyHC}       Health Cloud (health90) -- values: ~/crt-jwt-credentials/health90/credentials.txt
 
-Each page suite authenticates with the triple of ITS org (the mapping is `crt/orgs.json` in the GarzAI repo).
+Each page suite authenticates with the triple of ITS org (the mapping is `crt/orgs.json` in the GarzAI repo). No
+`${login_url}` is needed: navigation starts from `GetInstanceUrl` after `JwtLogin`.
+
+## Navigation (resources/garzai_navigation.robot)
+
+No suite carries a host, an app id or a record id. A step names WHAT to open and the resource resolves it at
+run time and reads the landing URL back:
+
+    Open Record Page    Case    CaseNumber    00001031    app=Health Cloud Console
+        -> GetInstanceUrl; AppDefinition WHERE Label='Health Cloud Console' -> /app/<DurableId>;
+           SELECT Id FROM Case WHERE CaseNumber='00001031' (exactly one, or it fails with the count);
+           GoTo <instance>/lightning/app/<id>/r/Case/<Id>/view; Verify Landed On /<Id>/view
+    Open Object Page    Contact    new    [app=...]        list | new | home
+    Open Nav Tab        Zoo_Nightmare_Inputs    [app=...]  a custom tab by API name
+    Open Lightning Path /lightning/...                     the verbatim fallback
+
+The record's name-field value is the one the page was captured with (from the capture's own title), so a
+suite follows the record wherever its Id lands (a refreshed sandbox, another org with the same data).
 
 ## What is measured and what is not
 
@@ -28,13 +45,20 @@ Each page suite authenticates with the triple of ITS org (the mapping is `crt/or
   page (`review_table.py live`, one representative per same-shape bucket; a member inherits its bucket's
   resolution). The comment above each block names the control and how many same-shape controls it stands for.
 - A Save / Submit / Delete is exported as a COMMENT -- a demo run commits nothing; run it yourself.
+- Two suites carry no page steps (`fsc-person-account`, `fsc-business-account-standard`): on those Insurance
+  Agent Console landing layouts no page-level control measured a live pass yet (the FlexCard read fields have
+  rows now but no SOQL truth to verify against), so only the login and the navigation are exported.
+- A keyword form that measured a live failure is exported as a COMMENT above its xpath form (grid cells on the
+  Contract page, the composer buttons) -- the xpath form is the one that resolved.
 - `# no keyword reaches this control (measured live) -- see the XPath form` marks a control whose keyword
   form failed live; the xpath form is the one that resolved.
-- **`garzai_console.robot` is UNMEASURED in CRT.** Its two keywords were measured through their Python twins on
+- **`garzai_console.robot` and `garzai_navigation.robot` are UNMEASURED in CRT.** Its two keywords were measured through their Python twins on
   three orgs (Health Cloud Console 4 tabs -> 0, Sales Console 2 -> 0, Digital Experiences console 2 -> 0); the
   Robot form here has not run in a CRT build yet. Treat its first CRT result as the proof.
-- The parity lint (`crt_parity_lint.py --project`) passes the generated suites; its findings are on the two
-  files that came from the CRT sample project and were left as you wrote them: `common.robot` carries UI-login
+- The parity lint (`crt_parity_lint.py --project`): on the generated suites it flags `Click Table Cell` (a real
+  QForce keyword the local shim lacks -- fine in CRT) and one page's `VerifyField Primary Email <address>` (a
+  captured data value in a file literal); the rest of its findings are on the two files that came from the CRT
+  sample project and were left as you wrote them: `common.robot` carries UI-login
   keywords (Login / Fill MFA -- the lint wants JwtImpersonate for run-as-user) and lacks a `JwtImpersonate`
   definition; `salesforceTests.robot` has an empty `*** Variables ***` table.
 
