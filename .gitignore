@@ -1,0 +1,13 @@
+.env
+.env.*
+secret*
+*.secrets
+*.key
+*.pem
+credentials.txt
+.DS_Store
+__pycache__/
+output/
+log.html
+report.html
+output.xml
