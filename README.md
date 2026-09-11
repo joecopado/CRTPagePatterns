@@ -8,7 +8,8 @@ LIVE-PROBED Salesforce pages, then dropped into this project's own conventions. 
     resources/garzai_console.robot  two console keywords CRT/QForce does not ship -- see "New keywords"
     resources/garzai_navigation.robot  URL-first navigation that resolves the instance, the app and the record at run time
     tests/salesforceTests.robot     your suite (the per-org JwtAuthenticate / JwtLogin lines)
-    tests/<page>.robot              one suite per reviewed page, two test cases each:
+    tests/<page>.robot              one suite per reviewed page, up to THREE members of every same-shape family
+                                    (user, 2026-09-11: "multiples of the families ... not an entire table worth"), two test cases each:
                                     "Keyword form" (what a person sees: label / heading / index) and
                                     "XPath form" (the backup: anchored on unique text, never an absolute path)
 
@@ -44,6 +45,8 @@ suite follows the record wherever its Id lands (a refreshed sandbox, another org
 - Every step in a page suite comes from a review row whose keyword form and xpath form were probed live on the
   page (`review_table.py live`, one representative per same-shape bucket; a member inherits its bucket's
   resolution). The comment above each block names the control and how many same-shape controls it stands for.
+- A Details-tab field reads back with VerifyField <label> <value>; a HIGHLIGHTS-panel value (the compact layout under
+  the record name) with VerifyText <value> anchor=<label>; a blank value or one with no SOQL truth is a comment.
 - A Save / Submit / Delete is exported as a COMMENT -- a demo run commits nothing; run it yourself.
 - Two suites carry no page steps (`fsc-person-account`, `fsc-business-account-standard`): on those Insurance
   Agent Console landing layouts no page-level control measured a live pass yet (the FlexCard read fields have

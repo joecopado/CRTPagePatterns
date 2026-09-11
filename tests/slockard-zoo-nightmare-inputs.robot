@@ -12,15 +12,29 @@ Keyword form -- /lightning/n/Zoo_Nightmare_Inputs
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
     Open Nav Tab    Zoo_Nightmare_Inputs
-    # Contract Term  (1 of 6 same-shape controls -- the same lines with the other label)
+    # Contract Term  (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     # no keyword reaches this control (measured live) -- see the XPath form
-    # Amount  (1 of 9 same-shape controls -- the same lines with the other label)
+    # Renewal Notice (days)
+    TypeText    Renewal Notice (days)    60
+    # Amount
+    TypeText    Amount    12345    anchor=List Price
+    # Amount  (3 of 9 same-shape controls shown; the others take the same lines with their own label)
     TypeText    Amount    12345    anchor=2
-    # Add Line  (1 of 3 same-shape controls -- the same lines with the other label)
+    # Amount
+    TypeText    Amount    12345    anchor=3
+    # Approved Budget
+    # no keyword reaches this control (measured live) -- see the XPath form
+    # Add Line  (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     ClickText    Add Line    anchor=1    partial_match=False
+    # Add Line
+    ClickText    Add Line    anchor=2    partial_match=False
     # Save -- commits; run it yourself after checking the form:
     # ClickText    Save    anchor=1    partial_match=False
-    # Territory  (1 of 2 same-shape controls -- the same lines with the other label)
+    # Save & New -- commits; run it yourself after checking the form:
+    # ClickText    Save & New    partial_match=False
+    # Save -- commits; run it yourself after checking the form:
+    # ClickText    Save    anchor=2    partial_match=False
+    # Territory  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
     DropDown    Territory    Southwest
     # Product Lines Covered
     ClickElement    xpath\=(//*[normalize-space(text())\="Product Lines Covered"]/following::input[@type\="text"])[1]
@@ -28,11 +42,15 @@ Keyword form -- /lightning/n/Zoo_Nightmare_Inputs
     # Support Tier
     ClickElement    xpath\=(//*[normalize-space(text())\="Support Tier"]/following::input[@type\="text"])[1]
     ClickText    Premier Success
+    # Escalation Regions
+    DropDown    Escalation Regions    EMEA
     # Entitled Services
     ClickText    Health Check    partial_match=False
     ClickElement    xpath\=//*[normalize-space(text())\="Entitled Services"]/following::*[contains(@class,"zn-arrow-r")][1]
     # 
-    #   (1 of 4 same-shape controls -- the same lines with the other label)
+    #   (3 of 4 same-shape controls shown; the others take the same lines with their own label)
+    # 
+    # 
     # 
 
 XPath form -- /lightning/n/Zoo_Nightmare_Inputs
@@ -41,15 +59,29 @@ XPath form -- /lightning/n/Zoo_Nightmare_Inputs
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
     Open Nav Tab    Zoo_Nightmare_Inputs
-    # Contract Term  (1 of 6 same-shape controls -- the same lines with the other label)
+    # Contract Term  (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     TypeText    xpath\=(//c-zoo-nightmare-inputs//input[@type\="text"])[2]    24
-    # Amount  (1 of 9 same-shape controls -- the same lines with the other label)
+    # Renewal Notice (days)
+    TypeText    xpath\=(//*[normalize-space(text())\="Renewal Notice (days)"]/following::input[@type\="text"])[1]    60
+    # Amount
+    TypeText    xpath\=//*[normalize-space(text())\="List Price"]/following-sibling::*//input[@type\="text"]    12345
+    # Amount  (3 of 9 same-shape controls shown; the others take the same lines with their own label)
     TypeText    xpath\=//*[normalize-space(text())\="Negotiated Discount"]/following-sibling::*//input[@type\="text"]    12345
-    # Add Line  (1 of 3 same-shape controls -- the same lines with the other label)
+    # Amount
+    TypeText    xpath\=//*[normalize-space(text())\="Net to Customer"]/following-sibling::*//input[@type\="text"]    12345
+    # Approved Budget
+    TypeText    xpath\=(//*[normalize-space(text())\="to"]/following::input[@type\="text"])[1]    130000
+    # Add Line  (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Go-Live Support"]/following::button[normalize-space(.)\="Add Line"])[1]
+    # Add Line
+    ClickElement    xpath\=(//c-zoo-nightmare-inputs//button)[6]
     # Save -- commits; run it yourself after checking the form:
     # ClickElement    xpath\=(//*[normalize-space(text())\="Go-Live Support"]/following::button[normalize-space(.)\="Save"])[1]
-    # Territory  (1 of 2 same-shape controls -- the same lines with the other label)
+    # Save & New -- commits; run it yourself after checking the form:
+    # ClickElement    xpath\=(//*[normalize-space(text())\="Go-Live Support"]/following::button[normalize-space(.)\="Save & New"])[1]
+    # Save -- commits; run it yourself after checking the form:
+    # ClickElement    xpath\=(//c-zoo-nightmare-inputs//button[normalize-space(.)\="Save"])[2]
+    # Territory  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
     DropDown    xpath\=(//*[normalize-space(text())\="Territory & Coverage"]/following::select)[1]    Southwest
     # Product Lines Covered
     ClickElement    xpath\=(//*[normalize-space(text())\="Product Lines Covered"]/following::input[@type\="text"])[1]
@@ -57,12 +89,18 @@ XPath form -- /lightning/n/Zoo_Nightmare_Inputs
     # Support Tier
     ClickElement    xpath\=(//*[normalize-space(text())\="Support Tier"]/following::input[@type\="text"])[1]
     ClickText    Premier Success
+    # Escalation Regions
+    DropDown    xpath\=(//*[normalize-space(text())\="Escalation Regions"]/following::select)[1]    EMEA
     # Entitled Services
     ClickElement    xpath\=//*[normalize-space(text())\="Entitled Services"]/following::*[contains(@class,"zn-arrow-r")][1]
     ClickElement    xpath\=//*[normalize-space(text())\="Entitled Services"]/following::*[contains(@class,"zn-arrow-r")][1]
     # 
     TypeText    xpath\=(//*[normalize-space(text())\="More"]/following::c-zoo-nightmare-inputs)[1]    GZREV 
-    #   (1 of 4 same-shape controls -- the same lines with the other label)
+    #   (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Onsite Schedule"]/following::c-zoo-nightmare-row)[1]
+    # 
+    ClickElement    xpath\=(//*[normalize-space(text())\="Kickoff Workshop"]/following::c-zoo-nightmare-row)[1]
+    # 
+    ClickElement    xpath\=(//*[normalize-space(text())\="Discovery Review"]/following::c-zoo-nightmare-row)[1]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Save & New"]/following::c-zoo-nightmare-combos)[1]
