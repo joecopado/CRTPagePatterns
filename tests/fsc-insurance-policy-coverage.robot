@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 16 steps, 10 controls listed as comments (10 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/InsurancePolicyCoverage/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -23,11 +25,13 @@ Keyword form -- /lightning/r/InsurancePolicyCoverage/{id}/view
     # Insurance Policy  (3 of 5 same-shape controls shown; the others take the same lines with their own label)
     VerifyText    4341 Health Platinum    anchor=Insurance Policy
     #   (3 of 4 same-shape controls shown; the others take the same lines with their own label)
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Name
     # Name -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Product
     # Product -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Related  (3 of 5 same-shape controls shown; the others take the same lines with their own label)
     ClickText    Related    partial_match=False
     # Details
@@ -43,18 +47,26 @@ Keyword form -- /lightning/r/InsurancePolicyCoverage/{id}/view
     # Edit Insurance Policy
     ClickItem    Edit Insurance Policy    tag=button
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Category
     # Category -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Edit Category
     ClickItem    Edit Category    tag=button
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickItem    NewEvent    tag=button
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickItem    NewTask    tag=button
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickItem    LogACall    tag=button
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickText    View All    partial_match=False
+    # Cancel and close -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
 
 XPath form -- /lightning/r/InsurancePolicyCoverage/{id}/view
     # the same actions through the xpath backup: anchored on unique text, never an absolute path
@@ -74,12 +86,14 @@ XPath form -- /lightning/r/InsurancePolicyCoverage/{id}/view
     VerifyText    4341 Health Platinum    anchor=Insurance Policy
     #   (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Insurance Policy Coverage"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Name
     # Name -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Product
     # Product -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="IPC-00000001"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Related  (3 of 5 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//a[@id\="relatedListsTab__item"]
     # Details
@@ -96,15 +110,23 @@ XPath form -- /lightning/r/InsurancePolicyCoverage/{id}/view
     ClickElement    xpath\=//button[@title\="Edit Insurance Policy"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Coverage Name"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Category
     # Category -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Edit Category
     ClickElement    xpath\=//button[@title\="Edit Category"]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//button[@aria-label\="New Event"]
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickElement    xpath\=//button[@aria-label\="New Task"]
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickElement    xpath\=//button[@aria-label\="Log a Call"]
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickElement    xpath\=//a[@title\="Show all past activities in a new tab"]
+    # Cancel and close -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK

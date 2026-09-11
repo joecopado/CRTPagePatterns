@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 18 steps, 9 controls listed as comments (15 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/Case/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -38,6 +40,10 @@ Keyword form -- /lightning/r/Case/{id}/view
     ClickText    Most Recent Activity    partial_match=False
     # Search this feed...
     TypeText    Search this feed...    GZREV Search this feed...
+    # Expand all visible posts -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Refresh this feed -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Click to collapse post -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Joseph Garza -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Joseph Garza  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
     ClickText    Joseph Garza    anchor=2    partial_match=False
     # August 30, 2026 at 9:30 AM
@@ -49,6 +55,8 @@ Keyword form -- /lightning/r/Case/{id}/view
     # Case Owner  (3 of 22 same-shape controls shown; the others take the same lines with their own label)
     VerifyField    Case Owner    Joseph Garza    partial_match=True
     #   (3 of 4 same-shape controls shown; the others take the same lines with their own label)
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Change Owner -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Contact Phone
     # Contact Phone -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Case Number
@@ -58,9 +66,12 @@ Keyword form -- /lightning/r/Case/{id}/view
     # Edit Account Name
     ClickItem    Edit Account Name    tag=button
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Edit Status
     ClickItem    Edit Status    tag=button
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
 
 XPath form -- /lightning/r/Case/{id}/view
     # the same actions through the xpath backup: anchored on unique text, never an absolute path
@@ -94,6 +105,10 @@ XPath form -- /lightning/r/Case/{id}/view
     ClickElement    xpath\=//a[@title\="Most Recent Activity"]
     # Search this feed...
     TypeText    xpath\=//input[@name\="searchInFeed"]    GZREV Search this feed...
+    # Expand all visible posts -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Refresh this feed -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Click to collapse post -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Joseph Garza -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Joseph Garza  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Status Changes"]/following::a[normalize-space(.)\="Joseph Garza"])[1]
     # August 30, 2026 at 9:30 AM
@@ -106,6 +121,8 @@ XPath form -- /lightning/r/Case/{id}/view
     VerifyText    Joseph Garza    anchor=Case Owner
     #   (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Case Owner"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Change Owner -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Contact Phone
     # Contact Phone -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Case Number
@@ -116,7 +133,10 @@ XPath form -- /lightning/r/Case/{id}/view
     ClickElement    xpath\=//button[@title\="Edit Account Name"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Account Name"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Edit Status
     ClickElement    xpath\=//button[@title\="Edit Status"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Created By"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK

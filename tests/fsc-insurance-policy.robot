@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 16 steps, 8 controls listed as comments (12 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/InsurancePolicy/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -41,12 +43,15 @@ Keyword form -- /lightning/r/InsurancePolicy/{id}/view
     # Edit Name Insured
     ClickItem    Edit Name Insured    tag=button
     #   (3 of 3 same-shape controls shown; the others take the same lines with their own label)
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Policy Name
     # Policy Name -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Edit Policy Name
     ClickItem    Edit Policy Name    tag=button
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Insurance Policy Billing Information (0)
     # keyword form measured CAUGHT-BUG live (QWebElementNotFoundError: Unable to find element for locator Insurance Policy Billing Inf…) -- see the XPath form
     # ClickText    Insurance Policy Billing Information (0)    partial_match=False
@@ -55,10 +60,15 @@ Keyword form -- /lightning/r/InsurancePolicy/{id}/view
     # ClickText    Show actions for Insurance Policy Billing Information    partial_match=False
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickItem    NewEvent    tag=button
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickItem    NewTask    tag=button
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickItem    LogACall    tag=button
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickText    View All    partial_match=False
 
@@ -98,23 +108,31 @@ XPath form -- /lightning/r/InsurancePolicy/{id}/view
     ClickElement    xpath\=//button[@title\="Edit Name Insured"]
     #   (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Name Insured"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Policy Name
     # Policy Name -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Edit Policy Name
     ClickElement    xpath\=//button[@title\="Edit Policy Name"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Billing Carrier Account"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Writing Carrier Account"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Insurance Policy Billing Information (0)
     ClickElement    xpath\=(//*[normalize-space(text())\="Audit Term"]/following::a)[1]
     # Show actions for Insurance Policy Billing Information
     ClickElement    xpath\=(//*[normalize-space(text())\="Insurance Policy Billing Information"]/following::a)[1]
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//button[@aria-label\="New Event"]
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickElement    xpath\=//button[@aria-label\="New Task"]
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickElement    xpath\=//button[@aria-label\="Log a Call"]
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickElement    xpath\=//a[@title\="Show all past activities in a new tab"]

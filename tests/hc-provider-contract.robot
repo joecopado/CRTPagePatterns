@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 15 steps, 33 controls listed as comments (23 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/Contract/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -12,6 +14,7 @@ Keyword form -- /lightning/r/Contract/{id}/view
     ${token}=    JwtAuthenticate    ${client_idHC}    ${usernameHC}    ${private_keyHC}
     JwtLogin
     Open Record Page    Contract    ContractNumber    00000101
+    # Navigation Mode Preview Show Actions Preview Show Actions Preview Show Actions Preview Sh… -- not exported: keyword not probed / xpath not probed
     # Navigation Mode
     # keyword form measured CAUGHT-BUG live (Set Table Cell resolution landed on a DIFFERENT node) -- see the XPath form
     # Click Table Cell    Navigation Mode    anchor=1
@@ -20,6 +23,7 @@ Keyword form -- /lightning/r/Contract/{id}/view
     # End Date
     #   (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     Click Table Cell
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Start Date  (3 of 21 same-shape controls shown; the others take the same lines with their own label)
     # keyword form measured CAUGHT-BUG live (Set Table Cell resolution landed on a DIFFERENT node) -- see the XPath form
     # Set Table Cell    Start Date
@@ -32,21 +36,33 @@ Keyword form -- /lightning/r/Contract/{id}/view
     # Show Actions  (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     # keyword form measured CAUGHT-BUG live (Set Table Cell resolution landed on a DIFFERENT node) -- see the XPath form
     # Set Table Cell    Show Actions
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
     # 
     Click Table Cell
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Show Actions
     # keyword form measured CAUGHT-BUG live (inherited from representative row 12: Set Table Cell resolution landed on a DIFFERENT node) -- see the XPath form
     # Set Table Cell    Show Actions
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
     # 
     Click Table Cell
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Show Actions
     # keyword form measured CAUGHT-BUG live (inherited from representative row 12: Set Table Cell resolution landed on a DIFFERENT node) -- see the XPath form
     # Set Table Cell    Show Actions
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
     # Date
     # keyword form measured CAUGHT-BUG live (Set Table Cell resolution landed on a DIFFERENT node) -- see the XPath form
     # Set Table Cell    Date
     # Joseph Garza
     Click Table Cell    Joseph Garza
+    # Preview Show Actions Preview Show Actions Preview Show Actions Preview Show Actions Previ… -- not exported: keyword not probed / xpath not probed
     # 
     Click Table Cell
     # Slack  (3 of 8 same-shape controls shown; the others take the same lines with their own label)
@@ -61,6 +77,8 @@ Keyword form -- /lightning/r/Contract/{id}/view
     ClickText    Show more actions    partial_match=False
     # Account Name  (3 of 5 same-shape controls shown; the others take the same lines with their own label)
     # Account Name -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
+    # row 94 (link) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Status
     # Status -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Contract Start Date
@@ -71,12 +89,29 @@ Keyword form -- /lightning/r/Contract/{id}/view
     ClickText    Activated    partial_match=False
     # Draft
     ClickText    Draft    partial_match=False
+    # Related -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Details -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Obligations -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Assets -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Pricing Schedule -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Contract Payment Agreements (6+) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All Contract Payment Agreements -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Contract History (1) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All Contract History -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Activity -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickItem    NewEvent    tag=button
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickItem    NewTask    tag=button
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickItem    LogACall    tag=button
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
 
 XPath form -- /lightning/r/Contract/{id}/view
     # the same actions through the xpath backup: anchored on unique text, never an absolute path
@@ -84,6 +119,7 @@ XPath form -- /lightning/r/Contract/{id}/view
     ${token}=    JwtAuthenticate    ${client_idHC}    ${usernameHC}    ${private_keyHC}
     JwtLogin
     Open Record Page    Contract    ContractNumber    00000101
+    # Navigation Mode Preview Show Actions Preview Show Actions Preview Show Actions Preview Sh… -- not exported: keyword not probed / xpath not probed
     # Navigation Mode
     ClickElement    xpath\=(//*[normalize-space(text())\="New"]/following::lightning-datatable)[1]
     # Name  (3 of 10 same-shape controls shown; the others take the same lines with their own label)
@@ -94,6 +130,7 @@ XPath form -- /lightning/r/Contract/{id}/view
     ClickElement    xpath\=//th[@aria-label\="End Date"]
     #   (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="End Date"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Start Date  (3 of 21 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Preventive Care Agreement"]/following::td)[1]
     # End Date
@@ -102,18 +139,30 @@ XPath form -- /lightning/r/Contract/{id}/view
     ClickElement    xpath\=(//article[@aria-label\="Contract Payment Agreements"]//td)[3]
     # Show Actions  (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Preventive Care Agreement"]/following::td[normalize-space(.)\="Show Actions"])[1]
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Preventive Care Agreement"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Show Actions
     ClickElement    xpath\=(//*[normalize-space(text())\="12/31/2027, 8:00 AM"]/following::td[normalize-space(.)\="Show Actions"])[1]
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="12/31/2027, 8:00 AM"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Show Actions
     ClickElement    xpath\=(//*[normalize-space(text())\="Bundled Care Fee Agreement"]/following::td[normalize-space(.)\="Show Actions"])[1]
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show Actions -- not exported: keyword CAUGHT-BUG / xpath CAUGHT-BUG
     # Date
     ClickElement    xpath\=(//*[normalize-space(text())\="New Value"]/following::th)[1]
     # Joseph Garza
     ClickElement    xpath\=//a[@title\="Joseph Garza"]
+    # Preview Show Actions Preview Show Actions Preview Show Actions Preview Show Actions Previ… -- not exported: keyword not probed / xpath not probed
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="New"]/following::table)[1]
     # Slack  (3 of 8 same-shape controls shown; the others take the same lines with their own label)
@@ -128,6 +177,8 @@ XPath form -- /lightning/r/Contract/{id}/view
     ClickElement    xpath\=(//*[normalize-space(text())\="Delete"]/following::button[@type\="button"])[1]
     # Account Name  (3 of 5 same-shape controls shown; the others take the same lines with their own label)
     # Account Name -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
+    # row 94 (link) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Status
     # Status -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Contract Start Date
@@ -138,9 +189,26 @@ XPath form -- /lightning/r/Contract/{id}/view
     ClickElement    xpath\=//a[@title\="Activated"]
     # Draft
     ClickElement    xpath\=//a[@title\="Draft"]
+    # Related -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Details -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Obligations -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Assets -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Pricing Schedule -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Contract Payment Agreements (6+) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All Contract Payment Agreements -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Contract History (1) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All Contract History -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Activity -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//button[@aria-label\="New Event"]
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickElement    xpath\=//button[@aria-label\="New Task"]
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickElement    xpath\=//button[@aria-label\="Log a Call"]
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK

@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 17 steps, 8 controls listed as comments (14 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/PartyRelationshipGroup/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -23,6 +25,7 @@ Keyword form -- /lightning/r/PartyRelationshipGroup/{id}/view
     # Account  (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     VerifyText    Adams Household    anchor=Account
     #   (3 of 3 same-shape controls shown; the others take the same lines with their own label)
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Category
     # Category -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Status
@@ -40,6 +43,7 @@ Keyword form -- /lightning/r/PartyRelationshipGroup/{id}/view
     # Account
     # Account -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Category
     # Category -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Edit Category
@@ -52,12 +56,18 @@ Keyword form -- /lightning/r/PartyRelationshipGroup/{id}/view
     # Map of 47 West 13th Street New York NY 10011 United States
     ClickItem    Map of 47 West 13th Street New York NY 10011 United States    tag=iframe    partial_match=False
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickItem    NewEvent    tag=button
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickItem    NewTask    tag=button
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickItem    LogACall    tag=button
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickText    View All    partial_match=False
     # 
@@ -81,6 +91,7 @@ XPath form -- /lightning/r/PartyRelationshipGroup/{id}/view
     VerifyText    Adams Household    anchor=Account
     #   (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Party Relationship Group"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Category
     # Category -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Status
@@ -99,6 +110,7 @@ XPath form -- /lightning/r/PartyRelationshipGroup/{id}/view
     # Account -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Name"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Category
     # Category -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Edit Category
@@ -113,12 +125,18 @@ United States"]
     ClickElement    xpath\=//iframe[@title\="Map of 47 West 13th Street New York NY 10011 United States"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Last Modified By"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//button[@aria-label\="New Event"]
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickElement    xpath\=//button[@aria-label\="New Task"]
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickElement    xpath\=//button[@aria-label\="Log a Call"]
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickElement    xpath\=//a[@title\="Show all past activities in a new tab"]
     # 

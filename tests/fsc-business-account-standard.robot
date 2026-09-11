@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 0 steps, 57 controls listed as comments (16 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/Account/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -12,6 +14,63 @@ Keyword form -- /lightning/r/Account/{id}/view
     ${token}=    JwtAuthenticate    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}
     JwtLogin
     Open Record Page    Account    Name    Petromax Carburetor
+    # row 31 (button) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 32 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 33 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # search-box -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Business Milestones -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Predefined Order -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # All Years -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Milestone -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Merger & Acquisition -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Expansion -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Executive Change -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Market Listing -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Bankruptcy -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Product Launch -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Partnership -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Funding -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Award -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Incorporation -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # POLICIES -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # CLAIMS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # ACCOUNT DETAILS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Premium Paid -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # total policies -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Help -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Up for Renewal -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Search Policies, Insured Items... -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Search -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show only inactive policies -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 59 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 60 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 61 (button) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New case -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Total Premium -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Expiration Date -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Type -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Term -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Status -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Details -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # INSURED ITEMS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # POLICY PARTICIPANTS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # TRANSACTIONS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # POLICY VERSION -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All Policies -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Refresh Alerts -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Help -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # refresh -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Post -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Poll -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Question -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Share an update... -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Share -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Sort by: -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Search this feed... -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Refresh this feed -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Dismiss -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 86 (button) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 87 (unknown) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
 
 XPath form -- /lightning/r/Account/{id}/view
     # the same actions through the xpath backup: anchored on unique text, never an absolute path
@@ -19,3 +78,60 @@ XPath form -- /lightning/r/Account/{id}/view
     ${token}=    JwtAuthenticate    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}
     JwtLogin
     Open Record Page    Account    Name    Petromax Carburetor
+    # row 31 (button) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 32 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 33 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # search-box -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Business Milestones -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Predefined Order -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # All Years -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Milestone -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Merger & Acquisition -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Expansion -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Executive Change -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Market Listing -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Bankruptcy -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Product Launch -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Partnership -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New Funding -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Award -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Incorporation -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # POLICIES -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # CLAIMS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # ACCOUNT DETAILS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Premium Paid -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # total policies -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Help -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Up for Renewal -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Search Policies, Insured Items... -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Search -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Show only inactive policies -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 59 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 60 (output_field) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 61 (button) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # New case -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Total Premium -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Expiration Date -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Type -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Term -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Status -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Details -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # INSURED ITEMS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # POLICY PARTICIPANTS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # TRANSACTIONS -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # POLICY VERSION -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # View All Policies -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Refresh Alerts -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Help -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # refresh -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Post -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Poll -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Question -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Share an update... -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Share -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Sort by: -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Search this feed... -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Refresh this feed -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Dismiss -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 86 (button) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # row 87 (unknown) -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK

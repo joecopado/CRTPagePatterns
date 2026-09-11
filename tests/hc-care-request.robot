@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 15 steps, 7 controls listed as comments (10 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/CareRequest/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -23,6 +25,7 @@ Keyword form -- /lightning/r/CareRequest/{id}/view
     # Care Request Case  (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     # Care Request Case -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     #   (2 of 2 same-shape controls shown; the others take the same lines with their own label)
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Member ID
     # Member ID -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Member First Name
@@ -44,14 +47,20 @@ Keyword form -- /lightning/r/CareRequest/{id}/view
     # Edit Member ID
     ClickItem    Edit Member ID    tag=button
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Activity
     ClickText    Activity    anchor=1    partial_match=False
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickItem    NewEvent    tag=button
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickItem    NewTask    tag=button
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickItem    LogACall    tag=button
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickText    View All    partial_match=False
 
@@ -73,6 +82,7 @@ XPath form -- /lightning/r/CareRequest/{id}/view
     # Care Request Case -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     #   (2 of 2 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Care Request"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Member ID
     # Member ID -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Member First Name
@@ -95,13 +105,19 @@ XPath form -- /lightning/r/CareRequest/{id}/view
     ClickElement    xpath\=//button[@title\="Edit Member ID"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Source System Identifier"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Activity
     ClickElement    xpath\=//a[@id\="activityTab__item"]
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//button[@aria-label\="New Event"]
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickElement    xpath\=//button[@aria-label\="New Task"]
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickElement    xpath\=//button[@aria-label\="Log a Call"]
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickElement    xpath\=//a[@title\="Show all past activities in a new tab"]

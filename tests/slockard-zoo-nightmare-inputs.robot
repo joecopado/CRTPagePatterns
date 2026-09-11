@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 14 steps, 0 controls listed as comments (11 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/n/Zoo_Nightmare_Inputs
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)

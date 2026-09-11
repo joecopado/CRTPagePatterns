@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 18 steps, 11 controls listed as comments (14 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/CarePlan/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -23,9 +25,11 @@ Keyword form -- /lightning/r/CarePlan/{id}/view
     # Case  (3 of 5 same-shape controls shown; the others take the same lines with their own label)
     # Case -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     #   (3 of 6 same-shape controls shown; the others take the same lines with their own label)
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Participant
     # Participant -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Status
     # Status -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Related  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
@@ -47,12 +51,21 @@ Keyword form -- /lightning/r/CarePlan/{id}/view
     # Edit Case
     ClickItem    Edit Case    tag=button
     # 
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickItem    NewEvent    tag=button
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickItem    NewTask    tag=button
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickItem    LogACall    tag=button
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickText    View All    partial_match=False
     # Show details for Regularly assess the patient's understanding and compliance with medication regimen  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
@@ -90,10 +103,12 @@ XPath form -- /lightning/r/CarePlan/{id}/view
     # Case -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     #   (3 of 6 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=(//*[normalize-space(text())\="Care Plan"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Participant
     # Participant -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Care Plan"]/following::*[normalize-space(text())\="Participant"])[1]/following::a[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Status
     # Status -- COULD-NOT-CHECK: no SOQL truth for this label (compound, unmapped, or the probe had no record)
     # Related  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
@@ -116,12 +131,21 @@ XPath form -- /lightning/r/CarePlan/{id}/view
     ClickElement    xpath\=//button[@title\="Edit Case"]
     # 
     ClickElement    xpath\=(//*[normalize-space(text())\="Description"]/following::a)[1]
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Preview -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Event  (3 of 4 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//button[@aria-label\="New Event"]
+    # More New Event Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # New Task
     ClickElement    xpath\=//button[@aria-label\="New Task"]
+    # No Additional New Task Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Log a Call
     ClickElement    xpath\=//button[@aria-label\="Log a Call"]
+    # No Additional Log a Call Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # More Email Actions -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
+    # Timeline Settings -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # View All
     ClickElement    xpath\=//a[@title\="Show all past activities in a new tab"]
     # Show details for Regularly assess the patient's understanding and compliance with medication regimen  (2 of 2 same-shape controls shown; the others take the same lines with their own label)

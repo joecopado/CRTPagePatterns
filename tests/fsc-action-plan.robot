@@ -5,6 +5,8 @@ Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
 
+# coverage: 11 steps, 3 controls listed as comments (8 buckets)
+
 *** Test Cases ***
 Keyword form -- /lightning/r/ActionPlan/{id}/view
     # every action a person takes on this page, resolved by what a person sees (label, heading, index)
@@ -12,6 +14,8 @@ Keyword form -- /lightning/r/ActionPlan/{id}/view
     ${token}=    JwtAuthenticate    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}
     JwtLogin
     Open Record Page    ActionPlan    Name    New Account Opening for Rachel
+    # Show Actions Show Actions Show Actions Show Actions -- not exported: keyword not probed / xpath not probed
+    # Show Actions Show Actions -- not exported: keyword not probed / xpath not probed
     # New Contact  (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     ClickText    New Contact    partial_match=False
     # New Opportunity
@@ -20,6 +24,7 @@ Keyword form -- /lightning/r/ActionPlan/{id}/view
     ClickText    New Case    partial_match=False
     # Show 7 more actions
     ClickItem    Show 7 more actions    tag=a    partial_match=False
+    # Joseph Garza -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Change Owner
     ClickItem    Change Owner    tag=button    partial_match=False
     # Items  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
@@ -41,6 +46,8 @@ XPath form -- /lightning/r/ActionPlan/{id}/view
     ${token}=    JwtAuthenticate    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}
     JwtLogin
     Open Record Page    ActionPlan    Name    New Account Opening for Rachel
+    # Show Actions Show Actions Show Actions Show Actions -- not exported: keyword not probed / xpath not probed
+    # Show Actions Show Actions -- not exported: keyword not probed / xpath not probed
     # New Contact  (3 of 3 same-shape controls shown; the others take the same lines with their own label)
     ClickElement    xpath\=//a[@title\="New Contact"]
     # New Opportunity
@@ -49,6 +56,7 @@ XPath form -- /lightning/r/ActionPlan/{id}/view
     ClickElement    xpath\=//a[@title\="New Case"]
     # Show 7 more actions
     ClickElement    xpath\=//a[@title\="Show 7 more actions"]
+    # Joseph Garza -- not exported: keyword COULD-NOT-CHECK / xpath COULD-NOT-CHECK
     # Change Owner
     ClickElement    xpath\=//button[@title\="Change Owner"]
     # Items  (2 of 2 same-shape controls shown; the others take the same lines with their own label)
