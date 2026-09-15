@@ -29,8 +29,7 @@ Revenue Management Walkthrough - US-0001043
     VerifyText                   Standard Rules                       timeout=10
     VerifyText                   Advanced Rules                       timeout=10
     VerifyText                   Automations                          timeout=10
-    ClickElement                 //button[@title\="Close"]           timeout=10    # UNVERIFIED: the modal's top-right X was not clicked live
-
+    ClickText                    Cancel and close
     # SAY: Product configuration changes carry their own before/after deployment steps -- laptop products, configuration rules, and refreshed decision tables.
     Open Deployment Steps
     VerifyText                   Deploy Laptop product                timeout=10
