@@ -24,6 +24,14 @@ suites `GoTo` it directly (same browser session) and fall back to the story's `C
 
 ## Verified live on 2026-09-15 vs UNVERIFIED
 
+Second pass, recorded as a kept session (`docs/recorder/sessions/cicd-demo/df26-copado-cicd-flow-2026-09-15.json` in the
+GarzAI repo) and written into the AI page-object store: the modal close button is `title="Cancel and close"` (not
+`Close`); the AI panel headings read `What Changed` / `Recommended Components` in the DOM (the caps are CSS, and
+`VerifyText` matches the DOM); the compare strip's counts sit in their own nodes (`Additions` alone verifies); the
+Revenue Cloud tabs carry their count in the same text (`partial_match=True`); Dependency Analysis auto-runs the moment a
+row is ticked (`Analyzing dependencies`), then reads `Dependency Analysis (2)`; the Explain Changes click must wait for
+the diagram's Changes strip or the panel does not open.
+
 Confirmed by driving the org: the story page controls and tabs; Deployment Steps on the Build tab; Get Changes
 (1,178 items on US-0000071); the Search box; the Compare cell and the flow diagram panel (Properties 2 / Additions 4 /
 Updates 4 / Deletions 6); Explain Changes -> Orchestrate Agent (Changes / Impact & Risk / Recommendations); the Flow
@@ -38,7 +46,6 @@ Marked `# UNVERIFIED:` in the files (eyeball before Tuesday):
 | 02_agentforce | select all | header checkbox xpath `(//div[@role="rowgroup"]/preceding::input[@type="checkbox"])[last()]` |
 | 03_data360 | DataPackageKitDefinition | picking the suggestion from the typeable filter |
 | 03_data360 | DK02 | the expand chevron on the kit row |
-| 04_revenue_management | Close | the modal's top-right X (`//button[@title="Close"]`) |
 | 04_revenue_management | Selected Data | that tab's contents for this story |
 | 05_data_template | PriceAdjustmentSchedule | the relationship / External Virtual Id section of the template page |
 

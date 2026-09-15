@@ -26,10 +26,10 @@ Revenue Management Walkthrough - US-0001043
     ClickText                    Revenue Cloud Settings              partial_match=False    # header button of the Copado app's story layout (confirmed live 2026-09-15)
     VerifyText                   Revenue Cloud Deployment Configuration    timeout=20
     # SAY: Copado reads the configuration rules and automations straight out of the org: Standard Rules, Advanced Rules and 57 Automations, targeted at Revenue QA. We pick, we never press Add Changes on this org.
-    VerifyText                   Standard Rules                       timeout=10
-    VerifyText                   Advanced Rules                       timeout=10
-    VerifyText                   Automations                          timeout=10
-    ClickText                    Cancel and close
+    VerifyText                   Standard Rules                       timeout=10    partial_match=True    # the tab text carries its count in the same node ('Standard Rules 2'); exact match resolves the superstring (measured 2026-09-15)
+    VerifyText                   Advanced Rules                       timeout=10    partial_match=True
+    VerifyText                   Automations                          timeout=10    partial_match=True
+    ClickText                    Cancel and close    # the user's own correction 2026-09-15 (the SLDS close button's title)
     # SAY: Product configuration changes carry their own before/after deployment steps -- laptop products, configuration rules, and refreshed decision tables.
     Open Deployment Steps
     VerifyText                   Deploy Laptop product                timeout=10

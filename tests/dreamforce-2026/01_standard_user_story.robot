@@ -56,9 +56,9 @@ Standard User Story Walkthrough - US-0000071 Account Automations
 
     # SAY: Compare renders the flow as a diagram with every node badged Added, Updated or Deleted -- and the XML toggle bottom-left shows the raw diff.
     VerifyText                   Flow: Opportunity_Creation_Automation    timeout=20
-    VerifyText                   Additions (4)                  timeout=10
-    VerifyText                   Updates (4)                    timeout=10
-    VerifyText                   Deletions (6)                  timeout=10
+    VerifyText                   Additions                      timeout=10    # the count sits in its own node: 'Additions (4)' as one string measured NOT FOUND live 2026-09-15
+    VerifyText                   Updates                        timeout=10
+    VerifyText                   Deletions                      timeout=10
 
     # SAY: Explain Changes hands this diff to Copado AI and asks it to summarize what changed and why, in plain language.
     # BRIEF: today's answer -- API version 55 to 62, amendment/renewal branching collapsed into one assignment, a new bypass
@@ -66,9 +66,9 @@ Standard User Story Walkthrough - US-0000071 Account Automations
     # WHY THEY CARE: a real code review on a Flow, in plain English, before it leaves the dev org.
     ClickText                    Explain Changes                 partial_match=False
     VerifyText                   Orchestrate Agent                timeout=${AI_PANEL_TIMEOUT}
-    VerifyText                   WHAT CHANGED                     timeout=${AI_PANEL_TIMEOUT}
+    VerifyText                   What Changed                     timeout=${AI_PANEL_TIMEOUT}    # DOM text is 'What Changed'; the caps are CSS text-transform (measured 2026-09-15)
     # SAY: It also checks this against the story's own description under User Story Alignment.
-    VerifyText                   USER STORY ALIGNMENT              timeout=10
+    VerifyText                   User Story Alignment              timeout=10    # same: DOM is title case, CSS uppercases it
     Close Side Panel
 
     # SAY: Let's close the compare view and select this Flow for the commit.
@@ -96,6 +96,7 @@ Standard User Story Walkthrough - US-0000071 Account Automations
     ClickText                    Changes                         partial_match=False    # exact match only hits the tab -- "Get Changes"/"Explain Changes"/"Refresh Changes"/"Select Changes" all contain this text but none equal it
     ClickItem                    btn-ai                            tag=button              # the AI Select Changes button carries class "btn btn-outline-primary btn-ai"
     VerifyText                   Orchestrate Agent                 timeout=${AI_PANEL_TIMEOUT}
-    VerifyText                   RECOMMENDED COMPONENTS FOR US-0000071    timeout=${AI_PANEL_TIMEOUT}
+    VerifyText                   Recommended Components           timeout=${AI_PANEL_TIMEOUT}    # the 'RECOMMENDED COMPONENTS FOR US-0000071' h5 is CSS-uppercased; this heading is plain DOM text (measured 2026-09-15)
+    VerifyText                   Smart Changes analysis completed    timeout=10    partial_match=True    # the green toast that marks the AI done state
     # SAY: That's the full loop -- search, compare, explain, analyze dependencies, and let AI recommend the commit. Nothing here has been saved.
     Close Side Panel
