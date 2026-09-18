@@ -30,7 +30,7 @@ try{fetch('http://127.0.0.1:%(port)d/compose',{method:'POST',headers:{'Content-T
 .then(function(res){return res.json()}).then(function(j){self.pushStep((j&&j.line)||r,event,xp)})
 .catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,xp)})}catch(e){self.pushStep(r,event,xp)}};
 """
-STATE = {"patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
+STATE = {"version": "2026-09-18c indent+xpath-fallback", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 
 def _log(msg):
