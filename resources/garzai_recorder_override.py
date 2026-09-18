@@ -25,12 +25,17 @@ PORT = 18077
 CALL = "this.pushStep(r,event,ctx?this.handler.getXPathForElement(ctx):undefined)"
 REPL = "window.__gzCompose(this,r,event,ctx)"
 JS = r"""
-;window.__gzCompose=function(self,r,event,ctx){var xp=ctx?self.handler.getXPathForElement(ctx):undefined;
-try{fetch('http://127.0.0.1:%(port)d/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({rendered:r,xpath:xp})})
-.then(function(res){return res.json()}).then(function(j){self.pushStep((j&&j.line)||r,event,xp)})
-.catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,xp)})}catch(e){self.pushStep(r,event,xp)}};
+;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};
+function axp(el){var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return '/html[1]/'+p.join('/')}
+function ask(body){return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(function(res){return res.json()})}
+window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
+ window.__gzQ=window.__gzQ.then(function(){return ask({rendered:r,xpath:x}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!=='')self.pushStep(line,event,x)}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
+document.addEventListener('click',function(ev){try{var tg=ev.target;if(!tg||tg.nodeType!==1)return;var el=tg.closest('[class*="zn-arrow"],button,[role="button"]');if(!el||(el.textContent||'').trim()!=='')return;
+ var self=window.__gzRec;if(!self){console.log('gz synthetic: no recorder instance yet');return}var x=axp(el);var now=Date.now();if(window.__gzSeen[x]&&now-window.__gzSeen[x]<1500)return;window.__gzSeen[x]=now;
+ window.__gzQ=window.__gzQ.then(function(){return ask({rendered:'',xpath:x,synthetic:true}).then(function(j){if(j&&j.line)self.pushStep(j.line,ev,x)}).catch(function(e){console.log('gz synthetic failed',e)})})}catch(e){}},true);
+try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18c indent+xpath-fallback", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
+STATE = {"version": "2026-09-18d queue+quiet-inputs+synthetic-clicks", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 
 def _log(msg):
@@ -76,6 +81,28 @@ def _driver():
     return _b.get_current_browser()
 
 
+def _unescape_xpath(step):
+    m = re.match(r"\s*ClickElement\s{2,}xpath\\=(.+?)\s*$", step)
+    return m.group(1).replace("\\=", "=") if m else None
+
+
+def _recipe_step_for(drv, target):
+    """A corrected recipe's own ClickElement step whose xpath resolves to this element (the
+    dual-listbox move arrow lives only inside row 77's recipe, not as a row of its own)."""
+    for row in ROWS:
+        for step in (row.get("corrected") or "").split(" ;; "):
+            xp = _unescape_xpath(step)
+            if not xp:
+                continue
+            try:
+                els = drv.find_elements("xpath", xp)
+            except Exception:
+                continue
+            if len(els) == 1 and drv.execute_script("return arguments[0] === arguments[1]", els[0], target):
+                return row["n"], "    " + step.strip()
+    return None, None
+
+
 def _cells(line):
     return [c for c in re.split(r" {2,}|\t", line.strip()) if c != ""]
 
@@ -85,8 +112,10 @@ def _our_line(row, rendered):
     leading whitespace: the editor inserts only a line that starts like a step (measured 2026-09-18,
     six composed lines arrived at the editor as keyword messages and none reached the pane)."""
     line = _our_line_body(row, rendered)
-    if not line:
+    if line is None:
         return None
+    if line == "":
+        return ""  # suppress: the recorder's line is noise for this control
     indent = rendered[: len(rendered) - len(rendered.lstrip())] or "    "
     return indent + line.strip()
 
@@ -107,6 +136,14 @@ def _our_line_body(row, rendered):
         # control and the read-back under Selected are the recipe's next lines
         return "ClickText    %s    partial_match=False" % cells[1]
     xp_ok = row.get("xp_verdict") == "VERIFIED-PASS" and row.get("xpath")
+    if t == "input_field" and action in ("ClickText", "VerifyText"):
+        # the focus click renders the field's current value as ClickText and the tab-out renders
+        # the next field's value as VerifyText (measured 2026-09-18, 8 of 17 recorded lines); the
+        # TypeText that follows carries the intent
+        return ""
+    if action == "" and xp_ok:
+        # a synthetic event: our own listener saw a click the recorder emits nothing for
+        return "ClickElement    %s" % _xp(row)
     if not row.get("locator") and not row.get("label"):
         if xp_ok and action in ("ClickText", "ClickElement", "ClickItem"):
             return "ClickElement    %s" % _xp(row)
@@ -152,6 +189,9 @@ class _H(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         self.end_headers()
 
+    def do_GET(self):
+        self._send({"ok": True, "version": STATE["version"]})
+
     def do_POST(self):
         STATE["served"] += 1
         n = int(self.headers.get("Content-Length") or 0)
@@ -179,12 +219,18 @@ class _H(BaseHTTPRequestHandler):
                             decision["row"] = row["n"]; decision["why"] = "identity match" if line else "matched, no better line"
                             break
                     if decision["row"] is None:
-                        decision["why"] = "no row resolves to this element"
+                        n, step = _recipe_step_for(drv, t)
+                        if step:
+                            line = step; decision["row"] = n; decision["why"] = "recipe step identity match"
+                        elif req.get("synthetic"):
+                            line = ""; decision["why"] = "synthetic click, nothing known; not recorded"
+                        else:
+                            decision["why"] = "no row resolves to this element"
                 else:
                     decision["why"] = "their xpath resolved to nothing"
             else:
                 decision["why"] = "no xpath in event"
-            decision["out"] = line or rendered
+            decision["out"] = rendered if line is None else line
         except Exception as exc:
             decision["why"] = "error: %s" % exc; decision["out"] = rendered
         STATE["decisions"].append(decision); STATE["decisions"] = STATE["decisions"][-50:]
