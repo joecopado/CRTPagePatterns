@@ -35,7 +35,7 @@ document.addEventListener('click',function(ev){try{var tg=ev.target;if(!tg||tg.n
  window.__gzQ=window.__gzQ.then(function(){return ask({rendered:'',xpath:x,synthetic:true}).then(function(j){if(j&&j.line)self.pushStep(j.line,ev,x)}).catch(function(e){console.log('gz synthetic failed',e)})})}catch(e){}},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18d queue+quiet-inputs+synthetic-clicks", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
+STATE = {"version": "2026-09-18e form-switch", "form": "keyword", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 
 def _log(msg):
@@ -116,6 +116,15 @@ def _our_line(row, rendered):
         return None
     if line == "":
         return ""  # suppress: the recorder's line is noise for this control
+    form = STATE.get("form") or "keyword"
+    xp_ok = row.get("xp_verdict") == "VERIFIED-PASS" and row.get("xpath")
+    if form in ("xpath", "both") and xp_ok and "xpath\\=" not in line:
+        cells = _cells(line)
+        if cells and cells[0] in ("TypeText", "ClickText", "ClickCheckbox", "ClickElement"):
+            kw = "ClickElement" if cells[0] in ("ClickText", "ClickElement") else cells[0]
+            args = [c for c in cells[2:] if not c.startswith("anchor=") and not c.startswith("partial_match=")]
+            xline = "    ".join([kw, _xp(row)] + args)
+            line = xline if form == "xpath" else line.strip() + "    # xpath form: " + xline
     indent = rendered[: len(rendered) - len(rendered.lstrip())] or "    "
     return indent + line.strip()
 
@@ -257,6 +266,15 @@ class garzai_recorder_override:
 
     def gz_override_status(self):
         return json.dumps({k: v for k, v in STATE.items() if k != "error"}, default=str)
+
+    def gz_override_form(self, form="keyword"):
+        """keyword: the live-verified keyword form, xpath only as backstop (default);
+        xpath: the verified xpath form wherever one exists; both: keyword line, xpath as a comment."""
+        form = str(form).strip().lower()
+        if form not in ("keyword", "xpath", "both"):
+            raise ValueError("form must be keyword, xpath or both")
+        STATE["form"] = form
+        return form
 
     def gz_override_restore(self):
         if os.path.exists(BACKUP):
