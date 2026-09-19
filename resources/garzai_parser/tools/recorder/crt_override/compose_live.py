@@ -246,32 +246,45 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
             return RT._rf('TypeText', RT._xp_arg(xp), value)
         return None
 
-    # 5. typing into a field
+    # 5. typing into a field the LIBRARY already has a verified recipe for: that recipe's own
+    #    action line, rendered with this row's value and D4's anchor slot. The recipe is the form
+    #    that was MEASURED working on a real page (`reactive-input-clear-then-verify`'s clear key,
+    #    `clarity-lookup`'s timeout=40), so it outranks the generic rung -- and it is what
+    #    `review_table.robot_call` renders for the same row, which has put the recipe ahead of its
+    #    keyword dispatch since the library landed. Until 2026-09-18 this branch order was the
+    #    other way round here, so the review exporter and the composer answered two different lines
+    #    for every recipe-bearing fill control (ledger F50).
+    if fam in FILL_FAMILIES and action in ('TypeText', 'TypeSecret') and value is not None and entry:
+        line = _recipe_first_action(entry, row, value)
+        if line:
+            return line
+
+    # 6. typing into a field: the generic rung, and the fallback for a row with no recipe
     if fam in FILL_FAMILIES and action in ('TypeText', 'TypeSecret') and value is not None:
         if label:
             return RT._rf('TypeText', label, value, anchor=anchor)
         return RT._rf('TypeText', RT._xp_arg(xp), value) if xp else None
 
-    # 6. a checkbox
+    # 7. a checkbox
     if fam in ('checkbox', 'radio') and action in CLICK_ACTIONS:
         if label:
             return RT._rf('ClickCheckbox', label, 'on', anchor=anchor)
         return RT._rf('ClickElement', RT._xp_arg(xp)) if xp else None
 
-    # 7. a native select
+    # 8. a native select
     if fam == 'dropdown' and action == 'DropDown' and value is not None:
         if label:
             return RT._rf('DropDown', label, value, anchor=anchor)
         return RT._rf('DropDown', RT._xp_arg(xp), value) if xp else None
 
-    # 8. a CLICK on a field the parser only knows how to FILL (opening a combobox, a lookup or a
+    # 9. a CLICK on a field the parser only knows how to FILL (opening a combobox, a lookup or a
     #    multi-select). The keyword rung describes filling it; the click is the xpath's job.
     if fam in FILL_FAMILIES and action in ('ClickElement', 'ClickItem', 'Click'):
         if xp:
             return RT._rf('ClickElement', RT._xp_arg(xp))
         return RT._rf('ClickText', label, anchor=anchor, partial_match='False') if label else None
 
-    # 9. a button, link or tab
+    # 10. a button, link or tab
     if action in CLICK_ACTIONS:
         if kw == 'ClickItem' and c0.get('locator'):
             return RT._rf('ClickItem', c0['locator'], tag=(row.get('tag_corrected') or c0.get('tag') or row.get('tag')),
@@ -281,7 +294,7 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
         if xp:
             return RT._rf('ClickElement', RT._xp_arg(xp))
 
-    # 10. nothing of ours fits the recorded action: a verified library recipe for this control, if
+    # 11. nothing of ours fits the recorded action: a verified library recipe for this control, if
     #     the library has one; otherwise the recorder's line stands.
     if entry:
         return _recipe_first_action(entry, row, value)
@@ -417,6 +430,87 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
     out['matched_by'] = 'identity'
     out['compose_ms'] = round((time.time() - t0) * 1000, 1)
     return out
+
+
+# ----------------------------------------------------------------------------- the batch layer
+def _owner_index(parsed: Parsed) -> tuple[dict, dict]:
+    """ONE resolve pass over the capture: every row's identity xpath evaluated exactly once.
+
+    Returns (path_by_n, owner_by_path).  `owner_by_path` is the row `compose_from_capture` would
+    have picked for an element at that tree path -- the FIRST row, in row order, whose identity
+    xpath resolves to exactly one node there.  That first-wins rule is not an optimisation, it is
+    the per-event path's own behaviour (its `for r in parsed.rows: ... break`), so two rows that
+    share one element compose the same line here as they do there.
+
+    Why it exists (ledger F51, 2026-09-18): `compose_from_capture` re-ran that inner loop for EVERY
+    control, so a page of n controls paid O(n^2) xpath evaluations -- 901 controls on
+    docs/dom-captures/web-ant-design/3-transfer-idle.html were ~405,000 evaluations and 41.9 s of
+    the 199.3 s a snapshot of that one capture cost.  The per-event path is unchanged: a recorder
+    event answers about ONE element and must not pay for the whole page.
+    """
+    path_by_n: dict = {}
+    owner_by_path: dict = {}
+    for r in parsed.rows:
+        ix = r.get('identity_xpath')
+        if not ix:
+            continue
+        cands = parsed.resolve(ix)
+        if len(cands) != 1:
+            path_by_n[r.get('n')] = None
+            continue
+        p = parsed.path_of(cands[0])
+        path_by_n[r.get('n')] = p
+        owner_by_path.setdefault(p, r)
+    return path_by_n, owner_by_path
+
+
+def compose_batch(html: str, url: str | None, org: str | None, form: str = 'keyword',
+                  rendered_for=None) -> dict:
+    """Every control of ONE capture, composed in one pass: parse once, resolve each row's identity
+    once, compose all controls.  The answer for a row is byte-identical to
+    `compose_from_capture(html, url, org, row['identity_xpath'], rendered_for(row), form)` --
+    proven row by row in tools/recorder/tests/test_compose_live.py.
+
+    `rendered_for(row) -> str` supplies the recorded action line per row (there is no recorder
+    event in a corpus pass; `retest_set.synthetic_rendered` is the caller that builds one from the
+    row's own family).  Returns
+    {'rows': <every parsed row>, 'composed': [(row, result), ...], 'page_key', 'parse_ms',
+     'batch_ms'} -- one `composed` entry per row that carries an identity xpath.
+    """
+    t0 = time.time()
+    parsed = parse_capture(html, url, org)
+    path_by_n, owner_by_path = _owner_index(parsed)
+    composed: list = []
+    for row in parsed.rows:
+        ix = row.get('identity_xpath')
+        if not ix:
+            continue
+        rendered = rendered_for(row) if rendered_for else ''
+        out = {'line': None, 'xpath_line': None, 'row': None, 'why': None,
+               'page_key': parsed.page_key, 'parse_ms': parsed.parse_ms, 'rows': len(parsed.rows)}
+        target_path = path_by_n.get(row.get('n'))
+        if target_path is None:
+            # the same tri-state the per-event path prints: an identity that names no single node
+            # is COULD-NOT-CHECK with its own count, never a silent skip and never a pass.
+            n_match = len(parsed.resolve(ix))
+            out['why'] = 'COULD-NOT-CHECK: the target xpath matched %d elements in the capture' % n_match
+            out['compose_ms'] = 0.0
+            composed.append((row, out))
+            continue
+        owner = owner_by_path.get(target_path)
+        if owner is None:                     # unreachable while this row resolved; kept honest
+            out['why'] = 'no parsed row resolves to this element'
+            out['compose_ms'] = 0.0
+            composed.append((row, out))
+            continue
+        t1 = time.time()
+        out.update(compose_for_row(owner, rendered, form))
+        out['row'] = _row_summary(owner)
+        out['matched_by'] = 'identity'
+        out['compose_ms'] = round((time.time() - t1) * 1000, 1)
+        composed.append((row, out))
+    return {'rows': parsed.rows, 'composed': composed, 'page_key': parsed.page_key,
+            'parse_ms': parsed.parse_ms, 'batch_ms': round((time.time() - t0) * 1000, 1)}
 
 
 # ----------------------------------------------------------------------------- the live layer

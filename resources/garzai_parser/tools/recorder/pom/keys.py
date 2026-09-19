@@ -2,11 +2,37 @@
 
 Usage: python3 tools/recorder/pom/keys.py <url> [--org alias] [--refresh-hosts]
 
-A page key is `<partition>|<pattern>[|rt=<RecordTypeId>][|layout=<hash8>]` where the partition
-is the ORG ALIAS for Salesforce hosts (never the host -- dev1 and slockard share URL patterns and
-must never collide; user, 2026-09-05) and the host for everything else. Record ids, session
-tokens, counters and cache-busters are normalised out; the object, the action (view/edit/new/list)
-and the record type are kept, because they decide the layout that renders.
+A page key is `<partition>|<pattern>[|app=<app>][|rt=<RecordTypeId>][|layout=<hash8>]` where the
+partition is the ORG ALIAS for Salesforce hosts (never the host -- dev1 and slockard share URL
+patterns and must never collide; user, 2026-09-05) and the host for everything else. Record ids,
+session tokens, counters and cache-busters are normalised out; the object, the action
+(view/edit/new/list), the record type and the LIGHTNING APP are kept, because they decide what
+renders.
+
+D15 (user, 2026-09-18: "the app should [be in the key]. That is the only way we know sales
+lightning vs sales console") REVERSES the 2026-09-15 collapse that folded `/lightning/app/<id>/r/…`
+onto the bare `/lightning/r/…` key. Measured that night on cicd-demo: one key
+`/lightning/r/copado__User_Story__c/{id}/view` held 128 controls learned in TWO Lightning apps, and
+the store asserted a `Revenue Cloud Settings` control (and a 133-control modal behind it) that does
+not exist on that page in the other app. The app is now a KEY SEGMENT -- the app's developer name
+when the org map's `org_level.apps` layer can resolve the 06m DurableId, else the 06m id itself,
+which is stable per org and is therefore identity, not a dynamic value. An app-LESS route keeps its
+own key: a direct link and an in-app link are two different reachability stories, not one page.
+
+Every DYNAMIC segment class is a placeholder, never a raw value (feedback rule
+`page-keys-are-structural-and-carry-a-reachability-verdict`, user 2026-09-18: "storing a dynamic
+value as a raw portion of a key is unmaintainable"): 15/18-char record ids `{id}`, dashed GUIDs
+`{uuid}`, 16+ contiguous hex `{hash}`, per-session IPv4 `{ip}`, bare counters `{n}`, and an epoch
+suffix `<name>_<10+ digits>` -> `<name>_{epoch}` (`vfFrameId_1757000000000`).
+
+Two WRAPPERS are unwrapped to the page they carry rather than keyed as themselves:
+  frontdoor/login  `?retURL=` / `?startURL=` (and the `&retURL=` form Salesforce also emits, which
+                   urlparse leaves sitting in the PATH -- measured on slockard, two store records
+                   keyed `slockard|/secur/frontdoor.jsp&retURL=/lightning/o/Account/list`)
+  aloha            `/one/one.app#<base64 JSON>` whose `attributes.address` is the real route.
+                   Before this, EVERY aloha-wrapped Visualforce page in an org collapsed into one
+                   key and one element list (`cicd-demo|/one/one.app`; evidence
+                   `docs/recorder/evidence/live-transitions-review-copado-2026-09-18.md` GAP 4).
 
 Alias resolution never imports qforce_lite/selenium (this runs on up.py's light path): the
 sandbox naming regex first (`co…--dev1.sandbox…` -> dev1), then a cached host-stem table built
@@ -16,6 +42,8 @@ page-object store; the recorder skill and qforce-lite are consumers, not provide
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -58,6 +86,20 @@ def single_surface_prefix(host: str, pattern: str) -> str | None:
     return None
 
 SF_ID = re.compile(r"^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$")
+# A REAL record id always carries a digit: the 3-char key prefix is numeric-ish (001, 00Q, a1v,
+# 06m) and the 2-char instance id + 9-char serial are base-62. Plain SF_ID matches any 15- or
+# 18-character word, so an OBJECT name of exactly that length -- InsurancePolicy (15),
+# ServiceAppointment (18), InteractionSummary (18) -- was read as an id. sf_pattern already guards
+# its own branches against that (2026-09-10, three of seventeen industry pages); this is the same
+# guard for the GENERIC segment normaliser, which had none.
+LIKELY_SF_ID = re.compile(r"^(?=[a-zA-Z0-9]*\d)[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$")
+# `vfFrameId_1757000000000`, `<name>_<10+ digits>`: a millisecond/second epoch stamped into a
+# segment at render time. CLAUDE.md's locator doctrine names the same shape as a never-a-locator
+# generated value; it is a never-a-page-key value for the same reason.
+EPOCH_SUFFIX = re.compile(r"^(.*[A-Za-z_-])_?\d{10,}$")
+# A Lightning app addressed by its 06m DurableId. The app is IDENTITY (D15), not a dynamic value:
+# the same id names the same app for the life of the org.
+APP_DURABLE_ID = re.compile(r"^06m[a-zA-Z0-9]{12}([a-zA-Z0-9]{3})?$")
 # 8-4-4-4-12 hex, the identifier shape non-Salesforce apps use for records in a URL path.
 UUID_SEG = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 # Strict dotted-quad, every octet 0-255, so version-like segments (1.2.3, v1.0.0, 2026.09.12) and
@@ -169,17 +211,77 @@ def alias_for_host(host: str, refresh: bool = False) -> str | None:
     return None
 
 
+RET_IN_PATH = re.compile(r"[?&](retURL|startURL|returnUrl)=(.+)$")
+
+
 def _unwrap_login(u) -> str | None:
-    """frontdoor / login / ec=302 URLs carry the real destination in retURL/startURL."""
+    """frontdoor / login / ec=302 URLs carry the real destination in retURL/startURL.
+
+    Salesforce also emits `/secur/frontdoor.jsp&retURL=/lightning/o/Account/list` -- an `&` where
+    the `?` belongs -- and urlparse then leaves the whole thing in `path` with an EMPTY query, so
+    the parse_qs branch never fires. Measured on the live slockard store 2026-09-18: two records
+    keyed `slockard|/secur/frontdoor.jsp&retURL=/lightning/o/{Account,Contact}/list`, both 0
+    elements, both orphans of a page the store already knows."""
     q = parse_qs(u.query)
     for k in ("retURL", "startURL", "returnUrl"):
         if k in q and q[k]:
             return unquote(q[k][0])
+    m = RET_IN_PATH.search(u.path or "")
+    if m:
+        return unquote(m.group(2))
     return None
 
 
+def _unwrap_aloha(u) -> str | None:
+    """`/one/one.app#<base64 JSON>` -> the route its `attributes.address` carries, or None.
+
+    The classic-page wrapper: the decoded fragment is
+    `{"componentDef":"one:alohaPage","attributes":{"address":"https://…/apex/copado__GitCommitMain?
+    userStoryId=…&variant=userstorycommit"},"state":{}}`. Keying the wrapper itself makes ONE bucket
+    for every classic page in the org (GAP 4). Also accepts the un-encoded `#/…` fragment form."""
+    if (u.path or "").rstrip("/") not in ("/one/one.app", "/one/one.app/", "/one/one.app"):
+        if not (u.path or "").endswith("/one/one.app"):
+            return None
+    frag = u.fragment or ""
+    if not frag:
+        return None
+    if frag.startswith("/"):
+        return frag
+    pad = frag + "=" * (-len(frag) % 4)
+    for dec in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            data = json.loads(dec(pad).decode("utf-8", "replace"))
+        except (binascii.Error, ValueError, UnicodeDecodeError):
+            continue
+        addr = ((data or {}).get("attributes") or {}).get("address")
+        if isinstance(addr, str) and addr:
+            return addr
+    return None
+
+
+def app_name(seg: str | None, org_map: dict | None = None) -> tuple[str | None, str | None]:
+    """(app name for the key, source). A 06m DurableId resolves to the app's DEVELOPER NAME through
+    the org map's `org_level.apps` layer when the map has it; otherwise the id is kept AS IS, because
+    it is stable per org and is the identity -- guessing is worse than an honest opaque id.
+
+    Measured 2026-09-18: of the org maps on this machine only **cicd-demo** carries the layer (55
+    apps, each with `durable_id`); slockard, dev1 and copado-trial all have `org_level.apps: null`,
+    so their app-scoped keys carry the raw 06m id until `discover.py` deepens that layer."""
+    if not seg:
+        return None, None
+    if not APP_DURABLE_ID.match(seg):
+        return seg, "url"          # already a developer name: standard__LightningSales, c__MyApp
+    apps = ((org_map or {}).get("org_level") or {}).get("apps") or {}
+    if isinstance(apps, dict):
+        for name, v in apps.items():
+            did = (v or {}).get("durable_id") if isinstance(v, dict) else None
+            if did and (did == seg or did[:15] == seg[:15]):
+                return name, "org map org_level.apps.%s.durable_id" % name
+    return seg, "unresolved 06m DurableId (org map has no org_level.apps layer)"
+
+
 def _norm_segment(seg: str) -> str:
-    if SF_ID.match(seg):
+    if LIKELY_SF_ID.match(seg):
         return "{id}"
     if re.fullmatch(r"\d+", seg):
         return "{n}"
@@ -197,6 +299,11 @@ def _norm_segment(seg: str) -> str:
         # documents for the Salesforce short record URL: the POM can never accumulate on a page
         # whose key is unique per visit. Non-Salesforce apps identify records this way as a rule.
         return "{uuid}"
+    m = EPOCH_SUFFIX.match(seg)
+    if m:
+        # `vfFrameId_1757000000000` -> `vfFrameId_{epoch}`: the NAME is the page, the stamp is the
+        # render. Keeps the readable half, which a bare {n} would have thrown away.
+        return m.group(1).rstrip("_") + "_{epoch}"
     return seg
 
 
@@ -205,7 +312,7 @@ def sf_pattern(path: str, query: dict, org_map: dict | None = None) -> dict:
     segs = [s for s in path.split("/") if s]
     out: dict = {"pattern": None, "object": None, "action": None, "record_type": None, "app": None}
     rt = (query.get("recordTypeId") or [None])[0]
-    # APP-SCOPED ROUTES (2026-09-15): Lightning serves the SAME page at two URLs --
+    # APP-SCOPED ROUTES. D15 (2026-09-18) -- Lightning serves the same ROUTE at two URLs --
     #   /lightning/app/06m7Q0000001l7SQAQ/r/copado__User_Story__c/a1v.../view   (navigated from within an app)
     #   /lightning/r/copado__User_Story__c/a1v.../view                          (a direct link)
     # Before this branch the first form fell into the generic `/lightning/app` case, which joins
@@ -213,7 +320,10 @@ def sf_pattern(path: str, query: dict, org_map: dict | None = None) -> dict:
     # from inside the app minted its own unmatchable page key -- the same class of failure H9/B3
     # documents for the short record URL. The app id is kept in `app` (it is metadata about how
     # the page was reached, not about which page it is) and the route resolves as if it had been
-    # opened directly, so both forms produce ONE key.
+    # opened directly -- but the app is now carried into the KEY as `|app=<name>` (page_key), so
+    # the two forms produce TWO keys, which is D15's whole point: the same route in `Sales` and in
+    # `Sales Console` renders different controls, and collapsing them let the store assert a
+    # control that a reader on the other app cannot reach.
     if segs[:2] == ["lightning", "app"] and len(segs) > 3 and segs[3] in (
             "r", "o", "n", "page", "setup", "cmp"):
         inner = sf_pattern("/" + "/".join(["lightning"] + segs[3:]), query, org_map=org_map)
@@ -261,12 +371,26 @@ def sf_pattern(path: str, query: dict, org_map: dict | None = None) -> dict:
     elif segs[:2] == ["lightning", "n"]:
         out.update(pattern="/" + "/".join(segs[:3]), action="tab")
     elif segs[:2] == ["lightning", "app"]:
-        out.update(pattern="/lightning/app/{id}" + ("/" + "/".join(segs[3:]) if len(segs) > 3 else ""),
+        # D15: the app is no longer a `{id}` placeholder INSIDE the pattern (which erased which app
+        # it was); it leaves the path and becomes the key's `app=` segment, so the app home pages of
+        # two apps are two keys and both say which app they are.
+        rest = "/" + "/".join(_norm_segment(x) for x in segs[3:]) if len(segs) > 3 else ""
+        out.update(pattern="/lightning/app" + rest,
                    app=segs[2] if len(segs) > 2 else None, action="app")
     elif segs[:2] == ["lightning", "cmp"]:
         out.update(pattern="/" + "/".join(segs[:3]), action="cmp")
     elif segs[:1] == ["apex"]:
-        out.update(pattern="/" + "/".join(segs[:2]), action="vf")
+        # A classic page's query can carry a SELECTOR that picks the rendering
+        # (`copado__GitCommitMain?variant=userstorycommit`). Same precedent as
+        # `/lightning/o/<Obj>/list?filterName=…` above. A param whose value is a DYNAMIC value --
+        # a record id, a uuid, a number, a hash -- is dropped, never placeholdered into the key:
+        # `userStoryId=a1vd1000000EstN` says which record, not which page.
+        sel = sorted((k, v[0]) for k, v in (query or {}).items()
+                     if v and v[0] and _norm_segment(v[0]) == v[0] and not v[0].startswith("http"))
+        pat = "/" + "/".join(segs[:2])
+        if sel:
+            pat += "?" + "&".join("%s=%s" % kv for kv in sel)
+        out.update(pattern=pat, action="vf")
     elif segs and SF_ID.match(segs[0]):
         out.update(pattern="/{id}", action="classic")
     else:
@@ -297,15 +421,31 @@ def layout_hash(org_map: dict | None, sobject: str | None, record_type: str | No
     return hashlib.sha1(blob.encode()).hexdigest()[:8]
 
 
+# (path, mtime, size) -> parsed map. dev1.json is 110 MB and fsc7f.json 61 MB on this machine, and
+# page_key loads a map on EVERY call: the store migration re-keying 155 records spent all its time
+# re-parsing the same four files. Keyed on mtime+size like skeleton.py's cache, so it is never
+# served stale after a `discover.py refresh`.
+_MAP_CACHE: dict[str, tuple[float, int, dict | None]] = {}
+
+
 def load_org_map(alias: str | None) -> dict | None:
     if not alias:
         return None
     p = os.path.join(ORG_MAP_DIR, f"{alias}.json")
     try:
-        with open(p) as f:
-            return json.load(f)
-    except Exception:
+        st = os.stat(p)
+    except OSError:
         return None
+    hit = _MAP_CACHE.get(p)
+    if hit and hit[0] == st.st_mtime and hit[1] == st.st_size:
+        return hit[2]
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except Exception:
+        data = None
+    _MAP_CACHE[p] = (st.st_mtime, st.st_size, data)
+    return data
 
 
 def page_key(url: str, org: str | None = None, org_map: dict | None = None,
@@ -314,11 +454,19 @@ def page_key(url: str, org: str | None = None, org_map: dict | None = None,
     u = urlparse(url or "")
     host = (u.hostname or "").lower()
     inner = _unwrap_login(u)
-    if inner and _depth < 2 and (u.path.startswith("/secur/frontdoor.jsp") or "ec=302" in (u.query or "")
+    if inner and _depth < 3 and (u.path.startswith("/secur/frontdoor.jsp") or "ec=302" in (u.query or "")
                                  or host in ("login.salesforce.com", "test.salesforce.com")):
         inner_url = inner if inner.startswith("http") else f"https://{host}{inner}"
         # the destination page is the identity; the login hop is not a page anyone tests
         return page_key(inner_url, org=org, org_map=org_map, template_version=template_version, _depth=_depth + 1)
+    aloha = _unwrap_aloha(u)
+    if aloha and _depth < 3:
+        # the aloha wrapper is a frame around a classic page, not a page: key what it carries
+        aloha_url = aloha if aloha.startswith("http") else f"https://{host}{aloha}"
+        pk = page_key(aloha_url, org=org, org_map=org_map, template_version=template_version,
+                      _depth=_depth + 1)
+        pk["wrapper"] = "one:alohaPage"
+        return pk
     sf = is_salesforce_host(host)
     alias = org if (org and sf) else (alias_for_host(host) if sf else None)
     if sf:
@@ -339,6 +487,9 @@ def page_key(url: str, org: str | None = None, org_map: dict | None = None,
         if _pre:
             pattern = _pre
     parts = [partition, pattern]
+    app_seg, app_src = app_name(info.get("app"), org_map) if sf else (None, None)
+    if app_seg:
+        parts.append(f"app={app_seg}")
     if info.get("record_type"):
         parts.append(f"rt={info['record_type']}")
     lh = None
@@ -357,7 +508,8 @@ def page_key(url: str, org: str | None = None, org_map: dict | None = None,
     return {"key": key, "slug": slug, "partition": partition, "alias": alias, "host": host,
             "salesforce": sf, "pattern": info["pattern"], "object": info.get("object"),
             "action": info.get("action"), "record_type": info.get("record_type"),
-            "app": info.get("app"), "layout_hash": lh, "template_version": template_version,
+            "app": info.get("app"), "app_name": app_seg, "app_source": app_src,
+            "wrapper": None, "layout_hash": lh, "template_version": template_version,
             "store_dir": store_dir, "path": os.path.join(store_dir, slug + ".json"),
             "render": render,
             "note": None if (alias or not sf) else "salesforce host with no known alias -- partitioned by host; run keys.py --refresh-hosts"}
