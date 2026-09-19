@@ -7,7 +7,7 @@ Documentation                   2026-09-18: the 29 lines the CRT recorder's pane
 Resource                        ../resources/common.robot
 Library                         ../resources/garzai_recorder_override.py
 Suite Setup                     Setup Browser
-Suite Teardown                  End suite
+Suite Teardown                  Run Keywords    Gz Override Restore    AND    End suite    # put the stock recorder bundle back: the patch outlives the session on a reused container (measured 2026-09-18)
 
 *** Test Cases ***
 Replay The 29 Composed Lines

@@ -9,7 +9,7 @@ Documentation                   SETUP RECORDING PROBE, OVERRIDE (2026-09-18): th
 Resource                        ../../resources/common.robot
 Library                         ../../resources/garzai_recorder_override.py
 Suite Setup                     Setup Browser
-Suite Teardown                  End suite
+Suite Teardown                  Run Keywords    Gz Override Restore    AND    End suite    # put the stock recorder bundle back: the patch outlives the session on a reused container (measured 2026-09-18)
 
 *** Test Cases ***
 Setup Pages With The GarzAI Composer
