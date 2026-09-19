@@ -19,8 +19,7 @@ ${GZ_ON_MISMATCH}    warn    # a TypeText mismatch prints CAUGHT-BUG and keeps g
 
 *** Test Cases ***
 Status Before Recording
-    ${token}=    JwtAuthenticate    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}
-    JwtLogin
+    Gz Login    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}    # the session id stays in ${GZ_TOKEN}; the console shows only PASS: Gz Login
     ${marker}=    Gz Container Marker    # FRESH or REUSED container
     Log To Console    ${marker}
     ${instance}=    GetInstanceUrl
@@ -43,3 +42,15 @@ Restore Stock Recorder
     # RUN THIS SELECTION before stopping the Live Testing session (Live Testing never runs the Suite Teardown)
     ${restored}=    Gz Override Restore
     Log To Console    recorder bundle: ${restored}
+
+*** Keywords ***
+Gz Login
+    [Documentation]    JwtAuthenticate + JwtLogin with the session id kept in a global variable and
+    ...    NOT returned, so the Live Testing console prints `PASS: Gz Login` instead of the raw
+    ...    `PASS: JwtAuthenticate 00D...!AQEA...` line (user, 2026-09-19: the pasted logs carried a live
+    ...    session id eight times and tripped a content safeguard twice).
+    [Arguments]    ${client_id}    ${username}    ${private_key}
+    ${token}=    JwtAuthenticate    ${client_id}    ${username}    ${private_key}
+    Set Global Variable    ${GZ_TOKEN}    ${token}
+    JwtLogin
+    Log    Gz Login: session established for ${username} (token held in \${GZ_TOKEN}, not printed)    console=True
