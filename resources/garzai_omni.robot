@@ -85,7 +85,7 @@ Gz Omni Verdict
         RETURN    ${result}
     END
     ${verdict}=    Set Variable    CAUGHT-BUG
-    IF    'CouldNotCheck' in $result or 'could not read back' in $result
+    IF    'CouldNotCheck' in $result or 'could not read back' in $result or 'could not verify' in $result or 'reporting UNKNOWN' in $result
         ${verdict}=    Set Variable    COULD-NOT-CHECK
     END
     ${line}=    Set Variable    ${keyword}('${key}'): asked '${asked}' -- ${result}
