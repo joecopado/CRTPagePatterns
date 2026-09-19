@@ -297,7 +297,8 @@ def read_back_for(kw: str, c: dict) -> dict | None:
 
 
 def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
-                 predicted_by_norm: dict, capture_rel: str) -> dict:
+                 predicted_by_norm: dict, capture_rel: str,
+                 capture_path: str | None = None) -> dict:
     rec = store._open(pk)
     rec.setdefault('asset', {})
     a = rec['asset']
@@ -330,6 +331,11 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
     a['state_stamp'] = {k: meta.get(k) for k in ('state', 'entered_via', 'host_url')}
     a['state_stamp']['present'] = bool(meta.get('state_stamp_present'))
     stamped_eids = []
+    # RAW id -> the id this record actually files the control under. `identify_control` may fold a
+    # control onto an element already in the store under another name (F70's twin fold), so the
+    # scope map -- which is minted from the capture's own DOM -- has to be translated before it
+    # can be attached to a member. Built here because this is the only place that knows both.
+    id_map: dict = {}
 
     for c in cs:
         # On a single-surface app the "container" is whatever prose surrounded the control on this
@@ -349,6 +355,7 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
         # folded in here, so one control is never two records (store.absorb_stamp_placeholder)
         STORE_MOD.absorb_stamp_placeholder(rec, eid, c['label'])
         stamped_eids.append(eid)
+        id_map[element_id(c['family'], c['label'], c['container'], stable_attrs(c['attrs']))] = eid
         pred = predicted_by_norm.get(c['norm'])
         el.update({
             'family': c['family'], 'label': c['label'], 'container': c['container'],
@@ -402,7 +409,14 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
     rec['_stamp'] = STORE_MOD.apply_capture_stamp(
         store, rec, stamped_eids, state=meta.get('state'), entered_via=meta.get('entered_via'),
         host_url=meta.get('host_url'), org=pk.get('alias'), stamp=a['built_at'],
-        evidence=capture_rel)
+        evidence=capture_rel,
+        # SCOPE (2026-09-19): the stamp reads the capture's own DOM to decide which members are
+        # INSIDE this state's container and which are the page around it. Without the path it
+        # writes no scope at all, which is COULD-NOT-CHECK -- never `own` by default.
+        capture_path=capture_path or (os.path.join(_ROOT, capture_rel)
+                                      if capture_rel and not os.path.isabs(capture_rel) else
+                                      capture_rel),
+        id_map=id_map)
     return rec
 
 
@@ -523,7 +537,7 @@ def cmd_build(a) -> int:
             pk = _repartition(store, pk)
         cs = controls(path)
         rec = build_record(store, pk, cs, capture_meta(path), template_provenance(path),
-                           predictions_for(pk, path), rel)
+                           predictions_for(pk, path), rel, capture_path=path)
         p = store.put(rec)
         written[pk['key']] = {'path': p, 'elements': len(rec['elements']), 'from_capture': len(cs),
                               # the state stamp: what this capture said, and what the store did

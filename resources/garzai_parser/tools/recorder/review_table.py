@@ -2241,7 +2241,10 @@ def cmd_writeback(a) -> int:
         stamp_results.append(STORE_MOD.apply_capture_stamp(
             store, rec, eids, state=state_name, entered_via=hdr_stamp.get('entered_via'),
             host_url=hdr_stamp.get('host_url'), org=pk.get('alias'), stamp=stamp,
-            evidence=review.get('capture')))
+            evidence=review.get('capture'),
+            # the SAME scope computation the capture writer uses (2026-09-19); with no readable
+            # capture behind the review the members simply carry no scope -- COULD-NOT-CHECK.
+            capture_path=review.get('capture')))
     path = store.put(rec)
     try:
         store.render(pk['partition'])

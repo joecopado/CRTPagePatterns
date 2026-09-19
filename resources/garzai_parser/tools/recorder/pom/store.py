@@ -56,9 +56,11 @@ from typing import Any, Iterable
 try:                                  # package import (tests, CLI) or flat sys.path (server)
     from . import keys as K
     from . import match as M
+    from . import scope as SCOPE
 except ImportError:                   # pragma: no cover
     import keys as K  # type: ignore
     import match as M  # type: ignore
+    import scope as SCOPE  # type: ignore
 
 STABLE_ATTRS = ("name", "aria-label", "title", "data-testid", "data-test-id", "item", "field",
                 "field-label", "data-target-selection-name", "placeholder", "id")
@@ -532,15 +534,58 @@ def page_state(rec: dict, name: str) -> dict:
 
 # --------------------------------------------------------------------- the CAPTURE STATE STAMP
 UNKNOWN_ENTERED_VIA = "unknown"
+# A state you LEAVE by dismissing it. A tab is not one: you do not close a tab to reach another.
+OVERLAY_KINDS = ("modal", "panel")
+CLOSER_LABELS = ("close", "cancel", "cancel and close", "dismiss", "x", "close this window")
 
 
 def _norm_label(s: str | None) -> str:
     return " ".join(str(s or "").split()).casefold()
 
 
+def _scope_for_capture(rec: dict, state: str | None, capture_path: str | None,
+                       id_map: dict | None) -> tuple[dict | None, set, str | None]:
+    """(scopes by FINAL element id, chrome ids to keep OUT of the state, note).
+
+    THE ONE PLACE scope is computed (2026-09-19). Both capture writers -- `pom_asset.build_record`
+    and `review_table.writeback` -- reach it through `apply_capture_stamp`, so the two cannot
+    disagree about what "inside this state" means.
+
+    `id_map` maps the RAW id a capture's control mints (`element_id(family,label,container,attrs)`)
+    to the id the record actually files it under, because `identify_control` may fold a control
+    onto an element the store already holds under another name (F70's twin fold). Two raw controls
+    can fold onto ONE element -- one inside the subtree and one outside; `own` wins, because the
+    member demonstrably IS in the state's own container.
+
+    Returns `(None, set(), note)` for COULD-NOT-CHECK: no capture to read, or a subtree the ladder
+    refuses to guess at. The caller then writes no `scope` key at all -- never `own` by default.
+    """
+    if not capture_path or not os.path.exists(capture_path):
+        return None, set(), "no capture behind this stamp"
+    try:
+        html = open(capture_path, errors="replace").read()
+    except OSError as e:                                    # pragma: no cover - unreadable file
+        return None, set(), "capture unreadable: %s" % e
+    kind = ((rec.get("states") or {}).get(state or "") or {}).get("kind")
+    raw = SCOPE.scopes_for_capture(html, state=state, kind=kind,
+                                   element_id=element_id, stable_attrs=stable_attrs)
+    chrome_raw = SCOPE.transient_ids(html, element_id=element_id, stable_attrs=stable_attrs)
+    m = id_map or {}
+    chrome = {m.get(k, k) for k in chrome_raw}
+    if raw is None:
+        return None, chrome, "the state's own subtree could not be resolved in this capture"
+    out: dict = {}
+    for k, v in raw.items():
+        fid = m.get(k, k)
+        if out.get(fid) != SCOPE.OWN:
+            out[fid] = v
+    return out, chrome, None
+
+
 def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: str | None,
                         entered_via: str | None, host_url: str | None, org: str | None = None,
-                        stamp: str | None = None, evidence: str | None = None) -> dict:
+                        stamp: str | None = None, evidence: str | None = None,
+                        capture_path: str | None = None, id_map: dict | None = None) -> dict:
     """Land one capture's state stamp -- the ONE writer both pom_asset.build_record and
     review_table.writeback go through, so the two cannot drift.
 
@@ -619,30 +664,89 @@ def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: st
         out["host_key"] = host_key
         return out
 
-    if not named_state:
-        out["gap"] = "no state to write (default state, no routed modal)"
-        return out
+    # THE BASE STATE IS A STATE (2026-09-19). Until now a capture of the page itself wrote nothing
+    # at all, so copado-trial's Data Template held 4 base-state members while its landing capture
+    # parsed 180 controls: a step "on the hierarchy of that general page" had almost nothing to
+    # resolve against, and the page's own controls lived only inside the tab and modal states that
+    # had leaked them. The base state is entered by NAVIGATING to the page, so it never takes an
+    # `entered_via` -- the old `page` state's opener was `button|Dismiss||`, a toast dismissal.
+    state_name = state if named_state else DEFAULT_STATE
+    scopes, chrome, scope_note = _scope_for_capture(rec, state_name, capture_path, id_map)
 
-    ps = page_state(rec, state)
+    ps = page_state(rec, state_name)
     ps["n_seen"] = (ps.get("n_seen") or 0) + 1
     ps["last_seen"] = stamp
-    for eid in eids:
+    if not named_state:
+        ps.setdefault("kind", "page")
+    # `eids` is a capture's control list in DOM order and two controls can fold onto ONE element
+    # (F70's twin fold), so every count below is over the UNIQUE members -- a per-occurrence count
+    # reported 8 own controls where the page has 7.
+    uniq = list(dict.fromkeys(eids))
+    filed = 0
+    for eid in uniq:
+        # A TOAST IS NOT A MEMBER OF ANYTHING. `button|Dismiss|Just so you know|` was a member of
+        # NINE states on the probe page and outside every one of their subtrees: a transient
+        # notification that happened to be on screen when the capture was taken. The element is
+        # still recorded; it is simply never filed under a state.
+        if eid in chrome:
+            continue
         _append_unique(ps["elements"], eid)
+        filed += 1
         el = (rec.get("elements") or {}).get(eid)
-        if el is not None:
-            el.setdefault("states", {})[state] = {"label": el.get("label")}
-    if known_via:
+        if el is None:
+            continue
+        seen_as = {"label": el.get("label")}
+        if scopes is not None and eid in scopes:
+            seen_as["scope"] = scopes[eid]
+        el.setdefault("states", {})[state_name] = seen_as
+    if scopes is not None:
+        ps["scope_from"] = evidence or os.path.basename(capture_path or "")
+    elif scope_note:
+        ps["scope_unknown"] = scope_note
+    if known_via and named_state:
         cand = identify_control(rec, entered_via, None)
         via_eid = cand if cand in (rec.get("elements") or {}) else None
-        _append_unique(ps["entered_via"], via_eid or entered_via)
-        if via_eid:
-            _bump((rec["elements"][via_eid]).setdefault("opens", {}), state)
-        ps.pop("entered_via_unknown", None)
-    else:
+        # A CLOSER IS NOT AN OPENER (2026-09-19). `object-fields` had
+        # `button|Close|GarzAI slockard cred Preview|title=Close` in its `entered_via`: the crawler
+        # returned to the tab by CLOSING the Preview modal, and the store read that as "this
+        # control opens object-fields". The rule is deliberately NARROW -- a closing LABEL on a
+        # control that is `own` in an OVERLAY state (modal/panel). Both halves are needed: the
+        # Preview button is `own` in the `details` TAB and genuinely opens the modal, so "own in
+        # another state" alone would have filed a real opener as a closer (measured, first run).
+        closes = None
+        if via_eid and _norm_label(entered_via) in CLOSER_LABELS:
+            for other, s in ((rec["elements"][via_eid].get("states") or {})).items():
+                if other == state_name or (s or {}).get("scope") != SCOPE.OWN:
+                    continue
+                if ((rec.get("states") or {}).get(other) or {}).get("kind") in OVERLAY_KINDS:
+                    closes = other
+                    break
+        if closes:
+            _append_unique(page_state(rec, closes).setdefault("closed_via", []), via_eid)
+            out["wrote"].append("closed_via[%s] += %r (not an opener of %s)"
+                                % (closes, via_eid, state_name))
+            if not ps["entered_via"]:
+                ps["entered_via_unknown"] = True
+                out["gap"] = ("state %r was entered by closing %r -- no opening control is known; "
+                              "audit_states.py names it under states_with_no_opening_control"
+                              % (state_name, closes))
+        else:
+            _append_unique(ps["entered_via"], via_eid or entered_via)
+            if via_eid:
+                _bump((rec["elements"][via_eid]).setdefault("opens", {}), state_name)
+            ps.pop("entered_via_unknown", None)
+    elif named_state:
         ps["entered_via_unknown"] = True
         out["gap"] = ("state %r has no opening control -- audit_states.py names it under "
                       "states_with_no_opening_control" % state)
-    out["wrote"].append("states[%s] += %d control(s)" % (state, len(eids)))
+    out["state"] = state_name
+    out["wrote"].append("states[%s] += %d control(s)" % (state_name, filed))
+    if chrome:
+        out["chrome_not_filed"] = sorted(chrome & set(uniq))
+    out["scope"] = ("COULD-NOT-CHECK: %s" % scope_note if scopes is None else
+                    {"own": sum(1 for e in uniq if scopes.get(e) == SCOPE.OWN),
+                     "shell": sum(1 for e in uniq if scopes.get(e) == SCOPE.SHELL),
+                     "absent": sum(1 for e in uniq if e not in scopes)})
     return out
 
 
@@ -945,6 +1049,14 @@ class Store:
                 seen_as: dict[str, Any] = {"label": label}
                 if enabled is not None:
                     seen_as["enabled"] = enabled
+                # SCOPE, the driven half (2026-09-19). A driven step carries no DOM: `--op kw`
+                # knows the keyword and nothing else, so nothing here can say whether the control
+                # was inside the modal or on the page behind it. When a CAPTURE of this state has
+                # already scoped this element, that fact is kept; otherwise the key is simply
+                # absent -- COULD-NOT-CHECK, never `own` by default.
+                prior = ((el.get("states") or {}).get(state) or {}).get("scope")
+                if prior:
+                    seen_as["scope"] = prior
                 el.setdefault("states", {})[state] = seen_as
             chosen = step.get("chosen")
             verdict = step.get("verdict") or "COULD-NOT-CHECK"

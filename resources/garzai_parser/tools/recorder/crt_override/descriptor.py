@@ -494,7 +494,7 @@ function labelIndex(el, label, fam){
    the omniscript element that carries the key; the old `h < 8` cap stopped three hops short and
    returned null silently. The cap is raised to the measured depth plus headroom, and the walk stops
    AT the omniscript element boundary -- if that host has no key, there is none to find and climbing
-   into the container would return a neighbouring element's key, which is worse than none. */
+   into the container would return a neighbouring element's key, which is worse than none.
    TWO boundaries, because not every `data-omni-key` names a CONTROL. A container carries one too
    (`-omniscript-step` is keyed `ApplicationSummary`; `runtime_omnistudio-flexcard` is keyed
    `ApplicationSummaryFC`, both measured in capture 03), and handing a container's key to
