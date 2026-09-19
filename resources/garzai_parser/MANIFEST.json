@@ -1,9 +1,9 @@
 {
  "bundle": "resources/garzai_parser",
- "bytes": 1752691,
+ "bytes": 1764310,
  "entry": "tools/recorder/crt_override/compose_live.py",
  "files": 56,
- "generated": "2026-09-19T08:41:33",
+ "generated": "2026-09-19T09:32:59",
  "generator": "tools/recorder/crt_override/build_parser_bundle.py",
  "sha256": {
   "docs/recorder/patterns/library.json": "c734f0f0dd1c3f138928aa875cdac2dc3cbe41588dd4e64e6fc1509bfd31c203",
@@ -51,16 +51,16 @@
   "tools/qforce-lite/discovery/page_chrome.py": "95b4a0f27bb2ee282491dcfd127b156aa726d4a803d876023d25396f1c954aec",
   "tools/qforce-lite/predict.py": "848b4383b7a7a78dd9b621f281c3f1413eeac9fddddcd0544e0e3aceee423fb0",
   "tools/qforce-lite/text_match.py": "bb4c3b8ff8abe4bd6181b648d22138cd0230766a2c84ff0bbda9669290e45538",
-  "tools/recorder/crt_override/compose_live.py": "2a47b1733bdc144c5200aa9423fae0a24d294a02e53fa3eb05f9978ea4bf5119",
-  "tools/recorder/crt_override/descriptor.py": "f6d5a8b93df2a697bae60b512767a521de6f476ac020cbe1aef13245fa4e511e",
+  "tools/recorder/crt_override/compose_live.py": "7809b52eb2df2f92085db53ec14b6fa16e0d72a4290df861ab1ae3d88cdc91a2",
+  "tools/recorder/crt_override/descriptor.py": "c7288ce4e8285fb3b079d3efc25aa599e461babd3d2e287329874f3cb8f1acac",
   "tools/recorder/disambiguation_args.py": "02c066836c4164d9a42fc6e557198523269a8aacf406f0dc7dca691f8c57b0f1",
   "tools/recorder/metadata_dom_parity.py": "a30c46b7f940e59e76fb24965a79d6710cffd20267f27e7a88f26f096ebf905e",
   "tools/recorder/pattern_library.py": "53750ce6f624e5175e1193580d33a79fe0fae3561315354ab1a5223251bbbeeb",
   "tools/recorder/pom/__init__.py": "1d3e859413cba4f1cce129b7498adcc4d29f377a14ea2b4489213bd7f2a673aa",
-  "tools/recorder/pom/keys.py": "d86e467414e917ac8019dcba2b0307b0a99f96942afedfc0b3947d86d0b3d711",
+  "tools/recorder/pom/keys.py": "286c3379751d4d992d0e908f5a5cf2266c63326525666665deab8f176fc42e77",
   "tools/recorder/pom/match.py": "dff1931feeeaf1cf17fc95a21702ae766d86e211612850b04bb1c8f6975e5df9",
-  "tools/recorder/pom/store.py": "c141450d699789785de1d79022934f191348e6355e13504280b1748955535ac9",
-  "tools/recorder/pom_asset.py": "3dacac03b3d1568557cc583e8d2a6c452a8e58f70ec61371f21511436ec38e14",
+  "tools/recorder/pom/store.py": "30f44742c2d7759fd293392418e7dff7f46d8a6d6e265e51ca35860cc0584ccf",
+  "tools/recorder/pom_asset.py": "f4722ceb8b66e35316f10bfd5f7f6bb0058c52204b1df7ef57f373a95f374067",
   "tools/recorder/review_table.py": "467120d91ef7314084cc6c68c0437e4270289c61d39abf0cd59b5c7f91ca8d3d"
  },
  "variant": "traced"

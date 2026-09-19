@@ -54,9 +54,61 @@ Library           QWeb
 # calls in via `Evaluate __import__('keywords_omni').<fn>(...)` -- mechanism 2 in the inventory,
 # the same mechanism the source template uses for this exact file.
 Library           ${CURDIR}/garzai_omni/keywords_omni.py    WITH NAME    OmniRaw
+Library           Collections    # Append To List in Gz Omni Verdict below
+
+
+*** Variables ***
+# THE STEP IS THE ACTION, THE VERDICT IS A LINE (user, 2026-09-19; the same rule
+# garzai_typetext_override.robot already follows). Measured on fsc7f run 5 (2026-09-19 13:13):
+# `Omni Type` returned in ~30 ms SEVEN times and nothing in the Live Testing console said whether
+# any value had landed -- the run log could not tell a pass from a silent miss, so every one of
+# them was COULD-NOT-CHECK. The three setters below now print ONE verdict line each and never stop
+# the run for a mismatch.
+@{GZ_OMNI_VERDICTS}
 
 
 *** Keywords ***
+Gz Omni Verdict
+    [Documentation]    The one place an OmniStudio setter's verdict is delivered. The keyword's
+    ...                own Python already reads the value back through the SAME `data-omni-key`
+    ...                resolver and raises on a mismatch (`confirm.typed_value`) or on an
+    ...                unreadable control (`confirm.CouldNotCheck`); this turns that raise into a
+    ...                console LINE so the step itself still runs to completion.
+    ...                `${GZ_ON_MISMATCH}` is honoured when the suite defines it (the typetext
+    ...                override's own variable) and defaults to `warn`: print, keep in
+    ...                @{GZ_OMNI_VERDICTS}, log at WARN, CONTINUE. `fail` makes the step fail.
+    ...                It NEVER upgrades a verdict -- a pass is only ever printed for a read-back
+    ...                the Python actually returned.
+    [Arguments]    ${keyword}    ${key}    ${asked}    ${status}    ${result}
+    IF    '${status}' == 'PASS'
+        Log To Console    VERIFIED-PASS: ${keyword}('${key}'): read back '${result}' -- matches '${asked}'
+        RETURN    ${result}
+    END
+    ${verdict}=    Set Variable    CAUGHT-BUG
+    IF    'CouldNotCheck' in $result or 'could not read back' in $result
+        ${verdict}=    Set Variable    COULD-NOT-CHECK
+    END
+    ${line}=    Set Variable    ${keyword}('${key}'): asked '${asked}' -- ${result}
+    Log To Console    ${verdict}: ${line}
+    ${mode}=    Get Variable Value    ${GZ_ON_MISMATCH}    warn
+    IF    '${mode}' == 'warn'
+        Append To List    ${GZ_OMNI_VERDICTS}    ${verdict}: ${line}
+        Set Suite Variable    ${GZ_OMNI_VERDICTS}
+        Log    ${verdict}: ${line}    level=WARN
+    ELSE
+        Fail    ${verdict}: ${line}
+    END
+    RETURN    ${NONE}
+
+Gz Omni Verdict Tally
+    [Documentation]    Prints every OmniStudio verdict kept while ${GZ_ON_MISMATCH} was warn and
+    ...                returns the count -- run it as the last step of a recording session.
+    ${n}=    Get Length    ${GZ_OMNI_VERDICTS}
+    Log To Console    GarzAI OmniStudio non-pass verdicts this session: ${n}
+    FOR    ${m}    IN    @{GZ_OMNI_VERDICTS}
+        Log To Console    - ${m}
+    END
+    RETURN    ${n}
 Omni Type
     [Documentation]    Set any OmniStudio free-text/number/currency/email/phone control by its
     ...                `data-omni-key` (equals `OmniProcessElement.Name`, an author-controlled,
@@ -74,8 +126,17 @@ Omni Type
     ...                docs/recorder/evidence/omni-fsc7f-flexcard-2026-09-06.json): "Loan Amount"
     ...                (currency, `250000` -> `$250,000.00`) and "Interest Rate" (number, `7.5`)
     ...                both VERIFIED-PASS, value held after 4 further keyword calls.
+    ...                VERDICT LINE (2026-09-19, build n2): prints one
+    ...                `VERIFIED-PASS: Omni Type('<key>'): read back '<v>' -- matches '<value>'`
+    ...                (or CAUGHT-BUG / COULD-NOT-CHECK) to the console and never stops the run.
+    ...                The read-back behind it is a SECOND, independent call through the same
+    ...                `data-omni-key` resolver -- until build n2 `omni_type` returned the
+    ...                `inp.value` it read inside the SAME JS that wrote it, which is the vacuous
+    ...                self-referential check `omni_date`'s own docstring names.
     [Arguments]    ${key}    ${value}    ${family}=omni-text
-    ${v}=    Evaluate    __import__('keywords_omni').omni_type($key, $value, $family)
+    ${status}    ${v}=    Run Keyword And Ignore Error
+    ...    Evaluate    __import__('keywords_omni').omni_type($key, $value, $family)
+    ${v}=    Gz Omni Verdict    Omni Type    ${key}    ${value}    ${status}    ${v}
     RETURN    ${v}
 
 Omni Select
@@ -94,8 +155,13 @@ Omni Select
     ...                (LoanTermSelection) changed -- the card's own reactive logic resets a
     ...                dependent field; not a resolver defect. Do not assume a Select value
     ...                survives a later change to a sibling control on this card.
+    ...                VERDICT LINE (2026-09-19, build n2): one console line per call, same form
+    ...                as `Omni Type`. `omni_select` already re-reads the combobox input in its
+    ...                own round trip after the commit, so the line reports a real second read.
     [Arguments]    ${key}    ${value}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_select($key, $value)
+    ${status}    ${v}=    Run Keyword And Ignore Error
+    ...    Evaluate    __import__('keywords_omni').omni_select($key, $value)
+    ${v}=    Gz Omni Verdict    Omni Select    ${key}    ${value}    ${status}    ${v}
     RETURN    ${v}
 
 Omni Radio
@@ -155,8 +221,13 @@ Omni Date
     ...                already drives; flagged so a caller does not assume every FlexCard date
     ...                instance survives re-render, only that the calendar-widget route (used
     ...                here) is the correct one.
+    ...                VERDICT LINE (2026-09-19, build n2): one console line per call, same form
+    ...                as `Omni Type`. `omni_date` already reads back through `get_omni_value`,
+    ...                the independent path that caught its original vacuous green.
     [Arguments]    ${key}    ${value}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_date($key, $value)
+    ${status}    ${v}=    Run Keyword And Ignore Error
+    ...    Evaluate    __import__('keywords_omni').omni_date($key, $value)
+    ${v}=    Gz Omni Verdict    Omni Date    ${key}    ${value}    ${status}    ${v}
     RETURN    ${v}
 
 Omni Multiselect

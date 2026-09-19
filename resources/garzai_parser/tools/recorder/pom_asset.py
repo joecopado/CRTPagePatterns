@@ -13,7 +13,9 @@ a custom LWC renders. So the knowledge must come from CAPTURED pages and be PERS
 page, so a known page is never relearned.
 
 THIS EXTENDS, IT DOES NOT REPLACE. The asset is the POM store that already exists:
-  tools/recorder/pom/keys.py   -- the page key (org alias | url pattern | rt= | layout=)
+  tools/recorder/pom/keys.py   -- the page key (org alias | url pattern | app= | rt=). D17
+                                  (2026-09-19) took `layout=` OUT of the key; the hash is a fact
+                                  on the record and is what `lookup --org` checks staleness by.
   tools/recorder/pom/store.py  -- one JSON per page key, merged never overwritten, ladder rungs
                                   with per-rung verdict history
 merge_session() already writes RECORDED knowledge into it. This module adds the second writer --
@@ -310,8 +312,13 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
         'layout_hash': pk.get('layout_hash'),
         'template_hash': tmpl.get('hash'),
         'map_built_at': (K.load_org_map(pk.get('alias')) or {}).get('built_at'),
-        'rule': ('STALE when the page key layout= component changes, when the template hash '
-                 'changes, or when any rung read-back fails live'),
+        # D17 (2026-09-19): the layout hash is no longer a KEY segment, so this check finally
+        # does something. Before, a changed layout minted a NEW key and a fresh empty record --
+        # the asset was never marked stale because the reader never reached it. Now the key is
+        # stable across renderings and the stored hash is what says the layout moved.
+        'rule': ('STALE when the org map\'s layout hash for this page changes (a FACT on the '
+                 'record since D17, no longer a key segment), when the template hash changes, '
+                 'or when any rung read-back fails live'),
     }
     rec['page']['title'] = meta.get('title')
     rec['last_seen'] = a['built_at']

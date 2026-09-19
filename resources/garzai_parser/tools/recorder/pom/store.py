@@ -683,6 +683,32 @@ def absorb_stamp_placeholder(rec: dict, eid: str, label: str | None) -> str:
     return eid
 
 
+def note_layout_hash(rec: dict, layout_hash: str | None, record_type: str | None) -> None:
+    """Record WHICH LAYOUT this visit rendered, as a fact on the page (D17, user 2026-09-19).
+
+    Until today the hash was a key SEGMENT, so a page rendered under two org-map builds was two
+    records and the question "which layout is this record about" never had to be asked. Now one
+    record accumulates every rendering, so it has to answer: `page.layout_hash` is the most recent
+    one and `page.layout_hashes` is the set, each with the record type it was rendered for, when it
+    was first and last seen, and how many visits landed on it.
+
+    That set is the evidence a reader needs to tell a page whose layout genuinely changed from one
+    that never moved -- the fact the old key destroyed by splitting the record instead of noting
+    the change. It is never used as identity: nothing keys, paths or looks a record up by it.
+    """
+    if not layout_hash:
+        return
+    page = rec.setdefault("page", {})
+    page["layout_hash"] = layout_hash
+    seen = page.setdefault("layout_hashes", {})
+    entry = seen.setdefault(layout_hash, {"record_type": record_type,
+                                          "first_seen": _iso(now()), "n": 0})
+    entry["n"] = (entry.get("n") or 0) + 1
+    entry["last_seen"] = _iso(now())
+    if record_type and not entry.get("record_type"):
+        entry["record_type"] = record_type
+
+
 def rung_key(c: dict) -> str:
     return json.dumps({"kw": c.get("kw") or c.get("name"), "args": c.get("args"), "kwargs": c.get("kwargs")},
                       sort_keys=True, default=str)
@@ -774,6 +800,7 @@ class Store:
         rec.setdefault("predictions", {})
         rec.setdefault("links", {})
         rec.setdefault("states", {})
+        note_layout_hash(rec, pk.get("layout_hash"), pk.get("record_type"))
         rec["_path"] = pk["path"]
         rec["_render"] = pk["render"]
         return rec

@@ -374,19 +374,64 @@ def omni_label(label: str | None) -> str:
     return re.sub(r'\s+', ' ', str(label or '')).strip().strip('*').strip()
 
 
+# The option a listbox offers for "nothing chosen". Picking one is NOT a step: the field ends where
+# it began. Measured live on fsc7f, 2026-09-19 13:13 (build n, run 5): `Omni Select    Salutation
+# -- No Value --` FAILED -- `omni_select` looks for the option's own commit and the control never
+# leaves its empty state. The pair composes nothing and the HELD open click is dropped with it
+# (clicking a combobox open and picking nothing is not a step either); both stock lines are kept as
+# dormant backups, so nothing the user did is lost.
+OMNI_PLACEHOLDER_OPTIONS = ('-- no value --', '--none--', '-- none --', 'none',
+                            'select an option', 'select...', 'select', '--select--',
+                            '-- select --', '--select an option--')
+
+
+def omni_placeholder_option(option: str | None) -> bool:
+    """True when this option is the listbox's own "nothing chosen" entry."""
+    o = re.sub(r'\s+', ' ', str(option or '')).strip()
+    if not o:
+        return True
+    return o.casefold() in OMNI_PLACEHOLDER_OPTIONS
+
+
+def omni_open_click_line(label: str | None, stock_open: str) -> tuple[str, str]:
+    """(the combobox OPEN click, why) in the form a person can read.
+
+    The user, 2026-09-19 (run 5): "Why are absolute paths coming up as backup options?" The stock
+    recorder writes the open click as ~1,200 characters of positional
+    `ClickElement /html[1]/body[1]/...`, which is a generated path by every rule in the locator
+    doctrine. When the descriptor knows the control's LABEL the honest backup is the same
+    label-form xpath the fill backups already carry; the positional line survives only when there
+    is no label at all, because then it is the only handle there is."""
+    lab = omni_label(label)
+    if not lab:
+        return (stock_open or '').strip(), 'no label on the combobox: the positional stock line is the only handle'
+    xp = '//label[normalize-space(.)=%s]/following::input[1]' % RT._lit(lab)
+    return RT._rf('ClickElement', RT._xp_arg(xp)), 'label form from the descriptor label %r' % lab
+
+
+def _dormant(indent: str, text: str) -> str:
+    return '%s#   backup: %s   (stock recorder line, unverified)' % (indent, (text or '').strip())
+
+
 def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_option: str,
                     indent: str = '    ') -> tuple[str, list]:
-    """(the one composed line, the two dormant backup lines) for one combobox pick.
+    """(the one composed line, the dormant backup lines) for one combobox pick.
 
     Returns ('', []) when there is no label to name the control with -- a keyword whose first
-    argument would be blank is not a proposal, it is a guess, and the stock lines stand instead."""
+    argument would be blank is not a proposal, it is a guess, and the stock lines stand instead.
+
+    Returns ('', [two backups]) for a PLACEHOLDER pick: nothing is composed AND the held open
+    click is dropped too, but both stock lines are kept as dormant backups. The empty line with a
+    NON-empty backup list is what tells the caller apart from the no-label case."""
     lab = omni_label(label)
     opt = (option or '').strip()
     if not lab or not opt:
         return '', []
+    open_line, _ = omni_open_click_line(label, stock_open)
+    backups = [_dormant(indent, s) for s in (open_line, stock_option) if (s or '').strip()]
+    if omni_placeholder_option(opt):
+        return '', backups
     line = '%s%s    %s' % (indent, RT._rf('Omni Select', lab, opt).strip(), UNVERIFIED)
-    backups = ['%s#   backup: %s   (stock recorder line, unverified)' % (indent, (s or '').strip())
-               for s in (stock_open, stock_option) if (s or '').strip()]
     return line, backups
 
 
@@ -454,6 +499,46 @@ def omni_iso_date(value: str) -> str | None:
     return '%s-%02d-%02d' % (yr, mo, da)
 
 
+_MASK_PLACEHOLDER = '_'
+
+
+def omni_mask_value(value: str) -> tuple[str, str]:
+    """(the value to compose, why) for a recorded value that carries MASK PLACEHOLDERS.
+
+    Measured live on fsc7f, run 4 (2026-09-19 12:49): the user typed six digits into the masked
+    Phone Number control and the recorder captured the control's RENDERED text mid-entry --
+    `TypeText    Phone Number    (666) 453-____` -- which the composer then emitted verbatim. Those
+    underscores are the widget's own unfilled slots, not characters anyone typed; replaying them
+    types literal `_` into a masked input.
+
+    Each `_` is one unfilled slot, so `digits + underscores` is what the mask wants and `digits` is
+    what the user actually entered -- which makes every surviving `_` proof that the value is
+    SHORT. Stripping alone would leave `(666) 453-`, whose trailing separator is the mask's own
+    furniture around a half-entered number, so the DIGITS are what gets composed (`666453`); the
+    stripped form is named in the `why` rather than thrown away. A value that is nothing but
+    placeholders returns '' -- there is no value to compose and the stock line stands.
+
+    AN UNDERSCORE IS NOT ALWAYS A MASK. `a_b@c.com`, `Zoo_Text__c`, `First_Name` are ordinary
+    values a person typed, and digits-only would destroy them. A `_` is read as a mask placeholder
+    only when the value carries NO letter -- the shape every masked control on this script renders
+    (`(666) 453-____`, `___-__-____`, `$ __,___.__`)."""
+    v = str(value or '')
+    if _MASK_PLACEHOLDER not in v:
+        return v, ''
+    if any(c.isalpha() for c in v):
+        return v, ''            # an underscore inside real text is a character, not a slot
+    stripped = v.replace(_MASK_PLACEHOLDER, '')
+    want = sum(c.isdigit() for c in v) + v.count(_MASK_PLACEHOLDER)
+    have = sum(c.isdigit() for c in stripped)
+    if not have:
+        return '', ('the recorded value is nothing but mask placeholders (%r): there is no value '
+                    'to compose and the stock line stands' % v)
+    digits = ''.join(c for c in stripped if c.isdigit())
+    return digits, ("a half-typed masked input: the recorder captured the widget's own unfilled "
+                    'slots (%r); %d of %d digits were entered, so the mask characters are dropped '
+                    'and the digits composed (stripped form was %r)' % (v, have, want, stripped))
+
+
 def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
                    indent: str = '    ') -> tuple:
     """(the Omni line, the dormant backup, why) for one composed fill on an OmniStudio control, or
@@ -477,6 +562,9 @@ def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
     if not key:
         return '', '', ('an OmniStudio %s, but the element carries no data-omni-key: the stock '
                         'TypeText line stands' % tag.rsplit('-', 1)[-1])
+    value, mask_why = omni_mask_value(value)
+    if not value:
+        return '', '', mask_why
     if tag == _OMNI_DATE_PICKER:
         iso = omni_iso_date(value)
         if not iso:
@@ -490,7 +578,9 @@ def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
     else:
         line = RT._rf('Omni Type', key, value, omni_value_family(value))
         why = "OmniStudio text input: TypeText's clear does not clear it (the value APPENDS)"
-    backup = '%s#   backup: %s   (stock recorder line, unverified)' % (indent, composed.strip())
+    if mask_why:
+        why = '%s; %s' % (why, mask_why)
+    backup = _dormant(indent, composed)
     return '%s%s    %s' % (indent, line.strip(), UNVERIFIED), backup, why
 
 

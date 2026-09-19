@@ -2,12 +2,24 @@
 
 Usage: python3 tools/recorder/pom/keys.py <url> [--org alias] [--refresh-hosts]
 
-A page key is `<partition>|<pattern>[|app=<app>][|rt=<RecordTypeId>][|layout=<hash8>]` where the
+A page key is `<partition>|<pattern>[|app=<app>][|rt=<RecordTypeId>]` where the
 partition is the ORG ALIAS for Salesforce hosts (never the host -- dev1 and slockard share URL
 patterns and must never collide; user, 2026-09-05) and the host for everything else. Record ids,
 session tokens, counters and cache-busters are normalised out; the object, the action
 (view/edit/new/list), the record type and the LIGHTNING APP are kept, because they decide what
 renders.
+
+D17 (user, 2026-09-19) REMOVED the `layout=<hash8>` segment this key used to carry. Everything in a
+key has to be stable for the page's lifetime, and that hash was not: it is a digest of the ORG MAP's
+create-layout items, so a `discover.py refresh` moved it with no change to the page. Measured on the
+live stores -- slockard's Account went `51619c5c` -> `cf4499f9` and its 141-control record became
+unreachable while a fresh empty one was minted on the new key; dev1 carried seven modal records
+across five hashes the org no longer renders (live: `083882ef`). The hash is now a FACT on the
+record (`page.layout_hash`, with `page.layout_hashes` accumulating each one beside the record type
+it was rendered for), which is what it always was: provenance about a rendering, not identity of a
+page. A RECORD TYPE stays in the key -- it is a real page variant the user picks, it comes from the
+URL rather than from the map, and it does not drift. `migrate_keys.py --steps layout` is the
+migration.
 
 D15 (user, 2026-09-18: "the app should [be in the key]. That is the only way we know sales
 lightning vs sales console") REVERSES the 2026-09-15 collapse that folded `/lightning/app/<id>/r/…`
@@ -494,9 +506,17 @@ def page_key(url: str, org: str | None = None, org_map: dict | None = None,
         parts.append(f"rt={info['record_type']}")
     lh = None
     if sf:
+        # D17 (user, 2026-09-19): the layout hash is a FACT ON THE RECORD, never a key segment.
+        # It is a hash of the ORG MAP's create-layout items, so it moves whenever the map is
+        # refreshed -- for a reason that has nothing to do with the page. Measured: slockard's
+        # Account went 51619c5c -> cf4499f9 on a refresh and the 141-control record became
+        # unreachable, with a fresh empty record minted beside it; dev1 holds seven modal records
+        # on five hashes the org no longer renders (live is 083882ef). A key whose identity drifts
+        # under the store is the same defect H9/B3 records for the short record URL: the POM can
+        # never accumulate on a page it cannot name twice. `layout_hash` still rides on the result
+        # and is written to `page.layout_hash`, so two renderings of one page now ACCUMULATE on one
+        # record and the record still says which layout each rendering was.
         lh = layout_hash(org_map, info.get("object"), info.get("record_type"))
-        if lh:
-            parts.append(f"layout={lh}")
     key = "|".join(parts)
     slug = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")[:180]
     if sf and alias:

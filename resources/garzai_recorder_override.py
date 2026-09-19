@@ -510,15 +510,47 @@ function labelIndex(el, label, fam){
   }
   return {index: found, group_size: k, scanned: c.list.length, capped: c.capped};
 }
-/* The OmniStudio element's own metadata id. `data-omni-key` equals `OmniProcessElement.Name` and
-   sits on the element HOST (`runtime_omnistudio_common-input`, `-masked-input`, `-date-picker`),
-   never on the <input> the user actually clicked, so this walks UP -- through shadow hosts, via the
-   same `up()` every label rung uses. It is what `keywords_omni.__host` resolves, which makes it the
-   first argument of `Omni Type` / `Omni Date`; without it the composer leaves the stock TypeText
-   line alone (measured 2026-09-19: TypeText's clear does not clear an OmniScript text input and the
-   value APPENDS, so the keyword choice is not cosmetic). */
+/* The OmniStudio element's own metadata id. `data-omni-key` equals `OmniProcessElement.Name`. This
+   walks UP -- through shadow hosts, via the same `up()` every label rung uses. It is what
+   `keywords_omni.__host` resolves, which makes it the first argument of `Omni Type` / `Omni Date`;
+   without it the composer leaves the stock TypeText line alone (measured 2026-09-19: TypeText's
+   clear does not clear an OmniScript text input and the value APPENDS, so the keyword choice is not
+   cosmetic).
+
+   WHERE THE KEY ACTUALLY SITS, measured on the committed fsc7f captures (2026-09-19, build n2):
+   in an OmniScript the attribute is on the `runtime_omnistudio_omniscript-omniscript-<type>`
+   ELEMENT host -- every one of the 14 `data-omni-key` occurrences in
+   docs/dom-captures/fsc7f-omnistudio/03-applicationform-omniscript-postintake.html is on such a
+   host (`-omniscript-step`, `-omniscript-ip-action`, `-omniscript-text-block`, ...), NOT on the
+   `runtime_omnistudio_common-*` control one level below it.
+
+   WHY THE DATE PICKER MISSED IT (build n, run 5: `omniKey` returned null for Date of Birth and the
+   fill fell back to the stock TypeText). It was the HOP CAP, not a missing attribute. The date
+   input sits EIGHT div levels inside `runtime_omnistudio_common-date-picker`'s shadow root -- the
+   live recording's own path tail is `.../-date-picker[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]
+   /div[2]/input[1]`, and 02-home-flexcard-loancalculator.html shows the same nesting. So the input
+   is 9 hops below the date-picker host, 10 below `runtime_omnistudio_common-input` and ~11 below
+   the omniscript element that carries the key; the old `h < 8` cap stopped three hops short and
+   returned null silently. The cap is raised to the measured depth plus headroom, and the walk stops
+   AT the omniscript element boundary -- if that host has no key, there is none to find and climbing
+   into the container would return a neighbouring element's key, which is worse than none. */
+   TWO boundaries, because not every `data-omni-key` names a CONTROL. A container carries one too
+   (`-omniscript-step` is keyed `ApplicationSummary`; `runtime_omnistudio-flexcard` is keyed
+   `ApplicationSummaryFC`, both measured in capture 03), and handing a container's key to
+   `Omni Type` would drive whatever input that container happens to hold first -- the six-times bug
+   in a new costume. So a CONTAINER stops the walk WITHOUT reading, and only the OmniScript ELEMENT
+   host stops it after reading. Reaching either with nothing is null, which the composer already
+   says out loud and answers with the stock TypeText line. */
+var OMNI_KEY_MAX_HOPS = 20;
+var OMNI_KEY_CONTAINER_RX = /^(runtime_omnistudio-(flexcard|omniscript|generated-omniscript)|runtime_omnistudio_flexcards-|runtime_omnistudio_omniscript-omniscript-(container|step)$)/;
+var OMNI_KEY_ELEMENT_RX = /^runtime_omnistudio_omniscript-omniscript-/;
 function omniKey(el){ var cur = el, h = 0;
-  while (cur && h < 8){ var k = attr(cur,'data-omni-key'); if (k) return k; cur = up(cur); h++; }
+  while (cur && h < OMNI_KEY_MAX_HOPS){
+    var t = cur.tagName ? cur.tagName.toLowerCase() : '';
+    if (OMNI_KEY_CONTAINER_RX.test(t)) return null;   /* its key names the container, not this control */
+    var k = attr(cur,'data-omni-key'); if (k) return k;
+    if (OMNI_KEY_ELEMENT_RX.test(t)) return null;     /* the element host itself, keyless */
+    cur = up(cur); h++; }
   return null; }
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
@@ -601,7 +633,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-19n dormant", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-19n2 picks", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -1194,12 +1226,29 @@ def _omni_clear():
     _OMNI_HOLD.update({"held": False, "line": "", "label": None, "t": 0.0})
 
 
-def _omni_flush():
+def _omni_flush(cl=None):
     """The held line, as a one-item `pre` list, and the hold cleared. A held line that is empty
-    flushes nothing -- there is no step to restore."""
-    out = [_OMNI_HOLD["line"]] if (_OMNI_HOLD["held"] and (_OMNI_HOLD["line"] or "").strip()) else []
+    flushes nothing -- there is no step to restore.
+
+    The flushed line is the LABEL FORM, not the ~1,200-character positional path the stock recorder
+    wrote (user, 2026-09-19 run 5: "Why are absolute paths coming up as backup options?"). An
+    unpaired open-and-close -- the recording's Nationality combobox -- pushed that positional line
+    as `pre`; it is the same click and it gets the same readable form. Without a label there is no
+    label form and the positional line is the only handle, so it stands."""
+    if not (_OMNI_HOLD["held"] and (_OMNI_HOLD["line"] or "").strip()):
+        _omni_clear()
+        return []
+    line, label = _OMNI_HOLD["line"], _OMNI_HOLD["label"]
+    indent = line[: len(line) - len(line.lstrip())] or "    "
+    if cl is not None:
+        try:
+            body, _why = cl.omni_open_click_line(label, line)
+            if body and body.strip():
+                line = "%s%s" % (indent, body.strip())
+        except Exception:
+            pass
     _omni_clear()
-    return out
+    return [line]
 
 
 def _omni_pair(req, decision, line, backups):
@@ -1213,24 +1262,35 @@ def _omni_pair(req, decision, line, backups):
     now = time.time()
     pre = []
     if _OMNI_HOLD["held"] and now - _OMNI_HOLD["t"] > cl.OMNI_PAIR_WINDOW_S:
-        pre = _omni_flush()               # the option click never came: the held line stands alone
+        pre = _omni_flush(cl)             # the option click never came: the held line stands alone
     if _OMNI_HOLD["held"] and cl.omni_combobox_option(rendered, *paths):
         option = _cells(rendered)[1]
-        pair, pair_backups = cl.omni_pair_lines(_OMNI_HOLD["label"], option,
-                                                _OMNI_HOLD["line"], rendered)
+        label = _OMNI_HOLD["label"]
+        pair, pair_backups = cl.omni_pair_lines(label, option, _OMNI_HOLD["line"], rendered)
         if pair:
             decision["why"] = ("OmniStudio combobox pick: the open click and the option click "
                                "composed as one Omni Select (%r -> %r); the two stock lines are "
-                               "dormant backups" % (cl.omni_label(_OMNI_HOLD["label"]), option))
+                               "dormant backups" % (cl.omni_label(label), option))
             decision["omni"] = "paired"
             _omni_clear()
             return pre, pair, pair_backups
+        if pair_backups:
+            # THE PLACEHOLDER PICK. `-- No Value --` leaves the control where it began, so neither
+            # the open click nor the pick is a step: both compose NOTHING and the held line is
+            # dropped with this one. Measured live on fsc7f 2026-09-19 13:13 -- `Omni Select
+            # Salutation    -- No Value --` failed there. Both stock lines stay as dormant backups.
+            decision["why"] = ("OmniStudio combobox placeholder pick (%r): picking nothing is not "
+                               "a step, so neither the open click nor the pick composes a line; "
+                               "both stock lines are dormant backups" % option)
+            decision["omni"] = "placeholder pick: nothing composed, the held click dropped too"
+            _omni_clear()
+            return pre, "", pair_backups
         # no label to name the control with: a keyword whose first argument is blank is a guess.
         decision["omni"] = "no label on the combobox: the two stock lines stand"
-        return pre + _omni_flush(), line, backups
+        return pre + _omni_flush(cl), line, backups
     if not req.get("synthetic") and cl.omni_combobox_opener(rendered, *paths,
                                                             family=desc.get("family")):
-        pre = pre + _omni_flush()         # two openers in a row: the first one stands alone
+        pre = pre + _omni_flush(cl)       # two openers in a row: the first one stands alone
         _OMNI_HOLD.update({"held": True, "line": line if isinstance(line, str) else rendered,
                            "label": desc.get("label") or desc.get("aria_label") or desc.get("placeholder"),
                            "t": now})
@@ -1239,7 +1299,7 @@ def _omni_pair(req, decision, line, backups):
         return pre, "", []
     if _OMNI_HOLD["held"]:
         decision["omni"] = "flushed the held combobox click"
-        pre = pre + _omni_flush()
+        pre = pre + _omni_flush(cl)
     return pre, line, backups
 
 

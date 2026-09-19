@@ -471,15 +471,47 @@ function labelIndex(el, label, fam){
   }
   return {index: found, group_size: k, scanned: c.list.length, capped: c.capped};
 }
-/* The OmniStudio element's own metadata id. `data-omni-key` equals `OmniProcessElement.Name` and
-   sits on the element HOST (`runtime_omnistudio_common-input`, `-masked-input`, `-date-picker`),
-   never on the <input> the user actually clicked, so this walks UP -- through shadow hosts, via the
-   same `up()` every label rung uses. It is what `keywords_omni.__host` resolves, which makes it the
-   first argument of `Omni Type` / `Omni Date`; without it the composer leaves the stock TypeText
-   line alone (measured 2026-09-19: TypeText's clear does not clear an OmniScript text input and the
-   value APPENDS, so the keyword choice is not cosmetic). */
+/* The OmniStudio element's own metadata id. `data-omni-key` equals `OmniProcessElement.Name`. This
+   walks UP -- through shadow hosts, via the same `up()` every label rung uses. It is what
+   `keywords_omni.__host` resolves, which makes it the first argument of `Omni Type` / `Omni Date`;
+   without it the composer leaves the stock TypeText line alone (measured 2026-09-19: TypeText's
+   clear does not clear an OmniScript text input and the value APPENDS, so the keyword choice is not
+   cosmetic).
+
+   WHERE THE KEY ACTUALLY SITS, measured on the committed fsc7f captures (2026-09-19, build n2):
+   in an OmniScript the attribute is on the `runtime_omnistudio_omniscript-omniscript-<type>`
+   ELEMENT host -- every one of the 14 `data-omni-key` occurrences in
+   docs/dom-captures/fsc7f-omnistudio/03-applicationform-omniscript-postintake.html is on such a
+   host (`-omniscript-step`, `-omniscript-ip-action`, `-omniscript-text-block`, ...), NOT on the
+   `runtime_omnistudio_common-*` control one level below it.
+
+   WHY THE DATE PICKER MISSED IT (build n, run 5: `omniKey` returned null for Date of Birth and the
+   fill fell back to the stock TypeText). It was the HOP CAP, not a missing attribute. The date
+   input sits EIGHT div levels inside `runtime_omnistudio_common-date-picker`'s shadow root -- the
+   live recording's own path tail is `.../-date-picker[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]
+   /div[2]/input[1]`, and 02-home-flexcard-loancalculator.html shows the same nesting. So the input
+   is 9 hops below the date-picker host, 10 below `runtime_omnistudio_common-input` and ~11 below
+   the omniscript element that carries the key; the old `h < 8` cap stopped three hops short and
+   returned null silently. The cap is raised to the measured depth plus headroom, and the walk stops
+   AT the omniscript element boundary -- if that host has no key, there is none to find and climbing
+   into the container would return a neighbouring element's key, which is worse than none. */
+   TWO boundaries, because not every `data-omni-key` names a CONTROL. A container carries one too
+   (`-omniscript-step` is keyed `ApplicationSummary`; `runtime_omnistudio-flexcard` is keyed
+   `ApplicationSummaryFC`, both measured in capture 03), and handing a container's key to
+   `Omni Type` would drive whatever input that container happens to hold first -- the six-times bug
+   in a new costume. So a CONTAINER stops the walk WITHOUT reading, and only the OmniScript ELEMENT
+   host stops it after reading. Reaching either with nothing is null, which the composer already
+   says out loud and answers with the stock TypeText line. */
+var OMNI_KEY_MAX_HOPS = 20;
+var OMNI_KEY_CONTAINER_RX = /^(runtime_omnistudio-(flexcard|omniscript|generated-omniscript)|runtime_omnistudio_flexcards-|runtime_omnistudio_omniscript-omniscript-(container|step)$)/;
+var OMNI_KEY_ELEMENT_RX = /^runtime_omnistudio_omniscript-omniscript-/;
 function omniKey(el){ var cur = el, h = 0;
-  while (cur && h < 8){ var k = attr(cur,'data-omni-key'); if (k) return k; cur = up(cur); h++; }
+  while (cur && h < OMNI_KEY_MAX_HOPS){
+    var t = cur.tagName ? cur.tagName.toLowerCase() : '';
+    if (OMNI_KEY_CONTAINER_RX.test(t)) return null;   /* its key names the container, not this control */
+    var k = attr(cur,'data-omni-key'); if (k) return k;
+    if (OMNI_KEY_ELEMENT_RX.test(t)) return null;     /* the element host itself, keyless */
+    cur = up(cur); h++; }
   return null; }
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;

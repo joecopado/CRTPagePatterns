@@ -313,14 +313,35 @@ def _confirm_readback(family: str, key: str, asked, got):
 # ---------------------------------------------------------------------------
 def omni_type(key: str, value, family: str = "omni-text"):
     """Set any OmniStudio free-text-ish control (Text, Number, Currency, Email,
-    Telephone, Date) by its `data-omni-key`, then READ IT BACK."""
+    Telephone, Date) by its `data-omni-key`, then READ IT BACK.
+
+    THE READ-BACK IS A SECOND, INDEPENDENT CALL (2026-09-19, build n2). Until now
+    this returned the `inp.value` it read inside the SAME JS that had just written
+    it -- exactly the self-referential, vacuous check `omni_date`'s own docstring
+    names as the reason its CAUGHT-BUG went unnoticed for a run: a native-value
+    write always reads back on the element it was written to, whether or not the
+    component committed it. Measured live on fsc7f, 2026-09-19 13:13: seven
+    `Omni Type` calls returned in ~30 ms each and whether any value landed was
+    COULD-NOT-CHECK from the log. The write half is unchanged; the value compared
+    now comes from `get_omni_value`, the same canonical `data-omni-key` selector
+    every `Omni Verify *` keyword uses, family-normalised by `_normalise_for`
+    (a masked Currency/Telephone REFORMATS on blur, so a raw string compare
+    reads a correct write as a mismatch).
+    """
     _require_host(key)
-    got = _js(
+    wrote = _js(
         """const h = __host(arguments[0]);
            const inp = __inside(h,'input:not([type=hidden]), textarea')[0];
            if(!inp) return null;
            __setNative(inp, arguments[1]);
            return inp.value;""", key, str(value))
+    if wrote is None:
+        confirm.unreadable(f"{family} {key}",
+                           tried="no input or textarea inside the data-omni-key host")
+    # The component's own blur/reformat runs on its next tick -- the same reason
+    # omni_select and omni_date each settle before their read.
+    time.sleep(0.3)
+    got = get_omni_value(key, family=family)
     return _confirm_readback(family, key, value, got)
 
 
