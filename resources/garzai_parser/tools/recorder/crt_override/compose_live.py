@@ -550,15 +550,49 @@ def live_capture(drv, org: str | None = None, max_depth: int = 120) -> dict:
             'title': data.get('title')}
 
 
-def _fingerprint(drv) -> int:
+# The page's own answer to "is this still the same page?". A NODE COUNT alone said yes to a page
+# that re-rendered in place with the same number of nodes -- a record page switching to inline edit,
+# a datatable swapping a row, a wizard step replacing its fields -- so the stale parse answered with
+# a label that is no longer on the page (challenge D10 finding 8, 2026-09-19). The count still
+# travels, and the CONTENT of the controls travels with it: tag plus the first of
+# aria-label / name / placeholder / text, for the controls and their labels, capped and hashed.
+# One execute_script, the same round trip the count cost.
+_FINGERPRINT_JS = r"""
+/* __gzFingerprint */
+var n = document.getElementsByTagName('*').length;
+var els = document.querySelectorAll('input,select,textarea,button,a,label,legend,[role],[contenteditable="true"]');
+var out = [String(n), String(els.length)];
+var cap = els.length < 400 ? els.length : 400;
+for (var i = 0; i < cap; i++) {
+  var e = els[i], t = '';
+  try { t = e.getAttribute('aria-label') || e.getAttribute('name') || e.getAttribute('placeholder') || e.textContent || ''; } catch (err) { t = ''; }
+  out.push(e.tagName + '=' + String(t).replace(/\s+/g, ' ').trim().slice(0, 40));
+}
+return out.join('|');
+"""
+
+
+def _fingerprint(drv) -> str:
+    """A content-sensitive page fingerprint, or `'-1'` when the page could not answer.
+
+    Never a bare node count: two different pages, and one page before and after an in-place
+    re-render, routinely carry the same count."""
     try:
-        return int(drv.execute_script("return document.getElementsByTagName('*').length"))
+        raw = drv.execute_script(_FINGERPRINT_JS)
     except Exception:
-        return -1
+        return '-1'
+    return hashlib.sha1(str(raw).encode('utf-8', 'replace')).hexdigest()[:16]
 
 
 CAPTURE_MIN_INTERVAL_S = 5.0     # a capture runs on the page's main thread; on a large Setup page it
-SCRIPT_TIMEOUT_S = 8             # is the stall the user saw when every click recaptured (2026-09-18)
+                                 # is the stall the user saw when every click recaptured (2026-09-18)
+# STRICTLY BELOW the page's own `ASK_MS` (6000 ms in the generated library's injected JS). The two
+# were inverted -- the page gave up at 6 s and pushed the recorder's line while the driver worked on
+# to 8 s -- so an abandoned request kept driving the browser while the page had already started the
+# next event's ask(): two handlers on one selenium driver (challenge D10 finding 7, 2026-09-19).
+# Whoever changes either number changes both: 4 < 6 is the invariant, asserted in the challenge file.
+SCRIPT_TIMEOUT_S = 4
+PAGE_ASK_MS = 6000               # what the injected JS waits; this module must finish inside it
 
 
 def capture_allowed(cache: dict, now: float | None = None) -> tuple[bool, float]:
@@ -599,12 +633,24 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
             if not ok:
                 return {'line': None, 'xpath_line': None, 'row': None,
                         'why': 'COULD-NOT-CHECK: capture budget: the page changed %.1f s after the last capture (minimum %.0f s)' % (since, CAPTURE_MIN_INTERVAL_S), **out_extra}
+            # A capture that RAISES is the third state, not an exception thrown at the caller:
+            # every other failure here returns a COULD-NOT-CHECK dict, and a page unloading
+            # mid-serialize (or an empty document -- measured 2026-09-18, `ParserError: Document is
+            # empty`) must read the same way (challenge D10 finding 9, 2026-09-19).
+            try:
+                shot = live_capture(drv, org)
+                fresh = parse_capture(shot['html'], shot['url'], org)
+            except Exception as exc:
+                return {'line': None, 'xpath_line': None, 'row': None,
+                        'why': 'COULD-NOT-CHECK: the capture failed: %s: %s' % (type(exc).__name__, exc),
+                        **out_extra}
+            # the budget is spent by a capture that PARSED, never by one that failed: stamping it
+            # first blinded the composer for the following 5 s every time a capture went wrong
             cache['last_capture_t'] = time.time()
-            shot = live_capture(drv, org)
             # the cache key is the DRIVER's url, never the serializer's rendering of it: when the two
             # differed in form every event re-captured, which is the Setup stall (2026-09-18)
             cache.update({'url': url, 'shot_url': shot['url'], 'fingerprint': fp, 'capture_ms': shot['capture_ms'],
-                          'parsed': parse_capture(shot['html'], shot['url'], org)})
+                          'parsed': fresh})
             cache['xpaths'] = [r.get('identity_xpath') or '' for r in cache['parsed'].rows]
             out_extra['capture_ms'] = shot['capture_ms']
             out_extra['recaptured'] = attempt > 1 or out_extra['recaptured']

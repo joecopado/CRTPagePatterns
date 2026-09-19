@@ -32,7 +32,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROWS = json.loads('[{"n": 0, "label": "Toggle Panel", "type": "button", "identity_xpath": "//button[@aria-expanded=\\"false\\" and @aria-label=\\"Toggle Panel\\" and @title=\\"Menu\\"]", "group_size": 2, "index": 1, "attrs": {"aria-expanded": "false", "aria-label": "Toggle Panel", "title": "Menu"}, "kw": "ClickItem", "locator": "Menu", "xpath": "//button[@aria-label=\\"Toggle Panel\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Skip to Main Content"], "kw_note": "ClickItem resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 1, "label": "Show menu", "type": "button", "identity_xpath": "//button[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @type=\\"button\\" and @value=\\"\\"]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "type": "button"}, "kw": "ClickText", "locator": "Show menu", "xpath": "(//*[normalize-space(text())=\\"Developer Edition\\"]/following::button[@type=\\"button\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 2, "label": "Search...", "type": "button", "identity_xpath": "//button[@aria-label=\\"Search\\" and @type=\\"button\\"]", "group_size": 2, "index": 1, "attrs": {"aria-label": "Search", "type": "button"}, "kw": "ClickText", "locator": "Search...", "xpath": "//button[@aria-label=\\"Search\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Show menu"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 3, "label": "Add favorite", "type": "button", "identity_xpath": "//button[@aria-label=\\"Add favorite\\" and @aria-pressed=\\"false\\" and @type=\\"button\\"]", "attrs": {"aria-label": "Add favorite", "type": "button"}, "kw": "ClickItem", "locator": "Add favorite", "xpath": "//button[@aria-label=\\"Add favorite\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickItem resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 4, "label": "Favorites list", "type": "button", "identity_xpath": "//button[@aria-haspopup=\\"false\\" and @type=\\"button\\"]", "attrs": {"aria-haspopup": "false", "type": "button"}, "kw": "ClickText", "locator": "Favorites list", "xpath": "(//*[normalize-space(text())=\\"Add favorite\\"]/following::button[@type=\\"button\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 5, "label": "Global Actions", "type": "button", "identity_xpath": "//a[@aria-describedby=\\"\\" and @aria-disabled=\\"false\\" and @aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @aria-labelledby=\\"\\" and @href=\\"javascript:void(0);\\" and @role=\\"button\\" and @tabindex=\\"0\\" and @title=\\"\\"][.//text()[normalize-space(.)=\\"Global Actions\\"]]", "attrs": {"aria-controls": "119:639;a", "aria-disabled": "false", "aria-expanded": "false", "aria-haspopup": "true", "href": "javascript:void(0);", "role": "button"}, "kw": "ClickText", "locator": "Global Actions", "xpath": "(//*[normalize-space(text())=\\"Favorites list\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 6, "label": "Guidance Center", "type": "button", "identity_xpath": "//button[@aria-haspopup=\\"dialog\\" and @type=\\"button\\"][.//text()[normalize-space(.)=\\"Guidance Center\\"]]", "attrs": {"aria-haspopup": "dialog", "type": "button"}, "kw": "ClickText", "locator": "Guidance Center", "xpath": "(//*[normalize-space(text())=\\"Global Actions\\"]/following::button[@type=\\"button\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 7, "label": "Salesforce Help", "type": "button", "identity_xpath": "//button[@aria-haspopup=\\"true\\" and @title=\\"\\" and @type=\\"button\\"]", "attrs": {"aria-haspopup": "true", "type": "button"}, "kw": "ClickText", "locator": "Salesforce Help", "xpath": "(//*[normalize-space(text())=\\"Guidance Center\\"]/following::button[@type=\\"button\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 8, "label": "Setup", "type": "button", "identity_xpath": "//a[@aria-describedby=\\"\\" and @aria-disabled=\\"false\\" and @aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @aria-labelledby=\\"\\" and @href=\\"javascript:void(0);\\" and @role=\\"button\\" and @tabindex=\\"0\\" and @title=\\"\\"][.//text()[normalize-space(.)=\\"Setup\\"]]", "attrs": {"aria-controls": "191:219;a", "aria-disabled": "false", "aria-expanded": "false", "aria-haspopup": "true", "href": "javascript:void(0);", "role": "button"}, "kw": "ClickText", "locator": "Setup", "xpath": "(//*[normalize-space(text())=\\"Salesforce Help\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 9, "label": "Notifications", "type": "button", "identity_xpath": "//button[@aria-haspopup=\\"dialog\\" and @type=\\"button\\"][.//text()[normalize-space(.)=\\"Notifications\\"]]", "attrs": {"aria-haspopup": "dialog", "type": "button"}, "kw": "ClickText", "locator": "Notifications", "xpath": "(//*[normalize-space(text())=\\"Setup\\"]/following::button[@type=\\"button\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 10, "label": "View profile", "type": "button", "identity_xpath": "//button[@aria-haspopup=\\"true\\" and @type=\\"button\\"][.//text()[normalize-space(.)=\\"View profile\\"]]", "attrs": {"aria-haspopup": "true", "type": "button"}, "kw": "ClickText", "locator": "View profile", "xpath": "(//*[normalize-space(text())=\\"Notifications\\"]/following::button[@type=\\"button\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 11, "label": "App Launcher", "type": "button", "identity_xpath": "//button[@aria-expanded=\\"false\\" and @aria-haspopup=\\"dialog\\" and @title=\\"App Launcher\\"]", "attrs": {"aria-expanded": "false", "aria-haspopup": "dialog", "data-target-selection-name": "181c7013df09423d8f755b49c067f6f3", "title": "App Launcher"}, "kw": "ClickItem", "locator": "App Launcher", "xpath": "//button[@title=\\"App Launcher\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickItem resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 12, "label": "Home", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/page/home\\" and @tabindex=\\"0\\" and @title=\\"Home\\"]", "attrs": {"href": "/lightning/page/home", "title": "Home"}, "kw": "ClickText", "locator": "Home", "xpath": "//a[@title=\\"Home\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 13, "label": "Opportunities", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Opportunity/home\\" and @tabindex=\\"0\\" and @title=\\"Opportunities\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Opportunity/home", "title": "Opportunities"}, "kw": "ClickText", "locator": "Opportunities", "xpath": "//a[@title=\\"Opportunities\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Home"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 14, "label": "Opportunities List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Opportunities List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Opportunities List", "xpath": "(//*[normalize-space(text())=\\"Opportunities\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 15, "label": "Leads", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Lead/home\\" and @tabindex=\\"0\\" and @title=\\"Leads\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Lead/home", "title": "Leads"}, "kw": "ClickText", "locator": "Leads", "xpath": "//a[@title=\\"Leads\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Opportunities List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 16, "label": "Leads List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Leads List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Leads List", "xpath": "(//*[normalize-space(text())=\\"Leads\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 17, "label": "Tasks", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Task/home\\" and @tabindex=\\"0\\" and @title=\\"Tasks\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Task/home", "title": "Tasks"}, "kw": "ClickText", "locator": "Tasks", "xpath": "//a[@title=\\"Tasks\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Leads List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 18, "label": "Tasks List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Tasks List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Tasks List", "xpath": "(//*[normalize-space(text())=\\"Tasks\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 19, "label": "Files", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/ContentDocument/home\\" and @tabindex=\\"0\\" and @title=\\"Files\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/ContentDocument/home", "title": "Files"}, "kw": "ClickText", "locator": "Files", "xpath": "//a[@title=\\"Files\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Tasks List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 20, "label": "Files List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Files List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Files List", "xpath": "(//*[normalize-space(text())=\\"Files\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 21, "label": "Accounts", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Account/home\\" and @tabindex=\\"0\\" and @title=\\"Accounts\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Account/home", "title": "Accounts"}, "kw": "ClickText", "locator": "Accounts", "xpath": "//a[@title=\\"Accounts\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Files List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 22, "label": "Accounts List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Accounts List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Accounts List", "xpath": "(//*[normalize-space(text())=\\"Accounts\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 23, "label": "Contacts", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Contact/home\\" and @tabindex=\\"0\\" and @title=\\"Contacts\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Contact/home", "title": "Contacts"}, "kw": "ClickText", "locator": "Contacts", "xpath": "//a[@title=\\"Contacts\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Accounts List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 24, "label": "Contacts List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Contacts List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Contacts List", "xpath": "(//*[normalize-space(text())=\\"Contacts\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 25, "label": "Campaigns", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Campaign/home\\" and @tabindex=\\"0\\" and @title=\\"Campaigns\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Campaign/home", "title": "Campaigns"}, "kw": "ClickText", "locator": "Campaigns", "xpath": "//a[@title=\\"Campaigns\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contacts List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 26, "label": "Campaigns List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Campaigns List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Campaigns List", "xpath": "(//*[normalize-space(text())=\\"Campaigns\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 27, "label": "Dashboards", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Dashboard/home\\" and @tabindex=\\"0\\" and @title=\\"Dashboards\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Dashboard/home", "title": "Dashboards"}, "kw": "ClickText", "locator": "Dashboards", "xpath": "//a[@title=\\"Dashboards\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Campaigns List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 28, "label": "Dashboards List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Dashboards List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Dashboards List", "xpath": "(//*[normalize-space(text())=\\"Dashboards\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 29, "label": "Reports", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Report/home\\" and @tabindex=\\"0\\" and @title=\\"Reports\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Report/home", "title": "Reports"}, "kw": "ClickText", "locator": "Reports", "xpath": "//a[@title=\\"Reports\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Dashboards List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 30, "label": "Reports List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Reports List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Reports List", "xpath": "(//*[normalize-space(text())=\\"Reports\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 31, "label": "Chatter", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/page/chatter\\" and @tabindex=\\"0\\" and @title=\\"Chatter\\"]", "attrs": {"href": "/lightning/page/chatter", "title": "Chatter"}, "kw": "ClickText", "locator": "Chatter", "xpath": "//a[@title=\\"Chatter\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 32, "label": "Groups", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/CollaborationGroup/home\\" and @tabindex=\\"0\\" and @title=\\"Groups\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/CollaborationGroup/home", "title": "Groups"}, "kw": "ClickText", "locator": "Groups", "xpath": "//a[@title=\\"Groups\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Chatter"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 33, "label": "Groups List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Groups List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Groups List", "xpath": "(//*[normalize-space(text())=\\"Groups\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 34, "label": "Calendar", "type": "link", "identity_xpath": "//a[@aria-current=\\"false\\" and @draggable=\\"false\\" and @href=\\"/lightning/o/Event/home\\" and @tabindex=\\"0\\" and @title=\\"Calendar\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/o/Event/home", "title": "Calendar"}, "kw": "ClickText", "locator": "Calendar", "xpath": "//a[@title=\\"Calendar\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Groups List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 35, "label": "Calendar List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Calendar List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Calendar List", "xpath": "(//*[normalize-space(text())=\\"Calendar\\"]/following::a)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 36, "label": "Zoo \\u00b7 Nightmare inputs", "type": "link", "identity_xpath": "//a[@aria-current=\\"page\\" and @draggable=\\"false\\" and @href=\\"/lightning/n/Zoo_Nightmare_Inputs\\" and @tabindex=\\"0\\" and @title=\\"Zoo \\u00b7 Nightmare inputs\\"]", "group_size": 2, "index": 1, "attrs": {"href": "/lightning/n/Zoo_Nightmare_Inputs", "title": "Zoo \\u00b7 Nightmare inputs"}, "kw": "ClickText", "locator": "Zoo \\u00b7 Nightmare inputs", "xpath": "//a[@title=\\"Zoo \\u00b7 Nightmare inputs\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Calendar List"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 37, "label": "Zoo \\u00b7 Nightmare inputs List", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"Zoo \\u00b7 Nightmare inputs List\\"]]", "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "Zoo \\u00b7 Nightmare inputs List", "xpath": "(//*[normalize-space(text())=\\"Calendar\\"]/following::a[normalize-space(.)=\\"Zoo \\u00b7 Nightmare inputs List\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 38, "label": "Close tab", "type": "button", "identity_xpath": "//button[.//text()[normalize-space(.)=\\"Close tab\\"]]", "attrs": {"data-id": "temp-1789057327358"}, "kw": "ClickText", "locator": "Close tab", "xpath": "(//*[normalize-space(text())=\\"Calendar\\"]/following::button)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 39, "label": "More", "type": "button", "identity_xpath": "//a[@aria-expanded=\\"false\\" and @aria-haspopup=\\"true\\" and @draggable=\\"false\\" and @role=\\"button\\" and @tabindex=\\"0\\"][.//text()[normalize-space(.)=\\"*\\"]]", "group_size": 2, "index": 1, "attrs": {"aria-expanded": "false", "aria-haspopup": "true", "role": "button"}, "kw": "ClickText", "locator": "More", "xpath": "//a[.//text()[normalize-space(.)=\\"More\\"]]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "COULD-NOT-CHECK", "anchors": ["Close tab"], "kw_note": "COULD-NOT-CHECK: identity xpath matched None QWeb-visible live, 0 in the DOM (QWebElementNotFoundError: Unable to find element for locator /", "xp_date": "2026-09-11T08:44:30"}, {"n": 40, "label": "Personalize your nav bar", "type": "button", "identity_xpath": "//button[@title=\\"Personalize your nav bar\\" and @type=\\"button\\"]", "attrs": {"title": "Personalize your nav bar", "type": "button"}, "kw": "ClickItem", "locator": "Personalize your nav bar", "xpath": "//button[@title=\\"Personalize your nav bar\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickItem resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 41, "type": "input_field", "identity_xpath": "(//input[@readonly=\\"\\" and @type=\\"text\\"])[1]", "attrs": {"readonly": "", "type": "text"}, "xpath": "//*[normalize-space(text())=\\"Contract Term\\"]/following-sibling::*//input[@type=\\"text\\"]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 42, "label": "Contract Term", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[2]", "group_size": 2, "index": 1, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Contract Term", "xpath": "(//c-zoo-nightmare-inputs//input[@type=\\"text\\"])[2]", "kw_verdict": "CAUGHT-BUG", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms"], "kw_note": "QWeb\'s input resolver (TypeText anchor=1) landed on a DIFFERENT node -- index mode did not reach this member", "xp_date": "2026-09-11T08:44:30"}, {"n": 43, "label": "Renewal Notice (days)", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[3]", "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Renewal Notice (days)", "xpath": "(//*[normalize-space(text())=\\"Renewal Notice (days)\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "QWeb\'s input resolver (TypeText) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 44, "label": "Amount", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[4]", "group_size": 3, "index": 1, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Amount", "xpath": "//*[normalize-space(text())=\\"List Price\\"]/following-sibling::*//input[@type=\\"text\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["List Price"], "kw_note": "QWeb\'s input resolver (TypeText anchor=1) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 45, "label": "Amount", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[5]", "group_size": 3, "index": 2, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Amount", "xpath": "//*[normalize-space(text())=\\"Negotiated Discount\\"]/following-sibling::*//input[@type=\\"text\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Negotiated Discount"], "kw_note": "QWeb\'s input resolver (TypeText anchor=2) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 46, "label": "Amount", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[6]", "group_size": 3, "index": 3, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Amount", "xpath": "//*[normalize-space(text())=\\"Net to Customer\\"]/following-sibling::*//input[@type=\\"text\\"]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Net to Customer"], "kw_note": "QWeb\'s input resolver (TypeText anchor=3) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 47, "label": "Approved Budget", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[7]", "group_size": 2, "index": 1, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Approved Budget", "xpath": "(//*[normalize-space(text())=\\"Approved Budget\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms", "Approval Envelope"], "kw_note": "QWeb\'s input resolver (TypeText anchor=1) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 48, "label": "Approved Budget", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[8]", "group_size": 2, "index": 2, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Approved Budget", "xpath": "(//*[normalize-space(text())=\\"to\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "CAUGHT-BUG", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms", "to"], "kw_note": "QWeb\'s input resolver (TypeText anchor=2) landed on a DIFFERENT node -- index mode did not reach this member", "xp_date": "2026-09-11T08:44:30"}, {"n": 49, "type": "button", "identity_xpath": "(//button)[13]", "xpath": "(//*[normalize-space(text())=\\"Kickoff Workshop\\"]/following::button)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 50, "label": "Start Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[9]", "group_size": 4, "index": 1, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Start Date", "xpath": "(//*[normalize-space(text())=\\"Kickoff Workshop\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Kickoff Workshop", "\\u2014 Seattle HQ"], "kw_note": "QWeb\'s input resolver (TypeText anchor=1) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 51, "label": "End Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[10]", "group_size": 4, "index": 1, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "End Date", "xpath": "(//*[normalize-space(text())=\\"Kickoff Workshop\\"]/following::*[normalize-space(text())=\\"End Date\\"])[1]/following::input[@type=\\"text\\"][1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Kickoff Workshop", "Start Date"], "kw_note": "QWeb\'s input resolver (TypeText anchor=1) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 52, "label": "Billable to customer", "type": "checkbox", "identity_xpath": "(//input[@type=\\"checkbox\\"])[1]", "group_size": 4, "index": 1, "attrs": {"type": "checkbox"}, "kw": "ClickCheckbox", "locator": "Billable to customer", "xpath": "(//*[normalize-space(text())=\\"Kickoff Workshop\\"]/following::input[@type=\\"checkbox\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Kickoff Workshop", "End Date"], "kw_note": "QWeb\'s checkbox resolver landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 53, "type": "button", "identity_xpath": "(//button)[14]", "xpath": "(//*[normalize-space(text())=\\"Discovery Review\\"]/following::button)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 54, "label": "Start Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[11]", "group_size": 4, "index": 2, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Start Date", "xpath": "(//*[normalize-space(text())=\\"Discovery Review\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Discovery Review", "\\u2014 Seattle HQ"], "kw_note": "QWeb\'s input resolver (TypeText anchor=2) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 55, "label": "End Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[12]", "group_size": 4, "index": 2, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "End Date", "xpath": "(//*[normalize-space(text())=\\"Discovery Review\\"]/following::*[normalize-space(text())=\\"End Date\\"])[1]/following::input[@type=\\"text\\"][1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Discovery Review", "Start Date"], "kw_note": "QWeb\'s input resolver (TypeText anchor=2) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 56, "label": "Billable to customer", "type": "checkbox", "identity_xpath": "(//input[@type=\\"checkbox\\"])[2]", "group_size": 4, "index": 2, "attrs": {"type": "checkbox"}, "kw": "ClickCheckbox", "locator": "Billable to customer", "xpath": "(//*[normalize-space(text())=\\"Discovery Review\\"]/following::input[@type=\\"checkbox\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Discovery Review", "End Date"], "kw_note": "QWeb\'s checkbox resolver landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 57, "type": "button", "identity_xpath": "(//button)[15]", "xpath": "(//*[normalize-space(text())=\\"Integration Checkpoint\\"]/following::button)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 58, "label": "Start Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[13]", "group_size": 4, "index": 3, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Start Date", "xpath": "(//*[normalize-space(text())=\\"Integration Checkpoint\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Integration Checkpoint", "\\u2014 Portland Annex"], "kw_note": "QWeb\'s input resolver (TypeText anchor=3) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 59, "label": "End Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[14]", "group_size": 4, "index": 3, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "End Date", "xpath": "(//*[normalize-space(text())=\\"Integration Checkpoint\\"]/following::*[normalize-space(text())=\\"End Date\\"])[1]/following::input[@type=\\"text\\"][1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Integration Checkpoint", "Start Date"], "kw_note": "QWeb\'s input resolver (TypeText anchor=3) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 60, "label": "Billable to customer", "type": "checkbox", "identity_xpath": "(//input[@type=\\"checkbox\\"])[3]", "group_size": 4, "index": 3, "attrs": {"type": "checkbox"}, "kw": "ClickCheckbox", "locator": "Billable to customer", "xpath": "(//*[normalize-space(text())=\\"Integration Checkpoint\\"]/following::input[@type=\\"checkbox\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Integration Checkpoint", "End Date"], "kw_note": "QWeb\'s checkbox resolver landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 61, "type": "button", "identity_xpath": "(//button)[16]", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::button)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 62, "label": "Start Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[15]", "group_size": 4, "index": 4, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "Start Date", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Go-Live Support", "\\u2014 Remote"], "kw_note": "QWeb\'s input resolver (TypeText anchor=4) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 63, "label": "End Date", "type": "input_field", "identity_xpath": "(//input[@type=\\"text\\"])[16]", "group_size": 4, "index": 4, "attrs": {"type": "text"}, "kw": "TypeText", "locator": "End Date", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::*[normalize-space(text())=\\"End Date\\"])[1]/following::input[@type=\\"text\\"][1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Go-Live Support", "Start Date"], "kw_note": "QWeb\'s input resolver (TypeText anchor=4) landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 64, "label": "Billable to customer", "type": "checkbox", "identity_xpath": "(//input[@type=\\"checkbox\\"])[4]", "group_size": 4, "index": 4, "attrs": {"type": "checkbox"}, "kw": "ClickCheckbox", "locator": "Billable to customer", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::input[@type=\\"checkbox\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Go-Live Support", "End Date"], "kw_note": "QWeb\'s checkbox resolver landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 65, "label": "Add Line", "type": "button", "identity_xpath": "(//button[.//text()[normalize-space(.)=\\"Add Line\\"]])[1]", "group_size": 2, "index": 1, "kw": "ClickText", "locator": "Add Line", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::button[normalize-space(.)=\\"Add Line\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms", "Billable to customer"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 66, "label": "Add Line", "type": "button", "identity_xpath": "(//button[.//text()[normalize-space(.)=\\"Add Line\\"]])[2]", "group_size": 2, "index": 2, "kw": "ClickText", "locator": "Add Line", "xpath": "(//c-zoo-nightmare-inputs//button)[6]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms", "Billable to customer"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 67, "label": "Save", "type": "button", "identity_xpath": "(//button[.//text()[normalize-space(.)=\\"Save\\"]])[1]", "group_size": 2, "index": 1, "kw": "ClickText", "locator": "Save", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::button[normalize-space(.)=\\"Save\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms", "Add Line"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 68, "label": "Save & New", "type": "button", "identity_xpath": "//button[.//text()[normalize-space(.)=\\"Save & New\\"]]", "kw": "ClickText", "locator": "Save & New", "xpath": "(//*[normalize-space(text())=\\"Go-Live Support\\"]/following::button[normalize-space(.)=\\"Save & New\\"])[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 69, "label": "Save", "type": "button", "identity_xpath": "(//button[.//text()[normalize-space(.)=\\"Save\\"]])[2]", "group_size": 2, "index": 2, "kw": "ClickText", "locator": "Save", "xpath": "(//*[normalize-space(text())=\\"Save & New\\"]/following::button)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Contract Terms", "Save & New"], "kw_note": "ClickText resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 70, "label": "Territory", "type": "dropdown", "identity_xpath": "//select[.//text()[normalize-space(.)=\\"--None--\\"]]", "group_size": 2, "index": 1, "kw": "DropDown", "locator": "Territory", "xpath": "(//*[normalize-space(text())=\\"Territory & Coverage\\"]/following::select)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "anchors": ["Territory & Coverage", "Seven controls. One of them is a real <select>. Six are not."], "kw_note": "QWeb\'s dropdown resolver landed on this <select>", "xp_date": "2026-09-11T08:44:30"}, {"n": 71, "label": "Territory", "type": "input_field", "identity_xpath": "(//input[@readonly=\\"\\" and @role=\\"combobox\\" and @type=\\"text\\"])[1]", "group_size": 2, "index": 2, "attrs": {"readonly": "", "role": "combobox", "type": "text"}, "kw": "TypeText", "locator": "Territory", "xpath": "(//*[normalize-space(text())=\\"Territory & Coverage\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "anchors": ["Territory & Coverage", "Southeast"], "kw_note": "combo_box has no resolve-only entry point; the drive step is the proof", "xp_date": "2026-09-11T08:44:30"}, {"n": 72, "label": "Coverage Owner", "type": "input_field", "identity_xpath": "//input[@aria-autocomplete=\\"list\\" and @role=\\"combobox\\" and @type=\\"text\\"]", "attrs": {"role": "combobox", "type": "text"}, "kw": "TypeText", "locator": "Coverage Owner", "xpath": "(//*[normalize-space(text())=\\"Coverage Owner\\"]/following::input[@type=\\"text\\"])[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "combo_box has no resolve-only entry point; the drive step is the proof", "xp_date": "2026-09-11T08:44:30"}, {"n": 73, "label": "Product Lines Covered", "type": "input_field", "identity_xpath": "(//input[@readonly=\\"\\" and @role=\\"combobox\\" and @type=\\"text\\"])[2]", "attrs": {"readonly": "", "role": "combobox", "type": "text"}, "kw": "TypeText", "locator": "Product Lines Covered", "xpath": "(//*[normalize-space(text())=\\"Revenue Cloud\\"]/following::input[@type=\\"text\\"])[1]", "corrected": "ClickElement    xpath\\\\=(//*[normalize-space(text())\\\\=\\"Product Lines Covered\\"]/following::input[@type\\\\=\\"text\\"])[1] ;; ClickText    Agentforce ;; VerifyText    Agentforce    timeout=5", "kw_verdict": "CAUGHT-BUG", "xp_verdict": "VERIFIED-PASS", "kw_note": "ClickElement resolution landed on a DIFFERENT node", "xp_date": "2026-09-11T08:44:30"}, {"n": 74, "label": "Support Tier", "type": "input_field", "identity_xpath": "(//input[@readonly=\\"\\" and @role=\\"combobox\\" and @type=\\"text\\"])[3]", "attrs": {"readonly": "", "role": "combobox", "type": "text"}, "kw": "TypeText", "locator": "Support Tier", "xpath": "(//*[normalize-space(text())=\\"Support Tier\\"]/following::input[@type=\\"text\\"])[1]", "corrected": "ClickElement    xpath\\\\=(//*[normalize-space(text())\\\\=\\"Support Tier\\"]/following::input[@type\\\\=\\"text\\"])[1] ;; ClickText    Premier Success ;; VerifyInputValue    xpath\\\\=(//*[normalize-space(text())\\\\=\\"Support Tier\\"]/following::input[@type\\\\=\\"text\\"])[1]    Premier Success", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "combo_box has no resolve-only entry point; the drive step is the proof", "xp_date": "2026-09-11T08:44:30"}, {"n": 75, "label": "Escalation Regions", "type": "dropdown", "identity_xpath": "//select[@multiple=\\"\\" and @size=\\"4\\"]", "kw": "DropDown", "locator": "Escalation Regions", "xpath": "(//*[normalize-space(text())=\\"Escalation Regions\\"]/following::select)[1]", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "QWeb\'s dropdown resolver landed on this <select>", "xp_date": "2026-09-11T08:44:30"}, {"n": 76, "label": "Dismiss", "type": "button", "identity_xpath": "//button[.//text()[normalize-space(.)=\\"Dismiss\\"]]", "kw": "ClickText", "locator": "Dismiss", "xpath": "(//*[normalize-space(text())=\\"Just so you know\\"]/following::button)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "COULD-NOT-CHECK", "kw_note": "COULD-NOT-CHECK: identity xpath matched None QWeb-visible live, 1 in the DOM (QWebElementNotFoundError: Unable to find element for locator /", "xp_date": "2026-09-11T08:44:30"}, {"n": 77, "label": "Entitled Services", "type": "dual_listbox", "identity_xpath": "//div[@data-aura-class=\\"navexDesktopLayoutContainer lafAppLayoutHost forceAccess forceStyle oneOne\\"]", "kw": "Multi Pick List", "locator": "Entitled Services", "corrected": "ClickText    Health Check    partial_match=False ;; ClickElement    xpath\\\\=//*[normalize-space(text())\\\\=\\"Entitled Services\\"]/following::*[contains(@class,\\"zn-arrow-r\\")][1] ;; VerifyText    Health Check    anchor=Selected", "kw_verdict": "VERIFIED-PASS", "xp_verdict": "VERIFIED-PASS", "kw_note": "Multi Pick List resolution landed on this node", "xp_date": "2026-09-11T08:44:30"}, {"n": 78, "type": "input_field", "identity_xpath": "//c-zoo-nightmare-inputs", "xpath": "(//*[normalize-space(text())=\\"More\\"]/following::c-zoo-nightmare-inputs)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 79, "type": "custom_component", "identity_xpath": "//c-zoo-nightmare-row[.//text()[normalize-space(.)=\\"Kickoff Workshop\\"]]", "xpath": "(//*[normalize-space(text())=\\"Onsite Schedule\\"]/following::c-zoo-nightmare-row)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 80, "type": "custom_component", "identity_xpath": "//c-zoo-nightmare-row[.//text()[normalize-space(.)=\\"Discovery Review\\"]]", "xpath": "(//*[normalize-space(text())=\\"Kickoff Workshop\\"]/following::c-zoo-nightmare-row)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 81, "type": "custom_component", "identity_xpath": "//c-zoo-nightmare-row[.//text()[normalize-space(.)=\\"Integration Checkpoint\\"]]", "xpath": "(//*[normalize-space(text())=\\"Discovery Review\\"]/following::c-zoo-nightmare-row)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 82, "type": "custom_component", "identity_xpath": "//c-zoo-nightmare-row[.//text()[normalize-space(.)=\\"Go-Live Support\\"]]", "xpath": "(//*[normalize-space(text())=\\"Integration Checkpoint\\"]/following::c-zoo-nightmare-row)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}, {"n": 83, "type": "custom_component", "identity_xpath": "//c-zoo-nightmare-combos", "xpath": "(//*[normalize-space(text())=\\"Save & New\\"]/following::c-zoo-nightmare-combos)[1]", "kw_verdict": "COULD-NOT-CHECK", "xp_verdict": "VERIFIED-PASS", "kw_note": "no keyword or no label", "xp_date": "2026-09-11T08:44:30"}]')
 PAGE_PATTERN = "/lightning/n/Zoo_Nightmare_Inputs"   # the ONLY page the embedded rows and recipe steps describe
+PAGE_PARTITION = "slockard"  # ... in the ONLY partition they were measured in (pom/keys.py)
+PAGE_HOST_STEMS = json.loads('["slockard-dev-ed"]')  # host stems `pom.keys` resolved to that partition at build time
 FE_SPEC = json.loads('{"_why": "2026-09-10 (user, Zoo_Nightmare_Inputs): the standard SLDS form element -- <div class=slds-form-element><div class=slds-form-element__label-wrapper><label class=slds-form-element__label>X</label></div><div class=slds-form-element__control>...<input></div></div> -- carries NO for= and the label is neither an ancestor nor a descendant of the control, so standard_label/label_span never read it: every one of the page\'s 26 inputs, selects and checkboxes parsed with no label (review raw_had: cousin labels x19). The rung climbs to the nearest form-element ancestor and reads its label element; a form element with no label of its own (the Approved Budget from/to pair) climbs to the next one. An input INSIDE the label wrapper (the readonly helper beside Contract Term) is not the control and gets no label.", "containerClassFragment": "slds-form-element", "excludeContainerClassFragments": ["slds-form-element__control", "slds-form-element__label-wrapper", "slds-form-element__help", "slds-form-element__icon", "slds-form-element__static", "slds-form-element__row"], "labelClassFragments": ["slds-form-element__label", "slds-checkbox__label", "slds-radio__label"], "targetInsideExcludedClassFragments": ["slds-form-element__label-wrapper", "slds-form-element__help-preview"], "climbWhenUnlabelled": true, "maxClimb": 8, "containerRowsNeverClaimIt": true, "targetTags": ["input", "select", "textarea"], "_why_targetTags": "2026-09-10 late (twelve industry-page audits): the rung labelled the inline-edit PENCIL with the field\'s name -- <button title=\\"Edit Name\\"> inside the field\'s slds-form-element read \'Name\' (56 rows on 4 pages, measured CAUGHT-BUG live: click_text(\'Name\', index=2) lands elsewhere) and every output field gained a phantom group_size 2. The rung is for the CONTROL the label names: a native form control, or a custom wrapper around exactly one. Buttons and links inside a form element keep their own title/text.", "wrapperMayBeTarget": true}')  # the template's own formElementLabel block, for the page-side describer
+GEN_SPEC = json.loads('{"prefixes": ["help-message-", "error-message-", "label-", "listbox-", "dropdown-element-", "tooltip-", "slds-combobox-", "slds-listbox-"], "patterns": ["^\\\\d+:\\\\d+;[a-z]$", "(^|:)j_id\\\\d+(:|$)", "^[a-z][a-z0-9]*(-[a-z0-9]+)*-\\\\d+$", "^[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*-\\\\d+$", "^ctab\\\\d+$", "^tabOperation-", "^tooltip-bubble_", "^check-button-label-\\\\d+(-\\\\d+)*$", "^[0-9a-f]{32}$", "^[A-Za-z][A-Za-z0-9]*_\\\\d{10,}$"]}')  # the template's own dynamicValuePatterns (D5), for the descriptor
 
 # --- tools/recorder/crt_override/descriptor.py, spliced in VERBATIM by the generator ------------
 """descriptor -- identity by what the page can SAY about the element it just recorded.
@@ -105,6 +108,70 @@ except Exception:                                        # ... and its stated tw
         return False
 
 
+_COUNT_SUFFIX_RX = re.compile(r'\s*\(\d+\)\s*$')
+
+
+def norm_label_exact(s) -> str:
+    """`norm_label` WITHOUT the trailing-count strip.
+
+    The two differ only for a label that ENDS in `(n)`, and that difference is a measured wrong
+    answer: a control the page calls `Amount (2)` matched a row called `Amount` and was reported as
+    a plain label match (challenge D10 finding 10, 2026-09-19). The strip exists for live counts on
+    related-list buttons (`Dependency Analysis (2)`), so it stays -- but a match that NEEDED it is
+    said out loud in the `why`, never passed off as an exact agreement."""
+    return re.sub(r'\s+', ' ', (s or '')).strip().strip('*').strip().casefold()
+
+
+# D5 -- "this value changes per render", the ONE judgement, never a second opinion.
+# `review_table.is_generated` reads the TEMPLATE's own `dynamicValuePatterns`; it is imported when
+# the parser is importable, and when it is not (the generated CRT library ships alone inside a CRT
+# container) the generator hands the SAME template block to `set_generated_rules` at import time.
+# The literals below are only the floor for a library built before either of those existed.
+try:
+    from review_table import is_generated as _rt_is_generated
+except Exception:
+    _rt_is_generated = None
+
+_GEN_PREFIXES = ('j_id', 'temp-', 'input-', 'lgt-', 'vfFrameId_')
+_GEN_PATTERNS = [re.compile(p) for p in (
+    r'^\d+:\d+;[a-z]$',                  # aria-controls="119:639;a"
+    r'(^|:)j_id\d+(:|$)',                 # a Visualforce view-state id
+    r'^[a-z][a-z0-9]*(-[a-z0-9]+)*-\d+$',  # lgt-datatable-1-options-1, input-123
+    r'^[0-9a-f]{32}$',                    # a 32-hex token
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-',         # a uuid
+    r'^[A-Za-z][A-Za-z0-9]*_\d{10,}$',    # vfFrameId_1788626362477
+)]
+
+
+def set_generated_rules(prefixes, patterns) -> int:
+    """Adopt the TEMPLATE's own dynamicValuePatterns (the generated library calls this once).
+
+    Returns how many patterns were adopted; anything unreadable leaves the floor in place, because
+    a rule that cannot be read is not a reason to stop refusing generated values."""
+    global _GEN_PREFIXES, _GEN_PATTERNS
+    try:
+        pats = [re.compile(p) for p in (patterns or [])]
+    except Exception:
+        return 0
+    if not pats:
+        return 0
+    _GEN_PREFIXES = tuple(prefixes or ())
+    _GEN_PATTERNS = pats
+    return len(pats)
+
+
+def is_generated(value) -> bool:
+    """True when this attribute VALUE changes per render, so it can never be an identity (D5)."""
+    if _rt_is_generated is not None:
+        return bool(_rt_is_generated(value))
+    v = str(value or '')
+    if not v:
+        return False
+    if any(v.startswith(pre) for pre in _GEN_PREFIXES):
+        return True
+    return any(rx.search(v) for rx in _GEN_PATTERNS)
+
+
 # The rungs a descriptor offers as "the label a person reads", in order. The first four are the
 # locator doctrine's own order (visible text, aria-label, title only for icon-only controls); the
 # association comes first because a form control's own text is empty.
@@ -157,28 +224,49 @@ def find_row(rows, desc: dict, get=_default_get):
         tried.append('%s=%r -> %d' % (rung, text[:40], len(cands)))
         if not cands:
             continue
+
+        def _rung(row, _rung_name=rung, _text=text):
+            """The rung name, marked when the trailing-count strip is what made it agree."""
+            if norm_label_exact(get(row)[0]) == norm_label_exact(_text):
+                return _rung_name
+            return '%s, count-normalised' % _rung_name
+
         if len(cands) == 1:
-            return cands[0], 'label (%s) %r' % (rung, text[:40])
+            return cands[0], 'label (%s) %r' % (_rung(cands[0]), text[:40])
         idx = desc.get('label_index')
         if idx:
             hits = [r for r in cands if (get(r)[2] or 1) == idx]
             if len(hits) == 1:
                 return hits[0], 'label (%s) %r + page index %d of %s' % (
-                    rung, text[:40], idx, desc.get('label_group_size'))
+                    _rung(hits[0]), text[:40], idx, desc.get('label_group_size'))
         return None, ('COULD-NOT-DISAMBIGUATE: %d rows carry label %r and the page counted index %r'
                       % (len(cands), text[:40], idx))
     return None, 'no row carries this descriptor label (%s)' % ('; '.join(tried) or 'none offered')
 
 
-def attribute_identity(desc, row):
-    """The stable attribute this descriptor and this row AGREE on, or None. Never a generated
-    value: a row's own identity is built with generated values stripped (review_table.is_generated),
-    so an agreement here is on a value the parser already judged stable."""
+def attribute_identity(desc, row, refused=None):
+    """The stable attribute this descriptor and this row AGREE on, or None.
+
+    NEVER a generated value, and that is now ENFORCED here rather than delegated. The docstring
+    used to promise it and the function checked nothing: it trusted whatever the row carried, so a
+    per-render `id="input-123"` or `name="j_id0:form:x"` that agreed on both sides became a
+    confident `attribute` identity -- D5's forbidden locator as an identity (challenge D10
+    finding 12, 2026-09-19). `is_generated` is now called on BOTH sides and a flagged pair is
+    skipped.
+
+    `refused` -- an optional list; the stated reason for each skipped pair is appended to it, so a
+    caller can put "it agreed on a generated value" in its decision rather than reporting a silent
+    miss."""
     attrs = (row.get('attrs') or {}) if isinstance(row, dict) else {}
     for key, dkey in (('name', 'name'), ('aria-label', 'aria_label'), ('data-testid', 'data_testid'),
                       ('title', 'title'), ('placeholder', 'placeholder'), ('id', 'id')):
         want, have = desc.get(dkey), attrs.get(key)
         if want and have and str(want) == str(have):
+            if is_generated(str(want)) or is_generated(str(have)):
+                if refused is not None:
+                    refused.append("@%s=%r is a GENERATED value (changes per render): "
+                                   "not an identity" % (key, want))
+                continue
             return '@%s=%r' % (key, want)
     return None
 
@@ -215,6 +303,16 @@ function hasFrag(el, frags){ var c = cls(el); for (var i=0;i<(frags||[]).length;
 function isFormElement(el){ var c = cls(el); if (c.indexOf(FE.containerClassFragment)<0) return false;
   var ex = FE.excludeContainerClassFragments||[]; for (var i=0;i<ex.length;i++){ if (c.indexOf(ex[i])>=0) return false; } return true; }
 function txt(el){ var t=''; try { t = el.innerText || el.textContent || ''; } catch(e){} return t.replace(/\s+/g,' ').trim(); }
+/* Is this element actually RENDERED? The describer used to read `innerText || textContent` off any
+   element a label rung pointed at, so a `display:none` <span> named by aria-labelledby still yielded
+   its text -- while the serializer that takes OUR capture drops display:none subtrees, so the parser
+   never saw that label and the row was unlabelled. The two halves read the same page and disagreed
+   about what is on it (challenge D10 finding 11, 2026-09-19). offsetParent alone is not enough: it
+   is null for a position:fixed element that IS on screen, hence the client-rect fallback. When the
+   question cannot be asked at all the answer is YES -- a describer must not silently drop a label
+   because a browser threw. */
+function shown(el){ try { if (!el) return false; if (el.offsetParent !== null) return true; var r = el.getClientRects ? el.getClientRects() : null; if (r && r.length) return true; var d = el.ownerDocument; if (!d || !d.defaultView || !d.defaultView.getComputedStyle) return true; var cs = d.defaultView.getComputedStyle(el); if (!cs) return true; return !(cs.display === 'none' || cs.visibility === 'hidden'); } catch(e){ return true; } }
+function vtxt(el){ return shown(el) ? txt(el) : ''; }
 function up(el){ if (!el) return null; if (el.parentElement) return el.parentElement;
   var p = el.parentNode; return (p && p.host) ? p.host : null; }
 function esc(s){ try { return (window.CSS && CSS.escape) ? CSS.escape(String(s)) : String(s).replace(/["\\]/g,'\\$&'); } catch(e){ return String(s); } }
@@ -235,7 +333,7 @@ function formElementLabel(el){
       for (var i=0;i<all.length;i++){
         var c = all[i], toks = cls(c).split(/\s+/), hit = false, frs = FE.labelClassFragments || [];
         for (var j=0;j<frs.length;j++){ if (toks.indexOf(frs[j])>=0){ hit = true; break; } }
-        if (hit && c !== el && !c.contains(el)){ var t = txt(c); if (t) return t; }
+        if (hit && c !== el && !c.contains(el)){ var t = vtxt(c); if (t) return t; }
       }
     }
     cur = up(cur); h++;
@@ -245,17 +343,17 @@ function formElementLabel(el){
 function nearestLabel(el){
   var root = el.getRootNode ? el.getRootNode() : document;
   try { var id = attr(el,'id');
-        if (id){ var l = root.querySelector('label[for="'+esc(id)+'"]'); if (l){ var t=txt(l); if (t) return [t,'label_for']; } } } catch(e){}
+        if (id){ var l = root.querySelector('label[for="'+esc(id)+'"]'); if (l){ var t=vtxt(l); if (t) return [t,'label_for']; } } } catch(e){}
   try { var lb = attr(el,'aria-labelledby');
         if (lb){ var parts = lb.split(/\s+/), out = [];
           for (var i=0;i<parts.length;i++){ var n = null;
             try { n = root.getElementById ? root.getElementById(parts[i]) : root.querySelector('#'+esc(parts[i])); } catch(e){}
-            if (n) out.push(txt(n)); }
+            if (n) out.push(vtxt(n)); }
           var t2 = out.join(' ').trim(); if (t2) return [t2,'aria_labelledby']; } } catch(e){}
-  try { var a = el.closest ? el.closest('label') : null; if (a){ var t3 = txt(a); if (t3) return [t3,'wrapping_label']; } } catch(e){}
+  try { var a = el.closest ? el.closest('label') : null; if (a){ var t3 = vtxt(a); if (t3) return [t3,'wrapping_label']; } } catch(e){}
   var fe = formElementLabel(el); if (fe) return [fe,'form_element_label'];
   try { var s = el.previousElementSibling, g = 0;
-        while (s && g < 3){ if (s.tagName === 'LABEL' || hasFrag(s, FE.labelClassFragments)){ var t4 = txt(s); if (t4) return [t4,'sibling_label']; } s = s.previousElementSibling; g++; } } catch(e){}
+        while (s && g < 3){ if (s.tagName === 'LABEL' || hasFrag(s, FE.labelClassFragments)){ var t4 = vtxt(s); if (t4) return [t4,'sibling_label']; } s = s.previousElementSibling; g++; } } catch(e){}
   return ['', null];
 }
 function familyOf(el){
@@ -357,6 +455,7 @@ def describe_js(fe_spec: dict) -> str:
     """The page-side describer with the template's formElementLabel block injected."""
     return DESCRIBE_JS_TEMPLATE.replace('__GZ_FE_SPEC__', json.dumps(fe_spec or {}))
 # ------------------------------------------------------------------------------------------------
+set_generated_rules(GEN_SPEC.get("prefixes"), GEN_SPEC.get("patterns"))   # D5, for attribute_identity
 DESCRIBE_JS = describe_js(FE_SPEC)
 BUNDLE = "/home/services/ui-recorder/content.bundle.js"
 BACKUP = BUNDLE + ".gz-orig"
@@ -366,18 +465,18 @@ CALL = "this.pushStep(r,event,ctx?this.handler.getXPathForElement(ctx):undefined
 REPL = "window.__gzCompose(this,r,event,ctx)"
 JS = r"""
 ;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};window.__gzPending={};window.__gzPendingEl={};var HOLD=900;
-function axp(el){var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return '/html[1]/'+p.join('/')}
+function axp(el){if(!el||el.isConnected===false)return null;var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return el?('/html[1]/'+p.join('/')):null}
 var ASK_MS=6000;function ask(body){body.frame=(window!==window.top);try{body.frame_path=location.pathname}catch(e){body.frame_path=''}var ctl=(typeof AbortController!=='undefined')?new AbortController():null;var timer=setTimeout(function(){try{ctl&&ctl.abort()}catch(e){}},ASK_MS);return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body),signal:ctl?ctl.signal:undefined}).then(function(res){clearTimeout(timer);return res.json()}).catch(function(e){clearTimeout(timer);throw e})}
 function enqueue(fn){window.__gzQ=window.__gzQ.then(fn).catch(function(e){console.log('gz queue',e)})}
 function stampAndDescribe(el){var out={nonce:null,descriptor:null};try{if(el&&el.nodeType===1&&window.__gzStamp){out.nonce=window.__gzStamp(el);out.descriptor=window.__gzDescribe(el)}}catch(e){out.describe_error=String(e)}return out}
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
- var alt;try{if(ctx&&ctx.nodeType===1){alt=axp(ctx);window.__gzSeen[alt]=Date.now();Object.keys(window.__gzPending).forEach(function(k){var pe=window.__gzPendingEl[k];if(k===alt||(pe&&(pe===ctx||pe.contains(ctx)||ctx.contains(pe)))){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k];delete window.__gzPendingEl[k];window.__gzSeen[k]=Date.now()}})}}catch(e){}
+ var alt;try{if(ctx&&ctx.nodeType===1){alt=axp(ctx);if(alt){window.__gzSeen[alt]=Date.now();Object.keys(window.__gzPending).forEach(function(k){var pe=window.__gzPendingEl[k];if(k===alt||(pe&&(pe===ctx||pe.contains(ctx)||ctx.contains(pe)))){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k];delete window.__gzPendingEl[k];window.__gzSeen[k]=Date.now()}})}}}catch(e){}
  var mark=stampAndDescribe(ctx);
  enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
 function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.target;if(!tg||tg.nodeType!==1)return;var el=tg;
  if(kind==='click'){el=tg.closest('button,a,[role="button"],[role="option"],[role="tab"],[role="menuitem"],[role="checkbox"],input,select,option,[class*="zn-arrow"],lightning-button-icon,lightning-button,lightning-icon')||tg}
  var self=window.__gzRec;if(!self){console.log('gz safety-net: no recorder instance yet');return}
- var k=axp(el);var now=Date.now();if(window.__gzSeen[k]&&now-window.__gzSeen[k]<1500)return;if(window.__gzPending[k])clearTimeout(window.__gzPending[k]);window.__gzPendingEl[k]=el;
+ var k=axp(el);if(!k){console.log('gz safety-net: the element is detached; no positional key');return}var now=Date.now();if(window.__gzSeen[k]&&now-window.__gzSeen[k]<1500)return;if(window.__gzPending[k])clearTimeout(window.__gzPending[k]);window.__gzPendingEl[k]=el;
  var value=(kind==='change')?(el.type==='checkbox'?(el.checked?'on':'off'):(el.value!==undefined?String(el.value):'')):undefined;
  var mark=stampAndDescribe(el);
  window.__gzPending[k]=setTimeout(function(){delete window.__gzPending[k];delete window.__gzPendingEl[k];if(window.__gzSeen[k]&&Date.now()-window.__gzSeen[k]<1500+HOLD)return;window.__gzSeen[k]=Date.now();
@@ -386,7 +485,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18k identity-by-attribute", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-18l guards", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -551,8 +650,17 @@ def _propose(drv, target, rendered, decision, desc=None):
     return line, backups
 
 
+# The pane mark for a line whose row was named by the POSITIONAL identity xpath and nothing else.
+# A parser proposal says `# unverified: parser proposal`; this is the same disclosure for the other
+# unverified door, and it is a Robot comment so the line still runs as written.
+POSITIONAL_MARK = "# positional identity: last resort"
+
+
 def _cells(line):
-    return [c for c in re.split(r" {2,}|\t", line.strip()) if c != ""]
+    # `# ` (hash SPACE) is one of our own trailing marks -- the positional-identity disclosure, the
+    # unverified marker, the xpath-form note -- never an argument; a value that merely starts with
+    # `#` (a hashtag someone typed) has no space and is kept.
+    return [c for c in re.split(r" {2,}|\t", line.strip()) if c != "" and not c.startswith("# ")]
 
 
 def _our_line(row, rendered):
@@ -673,7 +781,52 @@ def _backups(row_n, line, rendered):
     return out[:2]
 
 
-_LAST = {"el": None, "t": 0.0}
+_LAST = {"el": None, "t": 0.0, "action": None, "label": None, "family": None}
+_LOCK = threading.Lock()   # the selenium driver is not thread-safe and _CACHE/_LAST are shared
+
+
+def _action_class(rendered, req=None):
+    """click / type / select / verify -- what this event DID, or None when it cannot be told.
+
+    The dedupe is keyed on it: a focus CLICK and the TypeText that follows are two different
+    intents on one element, and treating them as the same event lost the typed value."""
+    cells = _cells(rendered or "")
+    kw = (cells[0] if cells else "").lower()
+    if kw.startswith("type"):
+        return "type"
+    if kw.startswith("click"):
+        return "click"
+    if kw in ("dropdown", "picklist", "combobox", "select"):
+        return "select"
+    if kw.startswith("verify"):
+        return "verify"
+    kind = (req or {}).get("kind")
+    if kind == "click":
+        return "click"
+    if kind == "change":
+        if (req.get("tag") or "").lower() == "select":
+            return "select"
+        if (req.get("etype") or "").lower() in ("checkbox", "radio"):
+            return "click"
+        return "type"
+    return None
+
+
+def _arm_dedupe(target, out_line, action, desc):
+    """Remember this event ONLY if it put a line in the pane.
+
+    An event composed as '' is noise we deliberately record nothing for -- the recorder's focus
+    click on a field, the safety net's synthetic click on one. It used to stamp the window anyway,
+    so the TypeText that followed within 2.5 s was declared a duplicate and suppressed too: the
+    typed value never reached the pane, and the event with the BETTER line lost by arriving second
+    (challenge D10 finding 4, 2026-09-19)."""
+    if target is None or (out_line or "").strip() == "":
+        return False
+    desc = desc or {}
+    _LAST.update({"el": target, "t": time.time(), "action": action,
+                  "label": desc.get("label") or desc.get("text") or None,
+                  "family": desc.get("family")})
+    return True
 
 
 def _by_nonce(drv, nonce):
@@ -738,7 +891,11 @@ def _match_row(drv, target, desc, decision):
             decision["identity"] = "label"
             return row, "%s | %s" % (why, note)
         decision["label_why"] = why
-        cands = [r for r in ROWS if attribute_identity(desc, r)]
+        refused = []
+        cands = [r for r in ROWS if attribute_identity(desc, r, refused)]
+        if refused:
+            # D5's forbidden locator refused as an IDENTITY, said out loud rather than read as a miss
+            decision["attribute_refused"] = sorted(set(refused))[:3]
         if len(cands) == 1:
             decision["identity"] = "attribute"
             return cands[0], "%s; one row agrees on %s" % (why, attribute_identity(desc, cands[0]))
@@ -757,33 +914,131 @@ def _match_row(drv, target, desc, decision):
     return None, decision.get("label_why") or "no row resolves to this element"
 
 
-def _on_reviewed_page(drv):
-    """True only when the live browser is on the page the embedded rows describe (the review's page
-    pattern; {id}/{uuid} placeholders matched loosely against the current URL path)."""
-    try:
-        cur = drv.current_url or ""
-        path = "/" + cur.split("://", 1)[-1].split("/", 1)[1] if "://" in cur else cur
-        path = path.split("?", 1)[0].split("#", 1)[0]
-    except Exception:
-        return False
+# `pom.keys.host_stem`'s own list, in its own order (the sandbox forms first, then the plain ones):
+# a stem this computes must be the stem the generator looked up in keys.py's host cache, or the two
+# halves of the gate would be asking different questions.
+_SF_SUFFIXES = (".sandbox.lightning.force.com", ".sandbox.my.salesforce.com",
+                ".sandbox.my.salesforce-setup.com",
+                ".lightning.force.com", ".my.salesforce.com", ".my.salesforce-setup.com",
+                ".my.site.com", ".vf.force.com", ".visualforce.com")
+_SANDBOX_HOST = re.compile(r"--([A-Za-z0-9]+)\.sandbox\.")
+_APP_SEGMENT = re.compile(r"^/lightning/app/[A-Za-z0-9]{15,18}(/|$)")
+
+
+def _partition_for(host):
+    """The POM PARTITION of a host -- the org alias for a Salesforce host, the host itself for
+    everything else (`pom/keys.py`, and CLAUDE.md's 'the partition is not negotiable').
+
+    Resolved WITHOUT any subprocess or network: a sandbox host names its alias in its own hostname,
+    and for everything else the generator embedded the host stems `keys.alias_for_host` resolved to
+    the review's partition at build time (`PAGE_HOST_STEMS`). A host we cannot place answers with
+    itself, which cannot equal an org alias -- so an unknown host closes the gate rather than
+    opening it, which is the safe direction."""
+    h = (host or "").lower()
+    if not h:
+        return ""
+    m = _SANDBOX_HOST.search(h)
+    if m:
+        return m.group(1)
+    stem = h
+    for suf in _SF_SUFFIXES:
+        if stem.endswith(suf):
+            stem = stem[: -len(suf)]
+            break
+    return PAGE_PARTITION if stem in PAGE_HOST_STEMS else h
+
+
+def _pattern_matches(path):
+    """The review's page pattern against a URL path, {id}/{uuid} placeholders matched loosely."""
     pat = PAGE_PATTERN.rstrip("/")
+    if not path:
+        return False
     if "{" not in pat:
         return path.rstrip("/") == pat or path.startswith(pat + "/")
-    import re as _re
-    rx = "^" + _re.escape(pat).replace(r"\{id\}", r"[A-Za-z0-9]{15,18}").replace(r"\{uuid\}", r"[0-9a-fA-F-]{36}") + "(/|$)"
-    return bool(_re.match(rx, path))
+    rx = "^" + re.escape(pat).replace(r"\{id\}", r"[A-Za-z0-9]{15,18}").replace(r"\{uuid\}", r"[0-9a-fA-F-]{36}") + "(/|$)"
+    return bool(re.match(rx, path))
 
 
-def _is_duplicate(drv, target, window_s=2.5):
+def _key_pattern(url, partition):
+    """`pom.keys.page_key(url)['pattern']`, or None when the key module is not reachable.
+
+    The alias is HANDED IN (`org=`), never resolved inside: `keys.alias_for_host` shells out to
+    `sf org list` when its host cache is cold, and a page gate that consults the network on every
+    recorded event is not a gate. The module travels in the parser bundle; without the bundle this
+    answers None and the local rules below stand in."""
+    try:
+        _parser()                                   # puts the bundle on sys.path if it is there
+        from pom import keys as _keys
+        return _keys.page_key(url, org=(partition or None)).get("pattern")
+    except Exception:
+        return None
+
+
+def _page_verdict(drv):
+    """(on the reviewed page, why) -- BOTH halves of the page KEY must agree, never the path alone.
+
+    The gate used to compare the raw PATH only, and the review is org-scoped: a custom tab of the
+    same API name in another org -- or on any host at all -- opened the gate and received this
+    review's VERIFIED-PASS lines and its confident `#   backup:` advice (challenge D10 finding 1,
+    2026-09-19; ledger F42 one level up). And the same path reached INSIDE a Lightning app,
+    `/lightning/app/<06m>/n/<tab>`, is the same page to `pom.keys` (D15 keeps the app as its own key
+    SEGMENT, not as part of the pattern) and was called off-page by the raw comparison, silently
+    downgrading the one page the review exists for (finding 2).
+
+    So: the PARTITION first (an org alias, never a host), then the PATTERN through `pom.keys` when
+    the bundle is there, with the raw comparison and an app-segment strip as the local fallbacks."""
+    try:
+        cur = drv.current_url or ""
+        rest = cur.split("://", 1)[1] if "://" in cur else ""
+        host = rest.split("/", 1)[0].lower()
+        path = "/" + rest.split("/", 1)[1]
+        path = path.split("?", 1)[0].split("#", 1)[0]
+    except Exception:
+        return False, "the URL carries no path"
+    part = _partition_for(host)
+    if part != PAGE_PARTITION:
+        return False, "partition %r (host %r) is not the review's %r" % (part, host, PAGE_PARTITION)
+    if _pattern_matches(path):
+        return True, "partition %r and pattern %r agree" % (part, PAGE_PATTERN)
+    kp = _key_pattern(cur, part)
+    if kp is not None and _pattern_matches(kp):
+        return True, "partition %r; page_key pattern %r agrees (the raw path did not)" % (part, kp)
+    if _APP_SEGMENT.match(path) and _pattern_matches(_APP_SEGMENT.sub("/lightning/", path)):
+        return True, "partition %r; app-scoped route of pattern %r" % (part, PAGE_PATTERN)
+    return False, "partition %r agrees; path %r is not pattern %r" % (part, path[:80], PAGE_PATTERN)
+
+
+def _on_reviewed_page(drv):
+    """True only when the live browser is on the page the embedded rows describe -- the review's
+    PARTITION and its page pattern, both (see `_page_verdict`)."""
+    return _page_verdict(drv)[0]
+
+
+def _is_duplicate(drv, target, action=None, desc=None, window_s=2.5):
     """The safety net and the recorder can resolve ONE click to two different elements (the anchor and
     its span), so a path-keyed dedupe in the page misses it (measured 2026-09-18: two lines for one
-    Fields & Relationships click). Identity in the DOM within a short window is the rule."""
+    Fields & Relationships click). Identity in the DOM within a short window is the rule.
+
+    CORROBORATED, never the page's `===` alone (challenge D10 finding 3, 2026-09-19). That script
+    runs in the page and we believed its answer with nothing beside it: a page whose `===` answers
+    truthy for any pair -- a stub, a proxy element, a driver returning a truthy value -- suppressed a
+    genuinely different control's step, and the only trace was a log line inside the container. So
+    the recorded ACTION and the descriptor's label and family must agree too. Either side UNKNOWN is
+    agreement (an old bundle sends no descriptor); two KNOWN values that differ are two events."""
     if _LAST["el"] is None or time.time() - _LAST["t"] > window_s:
         return False
-    try:
-        return bool(drv.execute_script("return arguments[0] === arguments[1]", _LAST["el"], target))
-    except Exception:
+    if not _same(drv, _LAST["el"], target):
         return False
+    desc = desc or {}
+    if _LAST.get("action") and action and _LAST["action"] != action:
+        return False
+    a, b = _LAST.get("label"), (desc.get("label") or desc.get("text") or None)
+    if a and b and str(a).strip().casefold() != str(b).strip().casefold():
+        return False
+    fa, fb = _LAST.get("family"), desc.get("family")
+    if fa and fb and str(fa).casefold() != str(fb).casefold():
+        return False
+    return True
 
 
 class _H(BaseHTTPRequestHandler):
@@ -809,12 +1064,21 @@ class _H(BaseHTTPRequestHandler):
         self._send({"ok": True, "version": STATE["version"]})
 
     def do_POST(self):
-        STATE["served"] += 1
         n = int(self.headers.get("Content-Length") or 0)
         try:
             req = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
         except Exception:
             req = {}
+        # SERIALISED. This is a ThreadingHTTPServer and everything below drives ONE selenium driver
+        # and mutates the shared _CACHE / _LAST / STATE. The page abandons a request at ASK_MS
+        # (6 s) and starts the next event's ask() immediately, so two handlers really do overlap --
+        # the driver-side cap is now 4 s to shorten that overlap, and this lock removes it
+        # (challenge D10 finding 7, 2026-09-19).
+        with _LOCK:
+            self._compose(req)
+
+    def _compose(self, req):
+        STATE["served"] += 1
         rendered = req.get("rendered") or ""
         xp = req.get("xpath")
         desc = req.get("descriptor") or {}
@@ -841,18 +1105,21 @@ class _H(BaseHTTPRequestHandler):
                 if t is None and xp:
                     # build k keeps the old paths as a FALLBACK, and says when it used one
                     tgt = drv.find_elements("xpath", xp)
+                    door = "theirs (the recorder's xpath)"
                     if not tgt and req.get("alt_xpath"):
                         # the recorder's path (shadow-aware, slot segments) often resolves to nothing in the
                         # driver on Lightning pages (3 of 5 on Setup, 2026-09-18); ours is a plain DOM walk
                         tgt = drv.find_elements("xpath", req["alt_xpath"])
                         if tgt:
-                            decision["resolve"] += "; their xpath resolved to nothing, ours did"
+                            door = "ours (our own alt xpath): their xpath resolved to nothing, ours did"
                     if tgt:
                         t = tgt[0]
-                        decision["resolve"] += "; fell back to the recorder's xpath"
-                if t is not None and _is_duplicate(drv, t):
+                        # NAME THE DOOR. The note used to say "fell back to the recorder's xpath"
+                        # even when OUR alt path is what resolved (challenge D10 finding 6).
+                        decision["resolve"] += "; the nonce found nothing; resolved by %s" % door
+                if t is not None and _is_duplicate(drv, t, _action_class(rendered, req), desc):
                     line = ""
-                    decision["why"] = "duplicate: the same element was served %d ms ago" % int((time.time() - _LAST["t"]) * 1000)
+                    decision["why"] = "duplicate: the same element, same action and same label was served %d ms ago" % int((time.time() - _LAST["t"]) * 1000)
                     t = None
                 elif t is not None and not _on_reviewed_page(drv):
                     # build k2 (2026-09-18): identity xpaths are POSITIONAL ((//input)[3]) and resolve to one
@@ -867,13 +1134,18 @@ class _H(BaseHTTPRequestHandler):
                             decision["why"] = "synthetic %s on <%s> %r off the reviewed page: no parser proposal (parser %s); not recorded" % (req.get("kind"), req.get("tag"), (req.get("text") or "")[:40], PARSER["state"])
                         else:
                             decision["why"] = "off the reviewed page; no parser proposal (parser %s)" % PARSER["state"]
-                    _LAST["el"] = t; _LAST["t"] = time.time()
                 elif t is not None:
                     row, why = _match_row(drv, t, desc, decision)
                     if row is not None:
                         if req.get("synthetic"):
                             row = dict(row, _syn={"kind": req.get("kind"), "value": req.get("value")})
                         line = _our_line(row, rendered)
+                        if line and decision.get("identity") == "positional":
+                            # SAY IT IN THE PANE. A positional identity is the mechanism F42/F44
+                            # retired, reached only when no label and no stable attribute named the
+                            # row; the decision log called it "the last resort" and the line a
+                            # person reads carried no mark at all (challenge D10 finding 6).
+                            line = line + "    " + POSITIONAL_MARK
                         decision["row"] = row["n"]
                         decision["why"] = ("%s match: %s" % (decision.get("identity"), why)) if line \
                             else ("matched row %s by %s, no better line" % (row["n"], decision.get("identity")))
@@ -892,12 +1164,13 @@ class _H(BaseHTTPRequestHandler):
                                     decision["why"] = "synthetic %s on <%s> %r: %s; no recipe, no parser proposal (parser %s); not recorded" % (req.get("kind"), req.get("tag"), (req.get("text") or "")[:40], why, PARSER["state"])
                                 else:
                                     decision["why"] = "%s; no recipe step; no parser proposal (parser %s)" % (why, PARSER["state"])
-                    _LAST["el"] = t; _LAST["t"] = time.time()
                 elif not decision["why"]:
                     decision["why"] = "the element could not be resolved: %s" % decision["resolve"]
             elif not decision["why"]:
                 decision["why"] = "no nonce and no xpath in event"
             decision["out"] = rendered if line is None else line
+            # ARM THE DEDUPE LAST, and only on an event that actually put a line in the pane.
+            decision["armed_dedupe"] = _arm_dedupe(t, decision["out"], _action_class(rendered, req), desc)
         except Exception as exc:
             decision["why"] = "error: %s" % exc; decision["out"] = rendered
         backups = proposal_backups or _backups(decision.get("row"), decision["out"], rendered)
@@ -926,11 +1199,21 @@ class garzai_recorder_override:
 
     def gz_override_status(self):
         st = {k: v for k, v in STATE.items() if k != "error"}
+        # BOTH halves of the page key the embedded rows were measured under: a pattern with no
+        # partition beside it is what let another org's identically named tab open the gate.
         st["reviewed_page"] = PAGE_PATTERN
+        st["reviewed_partition"] = PAGE_PARTITION
+        st["reviewed_page_key"] = "%s|%s" % (PAGE_PARTITION, PAGE_PATTERN)
         try:
-            st["on_reviewed_page"] = _on_reviewed_page(_driver())
-        except Exception:
+            drv = _driver()
+            st["on_reviewed_page"], st["page_gate"] = _page_verdict(drv)
+            cur = drv.current_url or ""
+            host = cur.split("://", 1)[1].split("/", 1)[0].lower() if "://" in cur else ""
+            st["live_partition"] = _partition_for(host)
+            st["live_pattern"] = _key_pattern(cur, st["live_partition"])
+        except Exception as exc:
             st["on_reviewed_page"] = None
+            st["page_gate"] = "COULD-NOT-CHECK: %s" % exc
         st["describer"] = {"bytes": len(DESCRIBE_JS), "nonce_attr": NONCE_ATTR,
                            "label_rungs": list(LABEL_RUNGS)}
         st["parser"] = PARSER["state"]          # loaded | missing | error | present (not imported yet)

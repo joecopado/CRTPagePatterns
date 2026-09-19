@@ -69,6 +69,70 @@ except Exception:                                        # ... and its stated tw
         return False
 
 
+_COUNT_SUFFIX_RX = re.compile(r'\s*\(\d+\)\s*$')
+
+
+def norm_label_exact(s) -> str:
+    """`norm_label` WITHOUT the trailing-count strip.
+
+    The two differ only for a label that ENDS in `(n)`, and that difference is a measured wrong
+    answer: a control the page calls `Amount (2)` matched a row called `Amount` and was reported as
+    a plain label match (challenge D10 finding 10, 2026-09-19). The strip exists for live counts on
+    related-list buttons (`Dependency Analysis (2)`), so it stays -- but a match that NEEDED it is
+    said out loud in the `why`, never passed off as an exact agreement."""
+    return re.sub(r'\s+', ' ', (s or '')).strip().strip('*').strip().casefold()
+
+
+# D5 -- "this value changes per render", the ONE judgement, never a second opinion.
+# `review_table.is_generated` reads the TEMPLATE's own `dynamicValuePatterns`; it is imported when
+# the parser is importable, and when it is not (the generated CRT library ships alone inside a CRT
+# container) the generator hands the SAME template block to `set_generated_rules` at import time.
+# The literals below are only the floor for a library built before either of those existed.
+try:
+    from review_table import is_generated as _rt_is_generated
+except Exception:
+    _rt_is_generated = None
+
+_GEN_PREFIXES = ('j_id', 'temp-', 'input-', 'lgt-', 'vfFrameId_')
+_GEN_PATTERNS = [re.compile(p) for p in (
+    r'^\d+:\d+;[a-z]$',                  # aria-controls="119:639;a"
+    r'(^|:)j_id\d+(:|$)',                 # a Visualforce view-state id
+    r'^[a-z][a-z0-9]*(-[a-z0-9]+)*-\d+$',  # lgt-datatable-1-options-1, input-123
+    r'^[0-9a-f]{32}$',                    # a 32-hex token
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-',         # a uuid
+    r'^[A-Za-z][A-Za-z0-9]*_\d{10,}$',    # vfFrameId_1788626362477
+)]
+
+
+def set_generated_rules(prefixes, patterns) -> int:
+    """Adopt the TEMPLATE's own dynamicValuePatterns (the generated library calls this once).
+
+    Returns how many patterns were adopted; anything unreadable leaves the floor in place, because
+    a rule that cannot be read is not a reason to stop refusing generated values."""
+    global _GEN_PREFIXES, _GEN_PATTERNS
+    try:
+        pats = [re.compile(p) for p in (patterns or [])]
+    except Exception:
+        return 0
+    if not pats:
+        return 0
+    _GEN_PREFIXES = tuple(prefixes or ())
+    _GEN_PATTERNS = pats
+    return len(pats)
+
+
+def is_generated(value) -> bool:
+    """True when this attribute VALUE changes per render, so it can never be an identity (D5)."""
+    if _rt_is_generated is not None:
+        return bool(_rt_is_generated(value))
+    v = str(value or '')
+    if not v:
+        return False
+    if any(v.startswith(pre) for pre in _GEN_PREFIXES):
+        return True
+    return any(rx.search(v) for rx in _GEN_PATTERNS)
+
+
 # The rungs a descriptor offers as "the label a person reads", in order. The first four are the
 # locator doctrine's own order (visible text, aria-label, title only for icon-only controls); the
 # association comes first because a form control's own text is empty.
@@ -121,28 +185,49 @@ def find_row(rows, desc: dict, get=_default_get):
         tried.append('%s=%r -> %d' % (rung, text[:40], len(cands)))
         if not cands:
             continue
+
+        def _rung(row, _rung_name=rung, _text=text):
+            """The rung name, marked when the trailing-count strip is what made it agree."""
+            if norm_label_exact(get(row)[0]) == norm_label_exact(_text):
+                return _rung_name
+            return '%s, count-normalised' % _rung_name
+
         if len(cands) == 1:
-            return cands[0], 'label (%s) %r' % (rung, text[:40])
+            return cands[0], 'label (%s) %r' % (_rung(cands[0]), text[:40])
         idx = desc.get('label_index')
         if idx:
             hits = [r for r in cands if (get(r)[2] or 1) == idx]
             if len(hits) == 1:
                 return hits[0], 'label (%s) %r + page index %d of %s' % (
-                    rung, text[:40], idx, desc.get('label_group_size'))
+                    _rung(hits[0]), text[:40], idx, desc.get('label_group_size'))
         return None, ('COULD-NOT-DISAMBIGUATE: %d rows carry label %r and the page counted index %r'
                       % (len(cands), text[:40], idx))
     return None, 'no row carries this descriptor label (%s)' % ('; '.join(tried) or 'none offered')
 
 
-def attribute_identity(desc, row):
-    """The stable attribute this descriptor and this row AGREE on, or None. Never a generated
-    value: a row's own identity is built with generated values stripped (review_table.is_generated),
-    so an agreement here is on a value the parser already judged stable."""
+def attribute_identity(desc, row, refused=None):
+    """The stable attribute this descriptor and this row AGREE on, or None.
+
+    NEVER a generated value, and that is now ENFORCED here rather than delegated. The docstring
+    used to promise it and the function checked nothing: it trusted whatever the row carried, so a
+    per-render `id="input-123"` or `name="j_id0:form:x"` that agreed on both sides became a
+    confident `attribute` identity -- D5's forbidden locator as an identity (challenge D10
+    finding 12, 2026-09-19). `is_generated` is now called on BOTH sides and a flagged pair is
+    skipped.
+
+    `refused` -- an optional list; the stated reason for each skipped pair is appended to it, so a
+    caller can put "it agreed on a generated value" in its decision rather than reporting a silent
+    miss."""
     attrs = (row.get('attrs') or {}) if isinstance(row, dict) else {}
     for key, dkey in (('name', 'name'), ('aria-label', 'aria_label'), ('data-testid', 'data_testid'),
                       ('title', 'title'), ('placeholder', 'placeholder'), ('id', 'id')):
         want, have = desc.get(dkey), attrs.get(key)
         if want and have and str(want) == str(have):
+            if is_generated(str(want)) or is_generated(str(have)):
+                if refused is not None:
+                    refused.append("@%s=%r is a GENERATED value (changes per render): "
+                                   "not an identity" % (key, want))
+                continue
             return '@%s=%r' % (key, want)
     return None
 
@@ -179,6 +264,16 @@ function hasFrag(el, frags){ var c = cls(el); for (var i=0;i<(frags||[]).length;
 function isFormElement(el){ var c = cls(el); if (c.indexOf(FE.containerClassFragment)<0) return false;
   var ex = FE.excludeContainerClassFragments||[]; for (var i=0;i<ex.length;i++){ if (c.indexOf(ex[i])>=0) return false; } return true; }
 function txt(el){ var t=''; try { t = el.innerText || el.textContent || ''; } catch(e){} return t.replace(/\s+/g,' ').trim(); }
+/* Is this element actually RENDERED? The describer used to read `innerText || textContent` off any
+   element a label rung pointed at, so a `display:none` <span> named by aria-labelledby still yielded
+   its text -- while the serializer that takes OUR capture drops display:none subtrees, so the parser
+   never saw that label and the row was unlabelled. The two halves read the same page and disagreed
+   about what is on it (challenge D10 finding 11, 2026-09-19). offsetParent alone is not enough: it
+   is null for a position:fixed element that IS on screen, hence the client-rect fallback. When the
+   question cannot be asked at all the answer is YES -- a describer must not silently drop a label
+   because a browser threw. */
+function shown(el){ try { if (!el) return false; if (el.offsetParent !== null) return true; var r = el.getClientRects ? el.getClientRects() : null; if (r && r.length) return true; var d = el.ownerDocument; if (!d || !d.defaultView || !d.defaultView.getComputedStyle) return true; var cs = d.defaultView.getComputedStyle(el); if (!cs) return true; return !(cs.display === 'none' || cs.visibility === 'hidden'); } catch(e){ return true; } }
+function vtxt(el){ return shown(el) ? txt(el) : ''; }
 function up(el){ if (!el) return null; if (el.parentElement) return el.parentElement;
   var p = el.parentNode; return (p && p.host) ? p.host : null; }
 function esc(s){ try { return (window.CSS && CSS.escape) ? CSS.escape(String(s)) : String(s).replace(/["\\]/g,'\\$&'); } catch(e){ return String(s); } }
@@ -199,7 +294,7 @@ function formElementLabel(el){
       for (var i=0;i<all.length;i++){
         var c = all[i], toks = cls(c).split(/\s+/), hit = false, frs = FE.labelClassFragments || [];
         for (var j=0;j<frs.length;j++){ if (toks.indexOf(frs[j])>=0){ hit = true; break; } }
-        if (hit && c !== el && !c.contains(el)){ var t = txt(c); if (t) return t; }
+        if (hit && c !== el && !c.contains(el)){ var t = vtxt(c); if (t) return t; }
       }
     }
     cur = up(cur); h++;
@@ -209,17 +304,17 @@ function formElementLabel(el){
 function nearestLabel(el){
   var root = el.getRootNode ? el.getRootNode() : document;
   try { var id = attr(el,'id');
-        if (id){ var l = root.querySelector('label[for="'+esc(id)+'"]'); if (l){ var t=txt(l); if (t) return [t,'label_for']; } } } catch(e){}
+        if (id){ var l = root.querySelector('label[for="'+esc(id)+'"]'); if (l){ var t=vtxt(l); if (t) return [t,'label_for']; } } } catch(e){}
   try { var lb = attr(el,'aria-labelledby');
         if (lb){ var parts = lb.split(/\s+/), out = [];
           for (var i=0;i<parts.length;i++){ var n = null;
             try { n = root.getElementById ? root.getElementById(parts[i]) : root.querySelector('#'+esc(parts[i])); } catch(e){}
-            if (n) out.push(txt(n)); }
+            if (n) out.push(vtxt(n)); }
           var t2 = out.join(' ').trim(); if (t2) return [t2,'aria_labelledby']; } } catch(e){}
-  try { var a = el.closest ? el.closest('label') : null; if (a){ var t3 = txt(a); if (t3) return [t3,'wrapping_label']; } } catch(e){}
+  try { var a = el.closest ? el.closest('label') : null; if (a){ var t3 = vtxt(a); if (t3) return [t3,'wrapping_label']; } } catch(e){}
   var fe = formElementLabel(el); if (fe) return [fe,'form_element_label'];
   try { var s = el.previousElementSibling, g = 0;
-        while (s && g < 3){ if (s.tagName === 'LABEL' || hasFrag(s, FE.labelClassFragments)){ var t4 = txt(s); if (t4) return [t4,'sibling_label']; } s = s.previousElementSibling; g++; } } catch(e){}
+        while (s && g < 3){ if (s.tagName === 'LABEL' || hasFrag(s, FE.labelClassFragments)){ var t4 = vtxt(s); if (t4) return [t4,'sibling_label']; } s = s.previousElementSibling; g++; } } catch(e){}
   return ['', null];
 }
 function familyOf(el){

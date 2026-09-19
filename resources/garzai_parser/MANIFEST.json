@@ -1,9 +1,9 @@
 {
  "bundle": "resources/garzai_parser",
- "bytes": 1710920,
+ "bytes": 1719086,
  "entry": "tools/recorder/crt_override/compose_live.py",
  "files": 56,
- "generated": "2026-09-19T00:36:42",
+ "generated": "2026-09-19T06:25:14",
  "generator": "tools/recorder/crt_override/build_parser_bundle.py",
  "sha256": {
   "docs/recorder/patterns/library.json": "c734f0f0dd1c3f138928aa875cdac2dc3cbe41588dd4e64e6fc1509bfd31c203",
@@ -51,8 +51,8 @@
   "tools/qforce-lite/discovery/page_chrome.py": "95b4a0f27bb2ee282491dcfd127b156aa726d4a803d876023d25396f1c954aec",
   "tools/qforce-lite/predict.py": "848b4383b7a7a78dd9b621f281c3f1413eeac9fddddcd0544e0e3aceee423fb0",
   "tools/qforce-lite/text_match.py": "bb4c3b8ff8abe4bd6181b648d22138cd0230766a2c84ff0bbda9669290e45538",
-  "tools/recorder/crt_override/compose_live.py": "b5aef1a53674c6153cc871a2f0907d1dca073328de8a1cbc67d91c9c6c37988b",
-  "tools/recorder/crt_override/descriptor.py": "230d1fddd43a4bb2be284759bc3cfdb9c80c16a2792abe02ff19978be7bfc6b7",
+  "tools/recorder/crt_override/compose_live.py": "cebaefb814fa829f49c73d31cf271be05edef214d3f4fa352a8e930db3a804d9",
+  "tools/recorder/crt_override/descriptor.py": "f1ca26a53015ce4fbbd1c032c567eda75f37f6a86054e879d2205a463d38f757",
   "tools/recorder/disambiguation_args.py": "02c066836c4164d9a42fc6e557198523269a8aacf406f0dc7dca691f8c57b0f1",
   "tools/recorder/metadata_dom_parity.py": "a30c46b7f940e59e76fb24965a79d6710cffd20267f27e7a88f26f096ebf905e",
   "tools/recorder/pattern_library.py": "53750ce6f624e5175e1193580d33a79fe0fae3561315354ab1a5223251bbbeeb",
