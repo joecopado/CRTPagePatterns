@@ -6,6 +6,7 @@ Documentation                   EXPERIMENT (2026-09-18): record on the Zoo Night
 ...                              identity against our live-verified rows for the page and answers with our line.
 ...                              Anything it cannot match passes through unchanged. Read-only: nothing is saved.
 Resource                        ../resources/common.robot
+Resource                        ../resources/garzai_typetext_override.robot    # comment out to record/run with stock QWeb TypeText
 Library                         ../resources/garzai_recorder_override.py
 Suite Setup                     Setup Browser
 Suite Teardown                  End suite
