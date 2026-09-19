@@ -633,7 +633,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-19n4 bundle", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-19n5 opens", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -1251,11 +1251,109 @@ def _omni_flush(cl=None):
     return [line]
 
 
+# ---------------------------------------------------------------- the OmniStudio date-picker pair
+# The user, run 8 (2026-09-19 14:17): "the birthdate thing is not capturing the initial click to
+# find the dates, so it's only showing the click to select the date". MEASURED LIVE the same day
+# on fsc7f (slot fsc7f@probe): a click on `input[data-id=date-picker-slds-input]` takes the widget
+# from closed to `{open:true, month:'September', year:'2026'}` -- A CLICK ON A DATE INPUT IS AN
+# OPENING CLICK, NOT A FOCUS CLICK. Rule 1b had been dropping it as noise, so the pane kept the
+# day-cell click alone (`ClickText    10    anchor=September`), which on a fresh page has no
+# calendar open and fails with `Could not find text using web recognition`.
+# Three moves, the same shape as the combobox: the opening click is HELD (its composed line is ''
+# because rule 1b already suppressed it, and that is fine -- what is held is the GESTURE); the
+# day-cell click joins the hold; and the `Omni Date` line comes out with both stock lines dormant
+# beneath it. The calendar's own header renders the MONTH alone, so unless the day cell's
+# `aria-label` reached the descriptor the year comes from the input's value after the pick -- the
+# authoritative read-back -- and the fill event completes the pair.
+# A held opening click with NO day pick composes NOTHING: opening a calendar and closing it again
+# is not a step.
+_OMNI_DATE = {"held": False, "open_line": "", "day_line": "", "label": None, "key": None,
+              "iso": None, "picked": False, "t": 0.0}
+
+
+def _omni_date_clear():
+    _OMNI_DATE.update({"held": False, "open_line": "", "day_line": "", "label": None, "key": None,
+                       "iso": None, "picked": False, "t": 0.0})
+
+
+def _omni_date_flush(cl=None):
+    """What a lapsed date hold leaves behind. With no day pick that is NOTHING. With a day pick
+    but no fill to name the year, the day-cell stock line is the only handle there is and it
+    stands, rather than losing a click the user really made."""
+    picked, day_line = _OMNI_DATE["picked"], _OMNI_DATE["day_line"]
+    _omni_date_clear()
+    if picked and (day_line or "").strip():
+        return [day_line]
+    return []
+
+
+def _omni_date_pair(req, decision, line, backups):
+    """(pre, line, backups) or None when this event is not the date picker's business."""
+    cl = _parser()
+    if cl is None or not hasattr(cl, "omni_date_opener"):
+        return None
+    rendered = req.get("rendered") or ""
+    paths = (req.get("xpath") or "", req.get("alt_xpath") or "")
+    desc = req.get("descriptor") or {}
+    now = time.time()
+    pre = []
+    if _OMNI_DATE["held"] and now - _OMNI_DATE["t"] > cl.OMNI_PAIR_WINDOW_S:
+        pre = _omni_date_flush(cl)
+    # 1. the DAY-CELL pick, while an opening click is held
+    if _OMNI_DATE["held"] and not _OMNI_DATE["picked"] and cl.omni_day_cell(rendered, *paths):
+        iso, why = cl.omni_day_cell_date(rendered, desc)
+        _OMNI_DATE.update({"picked": True, "day_line": line if isinstance(line, str) and line.strip()
+                           else rendered, "iso": iso, "t": now})
+        if iso:
+            out, bks = cl.omni_date_pair_lines(_OMNI_DATE["label"], _OMNI_DATE["key"], iso,
+                                               _OMNI_DATE["open_line"], _OMNI_DATE["day_line"])
+            if out:
+                decision["why"] = ("OmniStudio date pick: the calendar's opening click and the "
+                                   "day cell composed as one Omni Date (%s); both stock lines "
+                                   "are dormant backups -- %s" % (iso, why))
+                decision["omni"] = "date paired"
+                _omni_date_clear()
+                return pre, out, bks
+        decision["why"] = ("OmniStudio date pick: HELD with its opening click; %s" % why)
+        decision["omni"] = "date held for the input's own value"
+        return pre, "", []
+    # 2. the FILL on the same input completes the pair: `_omni_fill` composes the `Omni Date`
+    #    line from the value the widget committed, and the two held stock lines go under it.
+    if _OMNI_DATE["held"] and _OMNI_DATE["picked"] and cl.omni_fill_line(
+            line if isinstance(line, str) else "", *paths, omni_key=desc.get("omni_key"))[0]:
+        open_line, _why = cl.omni_open_click_line(_OMNI_DATE["label"], _OMNI_DATE["open_line"])
+        extra = [b for b in (open_line, _OMNI_DATE["day_line"]) if (b or "").strip()]
+        decision["omni"] = ("date pair completed by the input's own value: the opening click and "
+                            "the day cell are dormant backups on this line")
+        _omni_date_clear()
+        return pre, line, list(backups) + ["    #   backup: %s   (stock recorder line, unverified)"
+                                           % b.strip() for b in extra]
+    # 3. the OPENING click itself
+    if cl.omni_date_opener(rendered, *paths, family=desc.get("family")):
+        pre = pre + _omni_date_flush(cl)
+        _OMNI_DATE.update({"held": True, "open_line": line if isinstance(line, str) and line.strip()
+                           else rendered, "day_line": "", "picked": False, "iso": None,
+                           "label": desc.get("label") or desc.get("aria_label") or desc.get("placeholder"),
+                           "key": desc.get("omni_key"), "t": now})
+        decision["why"] = ("OmniStudio date picker OPENED: a click on a date input opens the "
+                           "calendar (measured live on fsc7f 2026-09-19), so it is HELD for its "
+                           "day-cell pick (up to %.0f s), not dropped as a focus click"
+                           % cl.OMNI_PAIR_WINDOW_S)
+        decision["omni"] = "date held"
+        return pre, "", []
+    if pre:
+        return pre, line, backups
+    return None
+
+
 def _omni_pair(req, decision, line, backups):
     """(pre, line, backups). `pre` are lines the page pushes BEFORE this event's own."""
     cl = _parser()
     if cl is None:
         return [], line, backups          # no parser bundle: no pairing, stock lines pass through
+    handled = _omni_date_pair(req, decision, line, backups)
+    if handled is not None:
+        return handled
     rendered = req.get("rendered") or ""
     paths = (req.get("xpath") or "", req.get("alt_xpath") or "")
     desc = req.get("descriptor") or {}
@@ -1298,6 +1396,23 @@ def _omni_pair(req, decision, line, backups):
         decision["omni"] = "held"
         return pre, "", []
     if _OMNI_HOLD["held"]:
+        # A SYNTHETIC EVENT IS PART OF THE GESTURE, NEVER THE END OF IT (the user, run 8,
+        # 2026-09-19: "same at ClickText Australia: it's not capturing the dropdown itself, only
+        # the step"). MEASURED LIVE on fsc7f the same day, with capture-phase listeners on the
+        # page: picking an option fires, in this order, `mousedown` on the option span, `mouseup`
+        # on the option span, **`change` on <runtime_omnistudio_common-combobox>**, and only THEN
+        # `click` on the option span. The widget commits on mouseup, so its own change event
+        # always arrives BEFORE the click the recorder pairs on. The old rule treated that change
+        # as "some other control", flushed the held open click, and `ClickText    Australia` then
+        # passed through alone -- decisions 19-24 of the run-8 fixture (a change on the combobox,
+        # a click on its <ul>, a click on the omniscript container <div>, and a click back on the
+        # input, all synthetic, all inside one pick). Only a REAL event on another control, or the
+        # 8 s window, ends a hold.
+        if req.get("synthetic"):
+            decision["omni"] = ("synthetic %s inside the held combobox gesture: the hold stands "
+                                "(the widget commits on mouseup, so its own change event arrives "
+                                "before the option click)" % (req.get("kind") or "event"))
+            return pre, line, backups
         decision["omni"] = "flushed the held combobox click"
         pre = pre + _omni_flush(cl)
     return pre, line, backups

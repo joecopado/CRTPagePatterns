@@ -192,13 +192,25 @@ function __openModals(){ let n = 0;
 // a click is NOT synchronous -- reading the month header in the same call that
 // clicked prevMonth/nextMonth returns the PRE-click text (measured: 0/1 without
 // a real wait, 15/15 with a ~0.3-0.5s wait per step).
+// The INPUT is an OPENING control, not a focus target (measured live on fsc7f
+// 2026-09-19, build n5): from a closed picker, a mousedown/mouseup/click on
+// `input[data-id=date-picker-slds-input]` takes __dateState from null to
+// {open:true, month:'September', year:'2026'} -- the same dialog the icon button
+// opens. It ALSO re-syncs the grid to the field's committed value (measured: a
+// grid left on 2026 snapped back to 2025 when the field held 09-22-2025). That is
+// why the recorder must treat a click on a date input as an opening click and
+// hold it for its day-cell pick, exactly as it holds a combobox open click.
 function __dateOpen(host){
   const already = __inside(host, '[data-id="date-picker-div"]')[0];
   if(already) return {already:true};
   const btn = __inside(host, 'button[data-id=datePickerBtn]')[0];
-  if(!btn) return {error:'no datePickerBtn'};
-  btn.click();
-  return {clicked:true};
+  if(btn){ btn.click(); return {clicked:'datePickerBtn'}; }
+  const inp = __inside(host, 'input[data-id=date-picker-slds-input]')[0];
+  if(!inp) return {error:'no datePickerBtn and no date input'};
+  inp.focus();
+  for(const t of ['mousedown','mouseup','click'])
+    inp.dispatchEvent(new MouseEvent(t,{bubbles:true,composed:true}));
+  return {clicked:'date-picker-slds-input'};
 }
 function __dateState(host){
   const div = __inside(host, '[data-id="date-picker-div"]')[0];
@@ -226,15 +238,48 @@ function __dateNav(host, direction){
   btn.click();
   return {ok:true};
 }
-function __dateClickDay(host, wantLabel){
+// CAUGHT-BUG, measured live on fsc7f 2026-09-19 (build n5, this stream): the day
+// cell that is ALREADY SELECTED renders its aria-label with a ` Selected` suffix --
+// `aria-label="Mon Sep 22 2025 Selected"` while every other September cell reads
+// `Mon Sep 21 2025`. The old exact `===` compare therefore failed on EXACTLY ONE
+// cell: the one already holding the value being asked for. That is what run 8's
+// `day cell 'Mon Sep 22 2025' not clickable: {'error':'day cell not found',
+// 'sample': ['Mon Sep 01 2025','Tue Sep 02 2025','Wed Sep 03 2025']}` was -- the
+// sample looked perfectly ordinary because cells 1-3 are not the selected one, and
+// the keyword read as a format/render mystery for a whole run. Re-asking for the
+// value a field already holds is the commonest thing a replayed suite does, so the
+// keyword was broken precisely where it had to be idempotent.
+// Proof of the suffix, verbatim from the live grid (September 2025, 30 cells):
+//   dayId21 -> 'Sun Sep 21 2025'
+//   dayId22 -> 'Mon Sep 22 2025 Selected'
+//   dayId23 -> 'Tue Sep 23 2025'
+// There is no ` Today` variant: on 2026-09-19 the September 2026 grid held zero
+// day labels of more than four words.
+// The match is therefore a DATE-PREFIX match, and `td[data-id="dayId<N>"]` -- the
+// widget's own stable per-day attribute, no render suffix in it -- is the backup
+// once the grid's own year and month have been read back as the wanted ones.
+function __dateClickDay(host, wantLabel, dayNum){
   const div = __inside(host, '[data-id="date-picker-div"]')[0];
   if(!div) return {error:'picker not open'};
   const cells = [...div.querySelectorAll('td.curr-month span[aria-label]')];
-  const hit = cells.find(c => c.getAttribute('aria-label') === wantLabel);
-  if(!hit) return {error:'day cell not found', wantLabel,
-                   sample: cells.slice(0,3).map(c=>c.getAttribute('aria-label'))};
+  const labOf = c => c.getAttribute('aria-label') || '';
+  let hit = cells.find(c => labOf(c) === wantLabel)
+         || cells.find(c => labOf(c).startsWith(wantLabel + ' '));
+  let via = hit ? 'aria-label' : null;
+  if(!hit && dayNum){
+    const td = div.querySelector('td.curr-month[data-id="dayId' + dayNum + '"]');
+    const sp = td ? td.querySelector('span[aria-label]') : null;
+    // only trust the positional backup when the grid is already showing the
+    // wanted month AND year -- the label carries both, so compare on it.
+    if(sp && labOf(sp).slice(-4) === wantLabel.slice(-4) &&
+       labOf(sp).slice(4,7) === wantLabel.slice(4,7)){ hit = sp; via = 'data-id'; }
+  }
+  if(!hit) return {error:'day cell not found', wantLabel, cells: cells.length,
+                   labels: cells.map(labOf)};
+  const label = labOf(hit);
   hit.closest('td').click();
-  return {ok:true};
+  return {ok:true, via: via, label: label,
+          already_selected: label !== wantLabel};
 }
 """
 
@@ -376,6 +421,16 @@ def omni_date(key: str, value: str):
     widget below committed `04-17-1990` for `1990-04-17`, read back through the
     SAME independent `get_omni_value` path used for the CAUGHT-BUG.
 
+    CAUGHT-BUG 2 (fsc7f 2026-09-19, build n5): the keyword failed on EXACTLY the
+    date the field already held. The widget appends ` Selected` to the selected
+    day's `aria-label` (`Mon Sep 22 2025 Selected`), and `__dateClickDay` compared
+    with `===`, so re-asking for the committed value -- the commonest thing a
+    replayed suite does -- returned `day cell not found` while cells 1-3 in the
+    printed sample looked perfectly ordinary. The compare is now a date-PREFIX
+    match with `td[data-id=dayId<N>]` as the backup, the day cell is POLLED rather
+    than read once, and the year oracle reads the label's 4-digit year instead of
+    its last four characters (which were `cted` on the selected cell).
+
     Each step below is its own `_js` round trip because the LWC re-render that
     follows a click is NOT synchronous -- reading the month header back inside
     the SAME script that clicked prevMonth/nextMonth returns the PRE-click text
@@ -400,39 +455,47 @@ def omni_date(key: str, value: str):
         confirm.unreadable(f"omni-date {key}", tried=f"could not open the calendar: {opened}")
     time.sleep(0.4)
 
-    year_res = _js("return __dateSetYear(__host(arguments[0]), arguments[1]);", key, str(y))
-    if year_res.get("error"):
-        confirm.unreadable(f"omni-date {key}", tried=f"could not select year {y}: {year_res}")
-    # The year <select>'s 'change' handler re-renders the DAY GRID on its own React
-    # tick -- measured live (fsc7f 2026-09-07, Start Date field): when the
-    # currently-shown MONTH TEXT already equals the target month, the month-nav
-    # loop below never clicks anything and so never waits, and the day grid still
-    # shows the OLD year's cells (`sel.value` itself updates synchronously, so
-    # polling the <select> proves nothing). Poll the actual rendered day cells for
-    # the target year instead of a fixed sleep or the select's own value.
-    for _ in range(10):
-        year_seen = _js(
-            """const h = __host(arguments[0]);
-               const div = __inside(h, '[data-id="date-picker-div"]')[0];
-               if(!div) return null;
-               const c = div.querySelector('td.curr-month span[aria-label]');
-               return c ? c.getAttribute('aria-label').slice(-4) : null;""", key)
-        if year_seen == str(y):
-            break
-        time.sleep(0.2)
-    else:
-        confirm.unreadable(f"omni-date {key}",
-                           tried=f"day grid still shows year {year_seen!r} after selecting {y!r}")
+    # ORDER MATTERS, and it used to be the wrong way round. CAUGHT-BUG 3, measured
+    # live on fsc7f 2026-09-19 the moment the new day-grid diagnostic printed the
+    # labels: the keyword set the YEAR first and then clicked prevMonth/nextMonth,
+    # but MONTH NAVIGATION ROLLS THE YEAR -- a step back past January decrements
+    # it, a step forward past December increments it. `Omni Date <key> 2026-12-03`
+    # with the grid on April 2026 took the shortest route (4 clicks back: March,
+    # February, January, December) and landed on DECEMBER 2025; the keyword then
+    # reported `day cell 'Thu Dec 03 2026' not clickable` and printed all 31
+    # December 2025 labels, which is how the roll was found at all.
+    # Setting the year never moves the month, so the convergence is: navigate the
+    # MONTH first, then set the YEAR, then read BOTH back. The second pass is a
+    # no-op whenever the first route did not cross a year boundary.
+    #
+    # The year is read off a RENDERED DAY CELL, not off the `<select>` (whose own
+    # `value` updates synchronously and so proves nothing about the grid) -- fsc7f
+    # 2026-09-07, Start Date: with the month already correct the old code never
+    # clicked and never waited, and the grid still held the old year's cells.
+    year_probe = """const h = __host(arguments[0]);
+           const div = __inside(h, '[data-id="date-picker-div"]')[0];
+           if(!div) return null;
+           const c = div.querySelector('td.curr-month span[aria-label]');
+           if(!c) return null;
+           // the SELECTED cell's label ends ' Selected', so the year is not always
+           // the last four characters -- take the 4-digit year itself.
+           const mm = (c.getAttribute('aria-label')||'').match(/\\b(\\d{4})\\b/);
+           return mm ? mm[1] : null;"""
 
-    for _ in range(15):
+    def _grid_month():
         st = _js("return __dateState(__host(arguments[0]));", key)
         if not st or not st.get("open"):
-            confirm.unreadable(f"omni-date {key}", tried="calendar closed unexpectedly mid-navigation")
-        if st["month"] == want_month:
+            confirm.unreadable(f"omni-date {key}",
+                               tried="calendar closed unexpectedly mid-navigation")
+        return st.get("month")
+
+    month_seen = None
+    for _ in range(15):
+        month_seen = _grid_month()
+        if month_seen == want_month:
             break
-        cur_idx = _MONTH_NAMES.index(st["month"])
-        want_idx = m - 1
-        diff = (want_idx - cur_idx) % 12
+        cur_idx = _MONTH_NAMES.index(month_seen)
+        diff = ((m - 1) - cur_idx) % 12
         direction = "nextMonthBtnId" if diff <= 6 else "prevMonthBtnId"
         nav = _js("return __dateNav(__host(arguments[0]), arguments[1]);", key, direction)
         if nav.get("error"):
@@ -441,11 +504,41 @@ def omni_date(key: str, value: str):
     else:
         confirm.unreadable(f"omni-date {key}",
                            tried=f"month never reached {want_month!r} in 15 clicks "
-                                 f"(stuck at {st.get('month')!r})")
+                                 f"(stuck at {month_seen!r})")
 
-    day_res = _js("return __dateClickDay(__host(arguments[0]), arguments[1]);", key, want_label)
+    year_res = _js("return __dateSetYear(__host(arguments[0]), arguments[1]);", key, str(y))
+    if year_res.get("error"):
+        confirm.unreadable(f"omni-date {key}", tried=f"could not select year {y}: {year_res}")
+    year_seen = None
+    for _ in range(12):
+        year_seen = _js(year_probe, key)
+        month_seen = _grid_month()
+        if year_seen == str(y) and month_seen == want_month:
+            break
+        time.sleep(0.2)
+    else:
+        confirm.unreadable(
+            f"omni-date {key}",
+            tried=f"day grid shows {month_seen!r} {year_seen!r} after navigating to "
+                  f"{want_month!r} and selecting year {y!r}")
+
+    # POLL on the cell itself, never a one-shot read. The grid re-renders on its own
+    # tick after the year <select> change and after every month click, and the cell
+    # is the only signal that says the render finished; a miss on the first look is
+    # not an answer. Cheap: ~10-50 ms per round trip into the warm holder.
+    day_res = None
+    for _ in range(16):
+        day_res = _js("return __dateClickDay(__host(arguments[0]), arguments[1], arguments[2]);",
+                      key, want_label, dnum)
+        if not day_res.get("error"):
+            break
+        time.sleep(0.25)
     if day_res.get("error"):
-        confirm.unreadable(f"omni-date {key}", tried=f"day cell {want_label!r} not clickable: {day_res}")
+        labels = day_res.pop("labels", [])
+        confirm.unreadable(
+            f"omni-date {key}",
+            tried=f"day cell {want_label!r} not clickable after 4 s of polling: {day_res}; "
+                  f"the grid's own labels were {labels!r}")
     time.sleep(0.4)
 
     got = get_omni_value(key, family="omni-date")

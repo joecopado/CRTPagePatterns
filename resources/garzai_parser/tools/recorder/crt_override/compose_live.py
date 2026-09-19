@@ -584,6 +584,102 @@ def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
     return '%s%s    %s' % (indent, line.strip(), UNVERIFIED), backup, why
 
 
+# ------------------------------------------------- the OmniStudio date picker's OPENING click
+# The user, on run 8 (2026-09-19 14:17): "the birthdate thing is not capturing the initial click
+# to find the dates, so it's only showing the click to select the date".
+#
+# MEASURED LIVE on fsc7f the same day (slot fsc7f@probe, `/lightning/n/GarzAI_Omni_Launcher`,
+# `FSC_DL_v1_Date_Of_Birth`): from a CLOSED picker, a mousedown/mouseup/click on
+# `input[data-id=date-picker-slds-input]` takes the widget's state from `null` to
+# `{open: true, month: 'September', year: '2026'}`. **A click on a date input is an OPENING
+# click, not a focus click.** Rule 1b had been suppressing it as recorder noise -- correct for
+# an ordinary text field, wrong for this widget -- so the pane kept the day-cell click alone
+# (`ClickText    10    anchor=September`), which on a fresh page has no calendar to click into
+# and failed with `Could not find text using web recognition`.
+#
+# So the date picker gets the same three moves the combobox already has: the opening click is
+# HELD, the day-cell pick joins it, and ONE `Omni Date` line comes out with both stock lines as
+# dormant backups. Two things the calendar itself decided:
+#   * the YEAR IS NOT IN THE HEADER. The widget's `h2[data-id=selected_month]` renders
+#     `September` and nothing else; the year lives in a `<select>` and in each day cell's own
+#     `aria-label`. So a day-cell click can only name the full date when the descriptor carried
+#     that cell's aria-label; otherwise the date comes from the input's own value afterwards,
+#     which is the authoritative read-back anyway.
+#   * the SELECTED cell's aria-label carries a ` Selected` suffix (`Mon Sep 22 2025 Selected`),
+#     measured verbatim on the live grid. Anything reading these labels matches on the DATE
+#     PREFIX -- an exact compare is the bug that made `omni_date` fail on the one date the field
+#     already held.
+_DAY_CELL_RX = re.compile(
+    r'^(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+'
+    r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})\b')
+_DAY_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+
+def omni_date_opener(rendered: str, *xpaths, family: str | None = None) -> bool:
+    """True when this event is the click that OPENS an OmniStudio date picker's calendar.
+
+    Unlike the combobox opener this accepts a SYNTHETIC click (`rendered` empty). On the user's
+    recording the opening click arrived by the safety net with no stock line at all, which is
+    exactly why rule 1b swallowed it."""
+    cells = _cells(rendered)
+    if cells and cells[0] not in ('ClickElement', 'ClickItem', 'Click', 'ClickText'):
+        return False                       # a TypeText on the same input is the FILL, not the open
+    if family is not None and family not in FILL_FAMILIES:
+        return False
+    blob = _paths(*xpaths)
+    return _OMNI_DATE_PICKER in blob and '/table[' not in blob and '/td[' not in blob
+
+
+def omni_day_cell(rendered: str, *xpaths) -> bool:
+    """True when this event is the DAY-CELL click inside an OmniStudio calendar: a click whose own
+    path runs through the date picker AND through the day grid (`table`/`tr`/`td`)."""
+    cells = _cells(rendered)
+    if cells and cells[0] not in ('ClickText', 'ClickElement', 'ClickItem', 'Click'):
+        return False
+    blob = _paths(*xpaths)
+    if _OMNI_DATE_PICKER not in blob:
+        return False
+    return any(seg in blob for seg in ('/table[', '/tr[', '/td['))
+
+
+def omni_day_cell_date(rendered: str, descriptor: dict | None = None) -> tuple:
+    """(ISO date, why) read off a day cell's OWN `aria-label`, or (None, why).
+
+    The widget generates that label with `Date().toDateString()` -- `Thu Sep 10 2026` -- and
+    appends ` Selected` to whichever cell is currently selected, so the match is on the DATE
+    PREFIX and never an exact compare. When no such label reached the descriptor the year is
+    simply not knowable from the calendar (its header renders the month alone), and this says so
+    rather than guessing one."""
+    desc = descriptor or {}
+    for field in ('aria_label', 'title', 'text', 'label'):
+        m = _DAY_CELL_RX.match(re.sub(r'\s+', ' ', str(desc.get(field) or '')).strip())
+        if m:
+            mon, day, yr = m.groups()
+            return ('%s-%02d-%02d' % (yr, _DAY_MONTHS.index(mon) + 1, int(day)),
+                    "the day cell's own aria-label %r" % desc.get(field))
+    cells = _cells(rendered)
+    day = cells[1] if len(cells) >= 2 else ''
+    return (None, "the calendar header renders the month alone (%r) and no day-cell aria-label "
+                  "reached the descriptor, so the year is not knowable here: the date comes from "
+                  "the input's own value after the pick" % (desc.get('label') or day))
+
+
+def omni_date_pair_lines(label: str | None, omni_key: str | None, iso: str | None,
+                         stock_open: str, stock_day: str, indent: str = '    ') -> tuple:
+    """(the one composed `Omni Date` line, the dormant backup lines) for one calendar pick.
+
+    ('', [backups]) when the date is known but the element carries no `data-omni-key`, or when
+    the date could not be read: nothing is composed and both stock lines survive as backups --
+    the same tri-state the combobox pair already keeps."""
+    open_line, _ = omni_open_click_line(label, stock_open)
+    backups = [_dormant(indent, s) for s in (open_line, stock_day) if (s or '').strip()]
+    key = str(omni_key or '').strip()
+    if not key or not iso:
+        return '', backups
+    return '%s%s    %s' % (indent, RT._rf('Omni Date', key, iso).strip(), UNVERIFIED), backups
+
+
 def verify_backup(composed: str, indent: str = '    ') -> str:
     """The dormant read-back line that belongs AFTER a fill step, or '' when this is not a fill.
 
