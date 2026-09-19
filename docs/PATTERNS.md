@@ -443,6 +443,76 @@ into `export_flow.py` or `review_table.py`, even though the override itself has 
 
 ---
 
+## OmniStudio (OmniScript + FlexCard) locator patterns
+
+**Landed 2026-09-18/19** (port stream): `resources/garzai_omni.robot` + `resources/garzai_omni/` +
+`tests/omnistudio/`. Not in `library.json` — OmniStudio elements live inside
+`runtime_omnistudio_*` LWC shadow roots this document's other patterns never reach at all (the
+`patterns actually used` section above is entirely QWeb/QForce label-proximity resolution over
+regular Lightning DOM; OmniStudio needs its own host anchor because it is not addressable that
+way). Full keyword-by-keyword citations: `resources/garzai_omni.robot`'s own `[Documentation]`
+blocks and `tests/omnistudio/README.md`.
+
+**The anchor, not a label.** Every keyword resolves a control via `__host(key)` trying, in order:
+`[data-omni-key="<key>"]` (OmniScript — equals `OmniProcessElement.Name`, an author-controlled
+metadata id present on 23/23 elements measured on dev1), `[data-element-label="<norm(key)>"]`
+(FlexCard — the Designer's own Element Label, lowercased/despaced, on the
+`runtime_omnistudio_flexcards-*` wrapper one level above the actual input), then `aria-label` or
+`placeholder` on the leaf control (FlexCard last resort). **Never a page-wide text search** — a
+page-wide option scan was measured once clicking "Agentforce" in the Lightning nav bar and
+reporting a pass; every keyword here is host-scoped first, and reads its own write back through
+`confirm.py` before returning.
+
+**Two mechanics a generic `ClickText`/`TypeText`/native-value-write cannot do:**
+- **Selecting an OmniStudio combobox option needs the full pointer sequence**
+  (`mouseover`→`mousedown`→`mouseup`→`click`) dispatched on the deepest node whose text matches,
+  scoped to the combobox's OWN listbox via `aria-controls` — a bare `.click()` on the option leaves
+  the field EMPTY, measured twice independently (dev1 and fsc7f).
+- **The OmniStudio/SLDS Date control only commits through its own calendar widget** — a plain
+  native-value write into the visible text input reads back the just-written string in the SAME
+  call (self-referential, vacuous) but a genuine second read comes back empty. `Omni Date` drives
+  the widget itself: open picker → select year from its own `<select>` → click prevMonth/nextMonth
+  until the header shows the target month (polling the RENDERED day-cell year, not the `<select>`'s
+  own synchronous `.value` — a same-month edge case was measured stale otherwise) → click the day
+  cell whose `aria-label` matches `Date().toDateString()`.
+
+**A sibling control can reset a field you already set, on a FlexCard.** Measured live on the fsc7f
+Digital Lending loan-calculator card: a Select value read back correctly immediately after the
+call, then read back EMPTY after a SIBLING radio group changed — the card's own reactive logic, not
+a resolver defect. General form of this codebase's "a picklist can overwrite a field you already
+typed" pattern, here triggered by a different control entirely. `Omni Type`/`Omni Select`/etc. do
+not defend against this (they cannot know the card's own dependency graph); an example suite that
+needs a value to SURVIVE should set the dependent field LAST and re-verify.
+
+**Two DOM families need two different Omni keyword groups, not one.** `omni-output`
+(`runtime_omnistudio_common-output-field`, 217 hosts measured, ZERO carrying any of the three
+anchors above — only a generated `data-style-id`) and `omni-action`
+(`runtime_omnistudio_flexcards-flex-action`, real clickable node inside its own shadow root) are
+each their own family with their own locator, entirely separate from the input-control anchor
+above:
+- `Omni Read Output`/`Omni Verify Output Field` resolve an output field by its RENDERED LABEL
+  (there is no key attribute at all) and refuse a caption-only host structurally — a caption host
+  has no label/value pair, so a reader that fell back to "first span in the host" would return the
+  caption text itself (this project's six-times bug, `get_field_value("Stage") -> "Stage"`, in its
+  purest form). An empty `.field-value` on a LABELLED host is COULD-NOT-CHECK, never `''` — 29 of
+  217 measured hosts render exactly that shape.
+- `Omni Click Action` refuses `runtime_omnistudio_common-action` BY NAME — 58 measured hosts, every
+  one attribute-free, wrapping an empty `<slot name="action">` with nothing assigned. Accepting one
+  would report a successful click on a node that cannot be clicked (the `ClickItem`-without-`tag=`
+  failure shape, generalised). The read-back requires the URL to change OR the count of VISIBLE,
+  content-bearing modals to rise — a raw `querySelectorAll` modal count is not an oracle by itself,
+  because one action host pre-renders an empty modal, so the count is already ≥1 before any click.
+
+**Wiring: `Evaluate __import__('keywords_omni').<fn>(...)`, not a native `Library` import of that
+file.** `resources/garzai_omni.robot` Library-imports `keywords_omni.py` itself (`WITH NAME
+OmniRaw`) purely for the `sys.path` side effect that lets the `Evaluate __import__` calls resolve
+the module — the same two-mechanism split the source template uses (see
+`docs/audit/non-qforce-keywords-inventory-2026-09-18.md` section 2). `WITH NAME` keeps the
+auto-generated per-function library keywords out of the unqualified namespace so they cannot
+collide with the hand-written keywords of the same name in this file.
+
+---
+
 ## Appendix — the rest of `library.json`, not used by any suite in this repo
 
 All 15 entries in `docs/recorder/patterns/library.json` are covered above **except one**, listed here

@@ -1037,6 +1037,50 @@ resource precedence with no ambiguity error). **Org:** slockard. **Prerequisites
 
 ---
 
+# 8. OmniStudio (OmniScript + FlexCard) examples — `tests/omnistudio/`
+
+Ported 2026-09-18/19 from the agentic-crt-orchestrator repo's `tools/qforce-lite/keywords_omni.py`
+(16 Python callables) per `docs/audit/non-qforce-keywords-inventory-2026-09-18.md` section 2. New
+resource `resources/garzai_omni.robot` (15 keywords — one Python callable, `omni_select_commit`, is
+an internal helper shared by three keywords and is not independently wrapped) plus
+`resources/garzai_omni/` (the copied `keywords_omni.py` + `confirm.py`, verbatim — see its own
+`README.md` and `MANIFEST.txt`). **Org: fsc7f only** — health90 has zero OmniStudio hosts on this
+org, measured 4 separate ways in the source evidence; there is nothing to drive there.
+coverage-target: none — both suites are structural examples (parsed and import-closure checked, not
+run live through this repo); every citation inside them points at the source session that drove
+the underlying keyword directly. Full step lists, per-keyword proof citations and the activation/
+compile trap: `tests/omnistudio/README.md`.
+
+**A real bug found and fixed during this port**, not present in any other section of this document:
+the source template wired nine of its sixteen `Omni *` Robot keywords (Type/Select/Radio/Checkbox/
+Date/Lookup/Typeahead/Edit Block Add Row/Next Step) to a READ-ONLY verify call instead of their own
+setter function — the shipped keyword never performed the write its name promised. Corrected in
+`resources/garzai_omni.robot`, disclosed in each affected keyword's own `[Documentation]` and in
+`resources/garzai_omni/README.md`. A naming collision (two source keywords both reading "Omni
+Verify Output") is resolved by renaming the OmniScript-input one to `Omni Verify Output Legacy`.
+
+## `fsc7f-digital-lending-omniscript.robot` — `DigitalLendingDF/ApplicantIntakeSecured`
+
+**Purpose:** drive a real 10-step OmniScript (`/lightning/n/GarzAI_Omni_Launcher`) through Date/
+Radio/Checkbox/Edit-Block-Add-Row/Next-Step keywords, one real field per step with a printed
+asked/read-back pair cited from a live fsc7f session (2026-09-07). One `Omni Lookup` step is left
+as a comment: server-backed listbox returned 0 options after 1.5s in the cited session
+(COULD-NOT-CHECK — a data gap in the script's own Party-creation sequence, not a keyword defect).
+Full 21-row step table: `tests/omnistudio/README.md`.
+
+## `fsc7f-digital-lending-flexcards.robot` — loan-calculator + ApplicationFormProduct FlexCards
+
+**Purpose:** two test cases on two FlexCard surfaces. `Drive Digital Lending Loan Calculator
+FlexCard` exercises Select/Currency/Radio/Number SET keywords (4 VERIFIED-PASS) and documents two
+real CAUGHT-BUGs as comments rather than false passes (a Select value reset by a sibling radio
+change; a Date value that does not survive this card's own re-renders). `Drive Application Form
+Product FlexCard Outputs And Actions` exercises `Omni Read Output`/`Omni Verify Output Field`
+(7/7 VERIFIED-PASS, including the guard seen firing on a deliberately wrong assertion) and `Omni
+Click Action` (host resolution + decoy refusal VERIFIED-PASS; one action's landing is
+COULD-NOT-CHECK and left as a comment, not asserted).
+
+---
+
 # Struggles / suite health (read before trusting a suite's own claimed step count)
 
 - **`tests/copado-cicd-pages/README.md`'s step counts are stale for all three `0{1,2,3}` files.**

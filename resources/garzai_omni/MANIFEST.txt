@@ -1,0 +1,14 @@
+# resources/garzai_omni/ -- source provenance (sha256)
+#
+# Ported verbatim (byte-identical, verified by `diff -q` at port time) from the
+# agentic-crt-orchestrator repo per
+# docs/audit/non-qforce-keywords-inventory-2026-09-18.md section 2's file list.
+# Regenerate this file's hashes with:
+#   shasum -a 256 resources/garzai_omni/*.py
+# and compare against the source tree's own hashes to detect drift:
+#   shasum -a 256 tools/qforce-lite/keywords_omni.py tools/qforce-lite/confirm.py
+#
+# Ported 2026-09-18/19.
+
+0e4f85506979d4d4489bc4f824f5482af87afd9f90e8bbd097514dc232446cf4  keywords_omni.py  <- tools/qforce-lite/keywords_omni.py (agentic-crt-orchestrator, commit fc5d1ad9)
+4c2d9ffeebbeb394da7376d30b571e0954d929a177c3f0ada68dab9bf2d8f9d1  confirm.py        <- tools/qforce-lite/confirm.py (agentic-crt-orchestrator, commit fc5d1ad9)
