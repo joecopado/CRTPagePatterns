@@ -1342,7 +1342,7 @@ class Store:
         out_path = os.path.join(self.docs_root, "docs", "recorder", "pom", "apps", f"{slug}.md")
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         lines = [f"# {label} -- app view (`{slug}`)", "",
-                 f"Rendered {_iso(now())} by `python3 tools/recorder/pom/pom.py render`. "
+                 f"Rendered {_iso(now())} by `python3 tools/recorder/pom/pom_cli.py render`. "
                  "Breadth-first from the registry's entry keys over each page's `links`.", "",
                  "**The partition rule does not bend for an app that spans both.** A page key's "
                  "partition is the org alias for a Salesforce page and the HOST for everything "
