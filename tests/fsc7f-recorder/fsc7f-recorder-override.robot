@@ -13,6 +13,9 @@ Library                         ../../resources/garzai_recorder_override.py
 Suite Setup                     Setup Browser
 Suite Teardown                  Run Keywords    Gz Override Restore    AND    End suite
 
+*** Variables ***
+${GZ_ON_MISMATCH}    warn    # a TypeText mismatch prints CAUGHT-BUG and keeps going; Gz Mismatch Tally lists them at the end
+
 *** Test Cases ***
 Status Before Recording
     ${token}=    JwtAuthenticate    ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}
@@ -33,6 +36,7 @@ Status Before Recording
 Status After Recording
     ${status}=    Gz Override Status
     Log To Console    ${status}
+    Gz Mismatch Tally
 
 Restore Stock Recorder
     # RUN THIS SELECTION before stopping the Live Testing session (Live Testing never runs the Suite Teardown)

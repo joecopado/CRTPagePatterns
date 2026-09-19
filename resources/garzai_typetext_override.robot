@@ -42,6 +42,14 @@ Documentation     GarzAI TypeText override (2026-09-18): shadows the library's o
 Library           QForce
 Library           Collections    # Set To Dictionary below; measured missing in Live Testing 2026-09-19 (every TypeText failed "No keyword with name 'Set To Dictionary' found")
 
+*** Variables ***
+# fail (default, builds): a mismatch FAILS the step. warn (Live Testing recording sessions, set it
+# in the suite's Variables): the mismatch is printed as CAUGHT-BUG, kept in @{GZ_MISMATCHES}, and
+# execution continues -- the user asked for this on 2026-09-19 after every failure stopped the
+# session and forced a re-select-and-rerun. `Gz Mismatch Tally` prints the list at the end.
+${GZ_ON_MISMATCH}    fail
+@{GZ_MISMATCHES}
+
 
 *** Keywords ***
 TypeText
@@ -80,11 +88,13 @@ TypeText
         END
     END
     IF    ${is_blank}
-        Fail    GarzAI TypeText('${locator}'): could not read back a value after typing '${input_text}' through two repair passes -- COULD-NOT-CHECK, not a pass.
+        Gz Report Mismatch    COULD-NOT-CHECK    GarzAI TypeText('${locator}'): could not read back a value after typing '${input_text}' through two repair passes -- not a pass.
+        RETURN
     END
     ${matches}=    Values Match    ${input_text}    ${actual}
     IF    not ${matches}
-        Fail    GarzAI TypeText('${locator}'): value did not land. asked for '${input_text}', field holds '${actual}' -- never re-typed over a non-blank mismatch (D13, CLAUDE.md).
+        Gz Report Mismatch    CAUGHT-BUG    GarzAI TypeText('${locator}'): value did not land. asked for '${input_text}', field holds '${actual}' -- never re-typed over a non-blank mismatch (D13, CLAUDE.md).
+        RETURN
     END
     Log    GarzAI TypeText('${locator}'): read back '${actual}' -- matches '${input_text}'.    console=True
 
@@ -125,16 +135,64 @@ Read Input Value Or Blank
 
 
 Values Match
-    [Documentation]    Lenient-equal (D13, CLAUDE.md): trim both sides; if BOTH sides, once trimmed,
-    ...    look like a number (at least one digit, and made up only of 0-9 , . $ % + - and spaces),
-    ...    compare NUMERICALLY (parsed as float after stripping thousands separators/currency/percent
-    ...    signs) so a numeric field's own re-render ('25000' rendered back as '25,000.00') still
-    ...    passes -- a digits-only STRING compare was tried first and measured wrong here: it left
-    ...    the trailing '.00' from '25,000.00' unstripped ('25000' != '25000.00' as strings), which
-    ...    is why this compares the parsed NUMBERS, not the digit characters. Never rescues a blank
-    ...    actual -- TypeText above routes a blank read-back to the repair pass instead of calling
-    ...    this. '25' != '202,525%' either way: neither trimmed-string equality nor the numeric
-    ...    reading holds.
+    [Documentation]    Lenient-equal (D13, CLAUDE.md), four tiers, first that applies decides:
+    ...    1. both sides are ONE number (digits with , . $ % + - and spaces): compare the parsed
+    ...       floats, so '25000' == '25,000.00' and '$ 7,876.00' == '$7,876.00';
+    ...    2. both sides are a three-part date (digits split by - or /): compare the parts as
+    ...       integers, so '09-01-2025' == '09/01/2025' and '1/1/1990' == '01/01/1990';
+    ...    3. the expected value is a FORMATTED IDENTIFIER (digits with -, /, (, ) or spaces and
+    ...       no letters: a phone, an SSN, a masked input): compare the digit sequences, so
+    ...       '(555) 111-2244' == '555-111-2244' and a mask placeholder '(___) ___-____' fails;
+    ...    4. trimmed string equality.
+    ...    Measured 2026-09-19 on fsc7f (the Digital Lending OmniScript): the earlier two-tier
+    ...    version raised ValueError on a dashed date ('09-01-2025' parsed as a float) and read a
+    ...    re-rendered phone as a mismatch. Never rescues a blank actual -- TypeText routes a blank
+    ...    read-back to the repair pass instead of calling this.
     [Arguments]    ${expected}    ${actual}
-    ${result}=    Evaluate    (float(re.sub(r'[^0-9.+-]','',str($expected).strip()))==float(re.sub(r'[^0-9.+-]','',str($actual).strip()))) if (re.search(r'\d',str($expected)) and re.search(r'\d',str($actual)) and re.fullmatch(r'[\s0-9,.$%+-]+',str($expected).strip()) and re.fullmatch(r'[\s0-9,.$%+-]+',str($actual).strip())) else str($expected).strip()==str($actual).strip()    modules=re
+    ${e}=    Evaluate    str($expected).strip()
+    ${a}=    Evaluate    str($actual).strip()
+    ${both_numbers}=    Evaluate    bool(re.fullmatch(r'[\s$+-]*[0-9][0-9,]*(\.[0-9]+)?\s*%?', $e) and re.fullmatch(r'[\s$+-]*[0-9][0-9,]*(\.[0-9]+)?\s*%?', $a))    modules=re
+    IF    ${both_numbers}
+        ${result}=    Evaluate    float(re.sub(r'[^0-9.+-]', '', $e)) == float(re.sub(r'[^0-9.+-]', '', $a))    modules=re
+        RETURN    ${result}
+    END
+    ${both_dates}=    Evaluate    bool(re.fullmatch(r'[0-9]{1,4}[-/][0-9]{1,2}[-/][0-9]{1,4}', $e) and re.fullmatch(r'[0-9]{1,4}[-/][0-9]{1,2}[-/][0-9]{1,4}', $a))    modules=re
+    IF    ${both_dates}
+        ${result}=    Evaluate    [int(x) for x in re.split(r'[-/]', $e)] == [int(x) for x in re.split(r'[-/]', $a)]    modules=re
+        RETURN    ${result}
+    END
+    ${formatted}=    Evaluate    bool(re.search(r'[0-9]', $e) and not re.search(r'[A-Za-z]', $e) and re.search(r'[-/() ]', $e))    modules=re
+    IF    ${formatted}
+        ${result}=    Evaluate    re.sub(r'[^0-9]', '', $e) == re.sub(r'[^0-9]', '', $a)    modules=re
+        RETURN    ${result}
+    END
+    ${result}=    Evaluate    $e == $a
     RETURN    ${result}
+
+
+Gz Report Mismatch
+    [Documentation]    One place a TypeText verdict other than a pass is delivered. Prints the
+    ...    EXPANDED message to the console first (the Fail template used to reach the console with
+    ...    its variables unexpanded, so the field's actual value was invisible there). Then, by
+    ...    ${GZ_ON_MISMATCH}: fail -> Fail (default); warn -> keep the message in @{GZ_MISMATCHES},
+    ...    log it at WARN and CONTINUE.
+    [Arguments]    ${verdict}    ${message}
+    Log To Console    ${verdict}: ${message}
+    IF    '${GZ_ON_MISMATCH}' == 'warn'
+        Append To List    ${GZ_MISMATCHES}    ${verdict}: ${message}
+        Set Suite Variable    ${GZ_MISMATCHES}
+        Log    ${verdict}: ${message}    level=WARN
+    ELSE
+        Fail    ${verdict}: ${message}
+    END
+
+
+Gz Mismatch Tally
+    [Documentation]    Prints every mismatch kept while ${GZ_ON_MISMATCH} was warn, and returns the
+    ...    count -- run it as the last step of a recording session.
+    ${n}=    Get Length    ${GZ_MISMATCHES}
+    Log To Console    GarzAI TypeText mismatches this session: ${n}
+    FOR    ${m}    IN    @{GZ_MISMATCHES}
+        Log To Console    - ${m}
+    END
+    RETURN    ${n}
