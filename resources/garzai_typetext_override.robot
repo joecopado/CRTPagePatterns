@@ -125,11 +125,15 @@ Read Input Value Or Blank
 
 Values Match
     [Documentation]    Lenient-equal (D13, CLAUDE.md): trim both sides; if BOTH sides, once trimmed,
-    ...    look like a number (only digits/separators: 0-9 , . $ % + -), compare DIGITS ONLY so a
-    ...    numeric field's own re-render ('25000' rendered back as '25,000.00') still passes. Never
-    ...    rescues a blank actual -- TypeText above routes a blank read-back to the repair pass
-    ...    instead of calling this. '25' != '202,525%' either way: neither trimmed-string equality
-    ...    nor digits-only equality holds.
+    ...    look like a number (at least one digit, and made up only of 0-9 , . $ % + - and spaces),
+    ...    compare NUMERICALLY (parsed as float after stripping thousands separators/currency/percent
+    ...    signs) so a numeric field's own re-render ('25000' rendered back as '25,000.00') still
+    ...    passes -- a digits-only STRING compare was tried first and measured wrong here: it left
+    ...    the trailing '.00' from '25,000.00' unstripped ('25000' != '25000.00' as strings), which
+    ...    is why this compares the parsed NUMBERS, not the digit characters. Never rescues a blank
+    ...    actual -- TypeText above routes a blank read-back to the repair pass instead of calling
+    ...    this. '25' != '202,525%' either way: neither trimmed-string equality nor the numeric
+    ...    reading holds.
     [Arguments]    ${expected}    ${actual}
-    ${result}=    Evaluate    __import__('re').sub(r'[^0-9.+-]','',str($expected))==__import__('re').sub(r'[^0-9.+-]','',str($actual)) if (__import__('re').fullmatch(r'[\s0-9,.$%+-]+',str($expected).strip()) and __import__('re').fullmatch(r'[\s0-9,.$%+-]+',str($actual).strip())) else str($expected).strip()==str($actual).strip()
+    ${result}=    Evaluate    (float(re.sub(r'[^0-9.+-]','',str($expected).strip()))==float(re.sub(r'[^0-9.+-]','',str($actual).strip()))) if (re.search(r'\d',str($expected)) and re.search(r'\d',str($actual)) and re.fullmatch(r'[\s0-9,.$%+-]+',str($expected).strip()) and re.fullmatch(r'[\s0-9,.$%+-]+',str($actual).strip())) else str($expected).strip()==str($actual).strip()    modules=re
     RETURN    ${result}
