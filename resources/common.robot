@@ -20,7 +20,7 @@ Setup Browser
     Open Browser          about:blank                 ${BROWSER}
     SetConfig             LineBreak                   ${EMPTY}               #\ue000
     Evaluate              random.seed()               random                 # initialize random generator
-    SetConfig             DefaultTimeout              45s                    #sometimes salesforce is slow
+    SetConfig             DefaultTimeout              5s                    #sometimes salesforce is slow
     # adds a delay of 0.3 between keywords. This is helpful in cloud with limited resources.
     SetConfig             Delay                       0.3
 
