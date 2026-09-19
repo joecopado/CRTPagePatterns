@@ -40,6 +40,7 @@ Documentation     GarzAI TypeText override (2026-09-18): shadows the library's o
 ...               bug, not a fixable-by-retrying one: retrying on a non-blank mismatch is exactly how
 ...               each retyped attempt landed on top of the last.
 Library           QForce
+Library           Collections    # Set To Dictionary below; measured missing in Live Testing 2026-09-19 (every TypeText failed "No keyword with name 'Set To Dictionary' found")
 
 
 *** Keywords ***
