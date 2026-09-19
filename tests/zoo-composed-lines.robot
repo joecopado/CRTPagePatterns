@@ -13,6 +13,8 @@ Suite Teardown                  Run Keywords    Gz Override Restore    AND    En
 Replay The 29 Composed Lines
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
+    ${marker}=    Gz Container Marker    # FRESH or REUSED container: does the disk survive between sessions?
+    Log To Console    ${marker}
     ${instance}=    GetInstanceUrl
     GoTo    ${instance}/lightning/n/Zoo_Nightmare_Inputs
     VerifyText    Nightmare    timeout=30

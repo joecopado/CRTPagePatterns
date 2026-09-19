@@ -56,7 +56,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18j alt-path+containment", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-18j2 container-marker", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -494,6 +494,30 @@ class garzai_recorder_override:
         """on: push dormant '#   backup:' comment lines under each composed step (default); off: only the line."""
         STATE["backups"] = str(on).strip().lower() in ("true", "on", "1", "yes")
         return STATE["backups"]
+
+    def gz_container_marker(self):
+        """Does the Live Testing container's disk survive between sessions? Writes
+        /home/services/log/gz_marker.json on first sight and reads it back on every later sight:
+        the answer is `first_seen` (when, by which suite) and `sightings`. Run it as the FIRST step
+        of any session. (2026-09-18: a stock session got the local-network prompt, which only our
+        patched bundle raises, so the extension directory had survived from an earlier session.)"""
+        path = "/home/services/log/gz_marker.json"
+        now = time.strftime("%Y-%m-%dT%H:%M:%S")
+        try:
+            data = json.load(open(path)) if os.path.exists(path) else {"first_seen": now, "sightings": 0}
+        except Exception:
+            data = {"first_seen": now, "sightings": 0, "note": "unreadable marker replaced"}
+        data["sightings"] = int(data.get("sightings", 0)) + 1
+        data["last_seen"] = now
+        data["bundle_patched_now"] = "__gzCompose" in open(BUNDLE, encoding="utf-8", errors="ignore").read() if os.path.exists(BUNDLE) else None
+        data["backup_present"] = os.path.exists(BACKUP)
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            json.dump(data, open(path, "w"))
+        except Exception as exc:
+            data["write_error"] = str(exc)
+        verdict = "REUSED container: marker first seen %s, %d sightings" % (data["first_seen"], data["sightings"]) if data["sightings"] > 1 else "FRESH container: no earlier marker"
+        return json.dumps({"verdict": verdict, **data})
 
     def gz_override_restore(self):
         if os.path.exists(BACKUP):

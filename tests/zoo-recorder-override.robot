@@ -16,6 +16,8 @@ Record On Zoo With GarzAI Composition
     # Slockard -- the suite's own variables; values live in CRT, never in this file
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
+    ${marker}=    Gz Container Marker    # FRESH or REUSED container: does the disk survive between sessions?
+    Log To Console    ${marker}
     ${instance}=    GetInstanceUrl
     GoTo    ${instance}/lightning/n/Zoo_Nightmare_Inputs
     VerifyText    Nightmare    timeout=30

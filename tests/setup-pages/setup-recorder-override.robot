@@ -15,6 +15,8 @@ Suite Teardown                  Run Keywords    Gz Override Restore    AND    En
 Setup Pages With The GarzAI Composer
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
+    ${marker}=    Gz Container Marker    # FRESH or REUSED container: does the disk survive between sessions?
+    Log To Console    ${marker}
     ${instance}=    GetInstanceUrl
     Gz Override Org    slockard
     ${status}=    Gz Override Status
