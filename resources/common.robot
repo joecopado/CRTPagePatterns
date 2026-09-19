@@ -17,7 +17,10 @@ Setup Browser
     # Setting search order is not really needed here, but given as an example 
     # if you need to use multiple libraries containing keywords with duplicate names
     Set Library Search Order                          QForce    QWeb
-    Open Browser          about:blank                 ${BROWSER}
+    # options=: Chrome 142+ asks 'wants to access other apps and services on this device' when a page
+    # calls a device-local address (the GarzAI composer on 127.0.0.1:18077); this flag turns that
+    # check off for the session. COULD-NOT-CHECK on Chrome 152 until one session runs with it.
+    Open Browser          about:blank                 ${BROWSER}    options=--disable-features=LocalNetworkAccessChecks
     SetConfig             LineBreak                   ${EMPTY}               #\ue000
     Evaluate              random.seed()               random                 # initialize random generator
     SetConfig             DefaultTimeout              5s                    #sometimes salesforce is slow
