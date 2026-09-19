@@ -451,6 +451,19 @@ def _fingerprint(drv) -> int:
         return -1
 
 
+CAPTURE_MIN_INTERVAL_S = 5.0     # a capture runs on the page's main thread; on a large Setup page it
+SCRIPT_TIMEOUT_S = 8             # is the stall the user saw when every click recaptured (2026-09-18)
+
+
+def capture_allowed(cache: dict, now: float | None = None) -> tuple[bool, float]:
+    """(allowed, seconds since the last capture). At most one capture per CAPTURE_MIN_INTERVAL_S per
+    composer: a page that changes faster than that is answered COULD-NOT-CHECK, never re-walked."""
+    now = time.time() if now is None else now
+    last = float(cache.get('last_capture_t') or 0.0)
+    since = now - last
+    return (last == 0.0 or since >= CAPTURE_MIN_INTERVAL_S), since
+
+
 def compose_live_element(drv, target_element, rendered: str, org: str | None = None,
                          cache: dict | None = None, url: str | None = None,
                          form: str = 'keyword') -> dict:
@@ -462,15 +475,25 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
     url = url or (drv.current_url or '')
     fp = _fingerprint(drv)
     out_extra = {'recaptured': False, 'capture_ms': cache.get('capture_ms', 0.0)}
+    try:
+        drv.set_script_timeout(SCRIPT_TIMEOUT_S)   # a navigation mid-capture must not hold the driver 30 s
+    except Exception:
+        pass
     for attempt in (1, 2):
         if cache.get('url') != url or cache.get('fingerprint') != fp or 'parsed' not in cache:
+            ok, since = capture_allowed(cache)
+            if not ok:
+                return {'line': None, 'xpath_line': None, 'row': None,
+                        'why': 'COULD-NOT-CHECK: capture budget: the page changed %.1f s after the last capture (minimum %.0f s)' % (since, CAPTURE_MIN_INTERVAL_S), **out_extra}
+            cache['last_capture_t'] = time.time()
             shot = live_capture(drv, org)
-            cache.update({'url': shot['url'], 'fingerprint': fp, 'capture_ms': shot['capture_ms'],
+            # the cache key is the DRIVER's url, never the serializer's rendering of it: when the two
+            # differed in form every event re-captured, which is the Setup stall (2026-09-18)
+            cache.update({'url': url, 'shot_url': shot['url'], 'fingerprint': fp, 'capture_ms': shot['capture_ms'],
                           'parsed': parse_capture(shot['html'], shot['url'], org)})
             cache['xpaths'] = [r.get('identity_xpath') or '' for r in cache['parsed'].rows]
             out_extra['capture_ms'] = shot['capture_ms']
             out_extra['recaptured'] = attempt > 1 or out_extra['recaptured']
-            url = shot['url']
         parsed: Parsed = cache['parsed']
         t0 = time.time()
         try:
@@ -510,9 +533,12 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                         'xpath_line': None, 'row': _row_summary(row), 'page_key': parsed.page_key,
                         'why': 'recipe step of row %s (%s)' % (row.get('n'), row.get('pattern')),
                         'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra}
-        if attempt == 1:
-            cache.pop('parsed', None)          # the page moved under us: one recapture, then stop
+        if attempt == 1 and _fingerprint(drv) != cache.get('fingerprint'):
+            # the page moved under us: ONE recapture, and only when the DOM actually changed -- a
+            # second walk of the same DOM yields the same rows and was the Setup stall (2026-09-18)
+            cache.pop('parsed', None)
             out_extra['recaptured'] = True
+            fp = _fingerprint(drv)
             continue
         return {'line': None, 'xpath_line': None, 'row': None, 'page_key': parsed.page_key,
                 'why': 'no parsed row and no recipe step resolves to this element',

@@ -40,7 +40,7 @@ REPL = "window.__gzCompose(this,r,event,ctx)"
 JS = r"""
 ;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};window.__gzPending={};var HOLD=900;
 function axp(el){var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return '/html[1]/'+p.join('/')}
-function ask(body){return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(function(res){return res.json()})}
+function ask(body){body.frame=(window!==window.top);try{body.frame_path=location.pathname}catch(e){body.frame_path=''}return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(function(res){return res.json()})}
 function enqueue(fn){window.__gzQ=window.__gzQ.then(fn).catch(function(e){console.log('gz queue',e)})}
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
  try{if(ctx&&ctx.nodeType===1){var k=axp(ctx);window.__gzSeen[k]=Date.now();if(window.__gzPending[k]){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k]}}}catch(e){}
@@ -56,7 +56,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18h parser-fallback", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-18i frames+dedupe+budget", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -339,6 +339,21 @@ def _backups(row_n, line, rendered):
     return out[:2]
 
 
+_LAST = {"el": None, "t": 0.0}
+
+
+def _is_duplicate(drv, target, window_s=2.5):
+    """The safety net and the recorder can resolve ONE click to two different elements (the anchor and
+    its span), so a path-keyed dedupe in the page misses it (measured 2026-09-18: two lines for one
+    Fields & Relationships click). Identity in the DOM within a short window is the rule."""
+    if _LAST["el"] is None or time.time() - _LAST["t"] > window_s:
+        return False
+    try:
+        return bool(drv.execute_script("return arguments[0] === arguments[1]", _LAST["el"], target))
+    except Exception:
+        return False
+
+
 class _H(BaseHTTPRequestHandler):
     def log_message(self, *a):  # quiet
         pass
@@ -374,9 +389,18 @@ class _H(BaseHTTPRequestHandler):
         proposal_backups = []
         try:
             line = None
+            if req.get("frame"):
+                # build i: an event raised INSIDE an iframe carries a path rooted at the frame's own
+                # document; resolving it against the top document finds the wrong element, and the
+                # capture that follows freezes a classic Setup page (measured 2026-09-18). Pass through.
+                decision["why"] = "event inside an iframe (%s): the composer is top-document only; passed through" % (str(req.get("frame_path") or "?")[:60])
+                line = "" if req.get("synthetic") else None
+                xp = None
             if xp:
                 drv = _driver()
                 tgt = drv.find_elements("xpath", xp)
+                if tgt and _is_duplicate(drv, tgt[0]):
+                    line = ""; decision["why"] = "duplicate: the same element was served %d ms ago" % int((time.time() - _LAST["t"]) * 1000); tgt = []
                 if tgt:
                     t = tgt[0]
                     for row in ROWS:
@@ -404,9 +428,10 @@ class _H(BaseHTTPRequestHandler):
                                     decision["why"] = "synthetic %s on <%s> %r: no row, no recipe, no parser proposal (parser %s); not recorded" % (req.get("kind"), req.get("tag"), (req.get("text") or "")[:40], PARSER["state"])
                                 else:
                                     decision["why"] = "no row resolves to this element; no parser proposal (parser %s)" % PARSER["state"]
-                else:
+                    _LAST["el"] = t; _LAST["t"] = time.time()
+                elif not decision["why"]:
                     decision["why"] = "their xpath resolved to nothing"
-            else:
+            elif not decision["why"]:
                 decision["why"] = "no xpath in event"
             decision["out"] = rendered if line is None else line
         except Exception as exc:
