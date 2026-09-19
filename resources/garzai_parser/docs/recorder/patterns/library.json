@@ -1,0 +1,443 @@
+{
+  "_about": "The pattern library (2026-09-10): reusable interaction recipes measured in the joint validation loop. One entry per pattern: how to recognise it on a parsed row (match), the keyword form and the xpath form CRT runs (placeholders: {label} {value} {index} {xpath} {attr_<name>} {anchor_kw} and any key in args), the read-back, the wait signal, the known failure, and the pages it held on. Entries are ordered specific -> general; the first match wins. The library never edits the parser: it is the interaction layer over what the parser found. Consumers: tools/recorder/patterns.py (match/recipe), review_table.py build (stamps row.pattern), robot_call (recipe when a row has no corrected call), the recorder's draft step. {anchor_kw} (2026-09-18) is D4's slot on any keyword form that locates by {label}/{label_base}: it renders '    anchor=<n>' when the row's group_size > 1 and '' when it occurs once -- pattern_library.recipe() computes it via disambiguation_args.to_call_kwargs, so a repeated control always carries QWeb's numeric anchor and a single one never does, matching the doctrine generic composers (compose_live._anchor_of, review_table.robot_call) already enforce outside the library. Found as a gap in native-select-dropdown (a select whose label group_size > 1 emitted no anchor at all); fixed there and audited into every other recipe that locates by {label}/{label_base}: clarity-lookup, adjacent-span-label-button, count-suffixed-button, tab-with-count-in-same-node. A recipe that locates by an attribute or an xpath (inline-edit-pencil, slotted-text-button-by-value, dueling-list-hand-built, pill-combobox-click-then-text) or a fixed literal (lightning-modal-cancel-and-close) is not in scope for this slot -- its locator does not resolve by the row's own label text.",
+  "patterns": [
+    {
+      "id": "clarity-lookup",
+      "platform": "copado-devops",
+      "name": "search-as-you-type lookup (cds-select-input): type, pick the option INSIDE the host, read back the pill",
+      "match": {
+        "family": "input_field",
+        "attrs": {
+          "role": "searchbox"
+        },
+        "ancestor_tags": [
+          "cds-select-input"
+        ]
+      },
+      "args": {
+        "host_id": {
+          "ancestor": "cds-select-input",
+          "attr": "id"
+        }
+      },
+      "keyword_form": [
+        "TypeText    {label}    {value}    timeout=40{anchor_kw}",
+        "ClickItem    {value}    tag=div",
+        "VerifyElement    xpath=//cds-select-input[@id=\"{host_id}\"]//span[normalize-space(.)=\"{value}\"]    timeout=20"
+      ],
+      "xpath_form": [
+        "TypeText    xpath=//cds-select-input[@id=\"{host_id}\"]//input[@role=\"searchbox\"]    {value}    timeout=40",
+        "ClickElement    xpath=//cds-select-input[@id=\"{host_id}\"]//*[@role=\"option\"][normalize-space(.)=\"{value}\"]",
+        "VerifyElement    xpath=//cds-select-input[@id=\"{host_id}\"]//span[normalize-space(.)=\"{value}\"]    timeout=20"
+      ],
+      "readback": "the selected-value pill span.csi__single-value-label under the host; the searchbox placeholder disappears after a pick so VerifyInputValue by placeholder cannot be the read-back",
+      "wait": "a dependent lookup stays aria-disabled until its parent is picked and its choices load (13.0 s measured); the keyword timeout is the wait, never a sleep; the pill rendered 10.3 s after the click",
+      "known_failure": "ClickText {value} resolves the same text anywhere on the page (the templates table behind the modal had 23 'Account'); anchor=<label> fails when the label text is also a table header; the option must QUALIFY (a credential must be authenticated: copado__Org__c.copado__Validated_Status__c = 'OK') -- query first, then click the exact full text",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-data-template-2026-09-10.md (drive 3/3 both forms, rows 75 and 77)"
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "native-select-dropdown",
+      "platform": "salesforce-lightning",
+      "name": "a native <select>: DropDown by label, VerifySelectedOption",
+      "match": {
+        "family": "dropdown",
+        "tag": "select"
+      },
+      "keyword_form": [
+        "DropDown    {label}    {value}{anchor_kw}",
+        "VerifySelectedOption    {label}    {value}{anchor_kw}"
+      ],
+      "xpath_form": [
+        "DropDown    xpath={xpath}    {value}",
+        "VerifySelectedOption    xpath={xpath}    {value}"
+      ],
+      "readback": "the select's selectedOptions text",
+      "wait": "none",
+      "known_failure": "PickList does not select a native <select> (measured 2026-09-10); DropDown by label works even when the label is a cousin",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-nightmare-inputs-2026-09-10.md (Territory, Escalation Regions)"
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "pill-combobox-click-then-text",
+      "platform": "salesforce-lightning",
+      "name": "a combobox whose label QWeb cannot reach: click the selector box by xpath, then ClickText the option",
+      "match": {
+        "family": "input_field",
+        "keyword": "ComboBox"
+      },
+      "keyword_form": [
+        "ClickElement    xpath={xpath}",
+        "ClickText    {value}",
+        "VerifyText    {value}    timeout=5"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath={xpath}",
+        "ClickText    {value}",
+        "VerifyText    {value}    timeout=5"
+      ],
+      "readback": "the option text visible after the pick (a pill or the input value)",
+      "wait": "the option list opens on the click; ClickText's timeout is the wait",
+      "known_failure": "ClickText <label> only clicks the label (user, 2026-09-10); a vacuous 'list opened' check counts always-visible options",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-nightmare-inputs-2026-09-10.md (Product Lines Covered, Support Tier)"
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "dueling-list-hand-built",
+      "platform": "salesforce-lightning",
+      "name": "an SLDS dueling list without lightning-dual-listbox: ClickText the option, click the move-right control, verify it under Selected",
+      "match": {
+        "family": "dual_listbox",
+        "tag": "div"
+      },
+      "keyword_form": [
+        "ClickText    {value}    partial_match=False",
+        "ClickElement    xpath=//*[normalize-space(text())=\"{label}\"]/following::*[contains(@class,\"zn-arrow-r\")][1]",
+        "VerifyText    {value}    anchor=Selected"
+      ],
+      "xpath_form": [
+        "ClickText    {value}    partial_match=False",
+        "ClickElement    xpath=//*[normalize-space(text())=\"{label}\"]/following::*[contains(@class,\"zn-arrow-r\")][1]",
+        "VerifyText    {value}    anchor=Selected"
+      ],
+      "readback": "the option text under the Selected column",
+      "wait": "none",
+      "known_failure": "the move control's class is the page's own (zn-arrow-r on Zoo_Nightmare_Inputs); a standard lightning-dual-listbox takes the QForce MultiPickList keyword instead",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-nightmare-inputs-2026-09-10.md (Entitled Services)"
+      ],
+      "status": "verified-on-one-page"
+    },
+    {
+      "id": "inline-edit-pencil",
+      "platform": "salesforce-lightning",
+      "name": "a record page's inline-edit pencil: ClickItem by its title",
+      "match": {
+        "family": "button",
+        "tag": "button",
+        "attr_regex": [
+          {
+            "name": "title",
+            "regex": "^Edit "
+          }
+        ]
+      },
+      "keyword_form": [
+        "ClickItem    {attr_title}    tag=button"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//button[@title=\"{attr_title}\"]"
+      ],
+      "readback": "the field's input appears (VerifyInputElement <field label>)",
+      "wait": "none",
+      "known_failure": "the pencil has no visible text; ClickText finds nothing",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-account-record-2026-09-10.md (55 buttons, all resolved)"
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "slotted-text-button-by-value",
+      "platform": "salesforce-lightning",
+      "name": "a button whose visible text arrives through a <slot> and repeats on the page: ClickItem by its value attribute",
+      "match": {
+        "family": "button",
+        "tag": "button",
+        "attrs": {
+          "value": "*"
+        },
+        "group_size_min": 2
+      },
+      "keyword_form": [
+        "ClickItem    {attr_value}    tag=button"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//button[@value=\"{attr_value}\"]"
+      ],
+      "readback": "the action's panel opens (VerifyText <panel heading>)",
+      "wait": "none",
+      "known_failure": "ClickText index 1 and 2 both landed on the other 'New Task' (the text is slotted)",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-account-record-2026-09-10.md (New Task)"
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "clarity-grid-row-checkbox",
+      "platform": "copado-devops",
+      "name": "a Clarity data-grid row checkbox (cds-checkbox host carries the aria-label, the input does not): click the input under the host by the host's aria-label",
+      "match": {
+        "family": "checkbox",
+        "ancestor_tags": [
+          "cds-checkbox"
+        ]
+      },
+      "args": {
+        "aria_label": {
+          "ancestor": "cds-checkbox",
+          "attr": "aria-label"
+        }
+      },
+      "keyword_form": [
+        "# no keyword reaches this control (measured live 2026-09-15): ClickCheckbox {aria_label} found nothing in 15 s"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//cds-checkbox[@aria-label=\"{aria_label}\"]//input    timeout=15"
+      ],
+      "readback": "the input's is_selected() flips true; on the Commit Experience the Dependency Analysis button immediately reads 'Analyzing dependencies' then enables (the analysis auto-runs on selection)",
+      "wait": "none before the click; after it the 'Analyzing dependencies' label is the signal that the selection registered",
+      "known_failure": "ClickCheckbox by the aria-label text: the label sits on the <cds-checkbox> host, QWeb's checkbox locator reads the <input> and its <label>, which carry nothing (Select row Flow:Opportunity_Creation_Automation, na.devops.copado.com/en/commit)",
+      "held_on": [
+        "na.devops.copado.com|/en/commit/{id}"
+      ]
+    },
+    {
+      "id": "clarity-grid-action-cell",
+      "platform": "copado-devops",
+      "name": "a Clarity data-grid action cell (cds-table-cell role=button holding only an icon, e.g. Compare): click it by the text of its own row",
+      "match": {
+        "tag": "cds-table-cell",
+        "attrs": {
+          "role": "button"
+        }
+      },
+      "args": {
+        "row_text": {
+          "nearest": "span",
+          "attr": "text"
+        }
+      },
+      "keyword_form": [
+        "# no keyword reaches this control: the cell has no text, only a cds-icon svg; ClickItem needs an attribute value the icon does not carry"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//cds-table-row[.//span[normalize-space()=\"{row_text}\"]]//cds-table-cell[@role=\"button\"]    timeout=15"
+      ],
+      "readback": "the panel it opens (Compare: 'Flow: <name>' with a Changes strip; a spinner first, the diagram 8-12 s later, 0.5 s when cached)",
+      "wait": "poll for the panel heading, then for the Changes strip before clicking anything inside it (Explain Changes clicked before the strip rendered did not open its panel)",
+      "known_failure": "while the grid's search box highlights, the row text is split by a <mark> element; a normalize-space() on the span still matches the whole text, a contains() on <mark> only matches the highlighted part",
+      "held_on": [
+        "na.devops.copado.com|/en/commit/{id}"
+      ]
+    },
+    {
+      "id": "count-suffixed-button",
+      "platform": "any",
+      "name": "a button whose label carries a live count in parentheses (Dependency Analysis (2), Get Previously Commited (9)): click by the label without the count, partial match ON",
+      "match": {
+        "family": "button",
+        "label_regex": "\\(\\d+\\)\\s*$"
+      },
+      "args": {
+        "label_base": {
+          "regex": "^(.*?)\\s*\\(\\d+\\)\\s*$",
+          "from": "label"
+        }
+      },
+      "keyword_form": [
+        "ClickText    {label_base}    timeout=15{anchor_kw}"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//button[starts-with(normalize-space(),\"{label_base}\")]    timeout=15"
+      ],
+      "readback": "the label itself: it reads 'Dependency Analysis' before the analysis ran and 'Dependency Analysis (2)' after; the count is the state",
+      "wait": "the count appears when the work behind the button finishes; verify the count, never the bare label, to know it ran",
+      "known_failure": "partial_match=False on the counted form fails the moment the count changes; the store's match rule (pom/match.py) drops the count when matching, so the stored element survives the relabel",
+      "held_on": [
+        "na.devops.copado.com|/en/commit/{id}"
+      ]
+    },
+    {
+      "id": "clarity-offcanvas-close",
+      "platform": "copado-devops",
+      "name": "the close X of a Clarity offcanvas panel (aria-label 'Close diff'): it sits under the global topbar, so a native click is intercepted -- click it through JavaScript",
+      "match": {
+        "tag": "button",
+        "attr_regex": [
+          {
+            "name": "aria-label",
+            "regex": "^Close"
+          }
+        ],
+        "ancestor_tags": [
+          "cds-icon"
+        ]
+      },
+      "args": {
+        "aria_label": {
+          "attr": "aria-label"
+        }
+      },
+      "keyword_form": [
+        "# ClickItem {aria_label} is intercepted: 'element click intercepted ... <header class=global-topbar> would receive the click' (measured 2026-09-15)"
+      ],
+      "xpath_form": [
+        "ExecuteJavascript    document.querySelector('button[aria-label=\"{aria_label}\"]').click()"
+      ],
+      "readback": "the panel heading is gone from the DOM",
+      "wait": "a 250 ms poll on the heading's absence",
+      "known_failure": "ClickElement on the same xpath: ElementClickInterceptedException at (1469, 80), the point under the fixed header",
+      "held_on": [
+        "na.devops.copado.com|/en/commit/{id}"
+      ]
+    },
+    {
+      "id": "lightning-modal-cancel-and-close",
+      "platform": "salesforce-lightning",
+      "name": "the X of a Lightning quick-action modal: its title is 'Cancel and close', never 'Close'",
+      "match": {
+        "tag": "button",
+        "attrs": {
+          "title": "Cancel and close"
+        }
+      },
+      "args": null,
+      "keyword_form": [
+        "ClickText    Cancel and close    timeout=10"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//button[contains(@class,\"slds-modal__close\")]    timeout=10"
+      ],
+      "readback": "the modal title is gone and the URL returns from /lightning/action/quick/... to the record (the quick action is its own page key while open)",
+      "wait": "a 250 ms poll on the URL leaving /lightning/action/quick/",
+      "known_failure": "//button[@title=\"Close\"] resolves a different button (a toast or banner dismiss) and the modal stays open (measured 2026-09-15, Revenue Cloud Settings on cicd-demo)",
+      "held_on": [
+        "cicd-demo|/lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_Deployment_Configuration"
+      ]
+    },
+    {
+      "id": "tab-with-count-in-same-node",
+      "platform": "salesforce-lightning",
+      "name": "a tab or pill whose count sits in the same text node as its label ('Standard Rules 2'): verify with partial match, never exact",
+      "match": {
+        "family": [
+          "button",
+          "tab",
+          "link"
+        ],
+        "label_regex": "\\s\\d+$"
+      },
+      "args": {
+        "label_base": {
+          "regex": "^(.*?)\\s+\\d+$",
+          "from": "label"
+        }
+      },
+      "keyword_form": [
+        "VerifyText    {label_base}    partial_match=True    timeout=10{anchor_kw}",
+        "ClickText    {label_base}    timeout=10{anchor_kw}"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath=//*[self::button or self::a][starts-with(normalize-space(),\"{label_base}\")]    timeout=10"
+      ],
+      "readback": "the tab's aria-selected flips; the count is the number of rows under it",
+      "wait": "none",
+      "known_failure": "VerifyText {label_base} exact: the read-back guard refuses it as SilentWrongValue ('asked for Standard Rules but resolved Standard Rules\\n2'); loosening the guard is the wrong fix, partial=True is the honest form",
+      "held_on": [
+        "cicd-demo|/lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_Deployment_Configuration"
+      ]
+    },
+    {
+      "id": "reactive-input-clear-then-verify",
+      "platform": "salesforce-lightning",
+      "name": "the Zoo Nightmare Inputs reactive text fields (Contract Term, Renewal Notice (days), Amount, Approved Budget): real TypeText's own clear_key is not reliable on this shape -- clear, type, read back, verify",
+      "match": {
+        "family": "input_field",
+        "tag": "input",
+        "label_regex": "^(Contract Term|Renewal Notice \\(days\\)|Amount|Approved Budget)$"
+      },
+      "keyword_form": [
+        "TypeText    {label}    {value}{anchor_kw}"
+      ],
+      "xpath_form": [
+        "TypeText    xpath={xpath}    {value}"
+      ],
+      "readback": "GetInputValue    {label}{anchor_kw}, compared lenient (trim; digits-only for a numeric render, '25000' == '25,000.00')",
+      "wait": "none",
+      "known_failure": "plain TypeText appends on reactive LWC inputs (docs/errors/entries/576d7e8859.json: on this holder neither {CONTROL + a} nor {COMMAND + a} cleared a reactive lightning-input at all -- 'GZREV Phone' retyped over 'GZREV Phone' read back 'GZREV PhoneGZREV Phone'; separately, tools/qforce-lite/qforce_lite.py type_text_clearing's own docstring measured a percent-formatted numeric field grow 25% -> 2,025% -> 202,525% across repeated attempts WITH clear_key already applied) -- CRT's stock TypeText has no answer to either shape beyond the one clear_key chord",
+      "crt_override_resource": "resources/garzai_typetext_override.robot",
+      "evidence": [
+        "docs/errors/entries/576d7e8859.json",
+        "tools/qforce-lite/qforce_lite.py type_text_clearing (~line 1177-1233, docstring)",
+        "docs/recorder/review/slockard-zoo-nightmare-inputs/review.json rows 42-48"
+      ],
+      "status": "measured-failure-only"
+    },
+    {
+      "id": "repeated-label-member",
+      "platform": "salesforce-lightning",
+      "name": "a control whose label repeats on the page: the member's index as QWeb's numeric anchor",
+      "match": {
+        "family": "input_field",
+        "group_size_min": 2,
+        "index_min": 2
+      },
+      "keyword_form": [
+        "TypeText    {label}    {value}    anchor={index}",
+        "VerifyInputValue    {label}    {value}    anchor={index}"
+      ],
+      "xpath_form": [
+        "TypeText    xpath={xpath}    {value}",
+        "VerifyInputValue    xpath={xpath}    {value}"
+      ],
+      "readback": "VerifyInputValue with the same anchor",
+      "wait": "none",
+      "known_failure": "a member QWeb cannot see (a wizard step not yet shown) makes anchor=2 land on member 1 ('Found 1 elements. Given anchor was 2'); the xpath //label[normalize-space(.)=\"{label}\"]/following::input[1] reaches it",
+      "evidence": [
+        "docs/recorder/evidence/joint-validation-phase1-2026-09-10.md (Deal Name x3)"
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "save-never-live",
+      "platform": "any",
+      "name": "Save / Submit / Delete: exported as a comment, run by the user after checking the form",
+      "match": {
+        "family": "button",
+        "label_regex": "^(Save|Submit|Delete)\\b"
+      },
+      "keyword_form": [
+        "# ClickText    {label}    partial_match=False"
+      ],
+      "xpath_form": [
+        "# ClickElement    xpath={xpath}"
+      ],
+      "readback": "SOQL after the user's click",
+      "wait": "n/a",
+      "known_failure": "ClickText Save without partial_match=False clicks 'Save & New'",
+      "evidence": [
+        "CLAUDE.md D13"
+      ],
+      "status": "policy"
+    },
+    {
+      "id": "adjacent-span-label-button",
+      "platform": "copado-devops",
+      "name": "a button whose visible label is two adjacent spans ('Available Parent Objects' + '(25)'): the parser joins them with a space the DOM does not have",
+      "match": {
+        "family": "button",
+        "tag": "button",
+        "raw_regex": "</span><span[^>]*>\\("
+      },
+      "keyword_form": [
+        "ClickText    {label}    partial_match=False{anchor_kw}"
+      ],
+      "xpath_form": [
+        "ClickElement    xpath={xpath}"
+      ],
+      "readback": "n/a",
+      "wait": "none",
+      "known_failure": "ClickText with the parser's label ('Available Parent Objects (25)') found nothing live; the DOM text is 'Available Parent Objects(25)' -- measured 2026-09-10, no working keyword form recorded yet; the xpath form (unique preceding text) resolved",
+      "evidence": [
+        "docs/recorder/review/cicd-demo-data-template-detail/review.json row 5"
+      ],
+      "status": "measured-failure-only"
+    }
+  ]
+}

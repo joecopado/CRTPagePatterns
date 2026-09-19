@@ -1,0 +1,842 @@
+{
+  "keywordRouting": {
+    "_note": "Stream 2A 2026-09-09. The generic keyword router. Rungs here are the ones whose mechanism is not Salesforce-specific (TypeText / PickList / ComboBox / ClickCheckbox / ClickText / ClickItem / VerifyText). A family whose only proven rung is a Salesforce one carries a stated reason rather than borrowing it -- 12-copado-commit-changes.html parses under THIS template (it carries no Lightning markers), and before this block its inputs fell through to a bare ClickItem with nothing said about why.",
+    "families": {
+      "text": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "textarea": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "number": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "currency": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "percent": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "email": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "url": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "date": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true,
+        "why": "a generic date input is typed as text -- Set Datetime drives Salesforce's two-control compound and does not apply here."
+      },
+      "datetime": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true,
+        "why": "typed as text; the Salesforce compound-control rung is not portable."
+      },
+      "time": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true,
+        "why": "typed as text."
+      },
+      "dropdown": {
+        "fill": "PickList",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "combobox": {
+        "fill": "ComboBox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "lookup": {
+        "fill": "ComboBox",
+        "verify": "VerifyText",
+        "fillFirst": true,
+        "why": "a type-to-search control; ComboBox must not blur after typing."
+      },
+      "checkbox": {
+        "fill": "ClickCheckbox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "boolean": {
+        "fill": "ClickCheckbox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "toggle": {
+        "fill": "ClickCheckbox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "radio": {
+        "fill": "ClickCheckbox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "slider": {
+        "fill": null,
+        "verify": null,
+        "reason": "a drag gesture has no read-back rung on any platform we own."
+      },
+      "output_field": {
+        "fill": null,
+        "verify": "VerifyText",
+        "reason": "a rendered read-only value -- nothing to fill; assert its text."
+      },
+      "button": {
+        "fill": null,
+        "verify": null,
+        "reason": "a button is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+      },
+      "link": {
+        "fill": null,
+        "verify": null,
+        "reason": "a link is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+      },
+      "tree": {
+        "fill": null,
+        "verify": null,
+        "reason": "a tree item is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+      },
+      "pill": {
+        "fill": null,
+        "verify": null,
+        "reason": "a pill shows a chosen value; set it through the control that produced it."
+      },
+      "badge": {
+        "fill": null,
+        "verify": "VerifyText",
+        "reason": "rendered status text -- assert it, never fill it."
+      },
+      "icon": {
+        "fill": null,
+        "verify": null,
+        "reason": "an icon carries no value."
+      },
+      "iframe": {
+        "fill": null,
+        "verify": null,
+        "reason": "an iframe is a FRAME, not a control -- drive what is inside it."
+      },
+      "_default": {
+        "fill": null,
+        "verify": null,
+        "reason": "no keywordRouting row is declared for this family in the generic template -- add one once a platform-neutral keyword is proven. Stated absence, never silence."
+      },
+      "password": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "phone": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "rich-text": {
+        "fill": "TypeText",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "picklist": {
+        "fill": "PickList",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "native-select": {
+        "fill": "PickList",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "select": {
+        "fill": "PickList",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "switch": {
+        "fill": "ClickCheckbox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "file": {
+        "fill": null,
+        "verify": null,
+        "reason": "a file input needs an upload rung; the one we own (Upload File To Record) is Salesforce-specific."
+      },
+      "grid": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "row/col addressing is structural and platform-neutral."
+      },
+      "table": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "row/col addressing is structural and platform-neutral."
+      },
+      "row": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "row/col addressing is structural and platform-neutral."
+      },
+      "cell": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "row/col addressing is structural and platform-neutral."
+      },
+      "rowheader": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "row/col addressing is structural and platform-neutral."
+      },
+      "columnheader": {
+        "fill": null,
+        "verify": null,
+        "reason": "a column header is an ARGUMENT to the table rungs, not a control."
+      },
+      "rowgroup": {
+        "fill": null,
+        "verify": null,
+        "reason": "table structure, not a control."
+      },
+      "tab": {
+        "fill": null,
+        "verify": null,
+        "reason": "a tab is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+      },
+      "tabpanel": {
+        "fill": null,
+        "verify": null,
+        "reason": "a tab panel is content, not a control."
+      },
+      "option": {
+        "fill": null,
+        "verify": null,
+        "reason": "an option is a VALUE inside a listbox -- the argument to PickList / ComboBox, never a control of its own."
+      },
+      "listbox": {
+        "fill": null,
+        "verify": null,
+        "reason": "a listbox is the popup a combobox opens -- drive the control."
+      },
+      "menu": {
+        "fill": null,
+        "verify": null,
+        "reason": "a menu is a container."
+      },
+      "radiogroup": {
+        "fill": "ClickCheckbox",
+        "verify": "VerifyText",
+        "fillFirst": true
+      },
+      "progress": {
+        "fill": null,
+        "verify": "VerifyText",
+        "reason": "rendered status -- assert it as text."
+      },
+      "div": {
+        "fill": null,
+        "verify": null,
+        "reason": "layout structure, not a control."
+      },
+      "span": {
+        "fill": null,
+        "verify": null,
+        "reason": "layout structure, not a control."
+      },
+      "li": {
+        "fill": null,
+        "verify": null,
+        "reason": "layout structure, not a control."
+      },
+      "label": {
+        "fill": null,
+        "verify": null,
+        "reason": "a label NAMES a control -- it is the locator argument, not a target."
+      },
+      "presentation": {
+        "fill": null,
+        "verify": null,
+        "reason": "role=presentation is explicitly not a control."
+      },
+      "section": {
+        "fill": null,
+        "verify": null,
+        "reason": "a section is a container."
+      },
+      "region": {
+        "fill": null,
+        "verify": null,
+        "reason": "a region is a container."
+      },
+      "tablist": {
+        "fill": null,
+        "verify": null,
+        "reason": "a tablist is a container."
+      },
+      "custom": {
+        "fill": null,
+        "verify": null,
+        "reason": "an unrecognised custom element has no proven keyword."
+      }
+    }
+  },
+  "hostInnerCollapse": {
+    "_why": "interop T16 2026-09-07, read by v3._collapse_host_inner. T14 priced v3's missing dedup pass at 27.1 points of precision: 87 of its 91 false positives were the SAME control emitted twice -- li[role=treeitem] plus the <a> inside it (57 in one Setup nav tree), and a <label> beside the control it captions under a lightning-input-field host (11 in Zoo_Aura_v3). A drop happens ONLY when a second element is provably the same control (nested within maxDepth AND same label, or a caption-family element duplicating a real control under a shared ancestor). Different labels mean different controls -- the tree grid's columnheader contains its column-action button and both survive. Set enabled:false to restore the pre-T16 output byte for byte.",
+    "enabled": true,
+    "maxDepth": 6,
+    "prefer": "inner",
+    "wrapperFamilies": [
+      "tree"
+    ],
+    "captionFamilies": [
+      "label"
+    ]
+  },
+  "name": "web-generic.v3",
+  "description": "Parser v3 vocabulary for a plain/SPA web application with no Salesforce markers. Learn a per-host template (template.py learn) and override these lists when a host has its own conventions.",
+  "frameworkMarkers": [],
+  "noiseTags": [
+    "script",
+    "style",
+    "template",
+    "noscript",
+    "link",
+    "meta",
+    "svg",
+    "path",
+    "use",
+    "g",
+    "canvas"
+  ],
+  "noiseTagPatterns": [],
+  "noiseClassFragments": [
+    "sr-only",
+    "visually-hidden",
+    "assistive-text"
+  ],
+  "unstableAttributePatterns": [
+    "^\\d+:\\d+$",
+    "^[A-Za-z0-9_-]{20,}$",
+    "^:r[0-9a-z]+:$",
+    "^mui-",
+    "^ember\\d+",
+    "^ng-",
+    "^j_id"
+  ],
+  "unstableAttributeNames": [
+    "class",
+    "style",
+    "id",
+    "data-reactid",
+    "data-v-"
+  ],
+  "stableAttributeRank": [
+    "data-testid",
+    "data-test-id",
+    "data-test",
+    "data-cy",
+    "data-qa",
+    "name",
+    "aria-label",
+    "title",
+    "data-id",
+    "placeholder",
+    "alt",
+    "role",
+    "type",
+    "href"
+  ],
+  "regionRules": [
+    {
+      "kind": "modal",
+      "roles": [
+        "dialog",
+        "alertdialog"
+      ],
+      "tags": [
+        "dialog"
+      ],
+      "classFragments": [
+        "modal"
+      ],
+      "labelFrom": [
+        "attr:aria-label",
+        "child:h1",
+        "child:h2",
+        "child:h3"
+      ]
+    },
+    {
+      "kind": "nav",
+      "tags": [
+        "nav"
+      ],
+      "roles": [
+        "navigation"
+      ],
+      "labelFrom": [
+        "attr:aria-label"
+      ]
+    },
+    {
+      "kind": "header",
+      "tags": [
+        "header"
+      ],
+      "roles": [
+        "banner"
+      ],
+      "labelFrom": [
+        "child:h1"
+      ]
+    },
+    {
+      "kind": "footer",
+      "tags": [
+        "footer"
+      ],
+      "roles": [
+        "contentinfo"
+      ],
+      "labelFrom": []
+    },
+    {
+      "kind": "form",
+      "tags": [
+        "form"
+      ],
+      "roles": [
+        "form"
+      ],
+      "labelFrom": [
+        "attr:aria-label",
+        "attr:name",
+        "child:h1",
+        "child:h2",
+        "child:legend"
+      ]
+    },
+    {
+      "kind": "section",
+      "tags": [
+        "section",
+        "fieldset",
+        "article"
+      ],
+      "roles": [
+        "region"
+      ],
+      "labelFrom": [
+        "attr:aria-label",
+        "child:legend",
+        "child:h1",
+        "child:h2",
+        "child:h3"
+      ]
+    },
+    {
+      "kind": "datatable",
+      "tags": [
+        "table"
+      ],
+      "roles": [
+        "grid",
+        "treegrid",
+        "table"
+      ],
+      "labelFrom": [
+        "attr:aria-label",
+        "child:caption"
+      ]
+    },
+    {
+      "kind": "tabset",
+      "roles": [
+        "tablist"
+      ],
+      "labelFrom": [
+        "attr:aria-label"
+      ]
+    },
+    {
+      "kind": "tabpanel",
+      "roles": [
+        "tabpanel"
+      ],
+      "labelFrom": [
+        "attr:aria-label"
+      ]
+    },
+    {
+      "kind": "menu",
+      "roles": [
+        "menu",
+        "listbox"
+      ],
+      "labelFrom": [
+        "attr:aria-label"
+      ]
+    },
+    {
+      "kind": "list",
+      "tags": [
+        "ul",
+        "ol"
+      ],
+      "roles": [
+        "list"
+      ],
+      "minInteractive": 3,
+      "labelFrom": [
+        "attr:aria-label"
+      ]
+    },
+    {
+      "kind": "frame",
+      "tags": [
+        "iframe",
+        "frame"
+      ],
+      "labelFrom": [
+        "attr:title",
+        "attr:name"
+      ],
+      "evidence": "BREADTH.md gap 5 (2026-09-05): Setup Classic content lives in a same-origin Visualforce iframe the serializer walks (<!--frame-content-->); v3 walked it but gave it no region"
+    }
+  ],
+  "fieldRules": [
+    {
+      "pair": {
+        "labelTag": "dt",
+        "valueTag": "dd"
+      }
+    },
+    {
+      "pair": {
+        "labelTag": "label",
+        "forAttr": "for"
+      }
+    }
+  ],
+  "rowRules": [
+    {
+      "kind": "datatable",
+      "rowTags": [
+        "tr"
+      ],
+      "rowRoles": [
+        "row"
+      ],
+      "headerCellTags": [
+        "th"
+      ],
+      "headerRoles": [
+        "columnheader"
+      ],
+      "cellTags": [
+        "td",
+        "th"
+      ],
+      "cellRoles": [
+        "gridcell",
+        "cell",
+        "rowheader"
+      ],
+      "keyCell": "first-link-or-text"
+    }
+  ],
+  "signalRules": {
+    "modal": {
+      "roles": [
+        "dialog",
+        "alertdialog"
+      ],
+      "tags": [
+        "dialog"
+      ],
+      "classFragments": [
+        "modal"
+      ],
+      "titleTags": [
+        "h1",
+        "h2",
+        "h3"
+      ]
+    },
+    "toast": {
+      "roles": [
+        "status"
+      ],
+      "classFragments": [
+        "toast",
+        "snackbar",
+        "flash"
+      ]
+    },
+    "banner": {
+      "roles": [
+        "alert"
+      ],
+      "classFragments": [
+        "error",
+        "alert-danger",
+        "invalid-feedback"
+      ]
+    },
+    "busy": {
+      "attr": {
+        "aria-busy": "true"
+      },
+      "classFragments": [
+        "spinner",
+        "loading"
+      ]
+    },
+    "textNoiseClassFragments": [
+      "sr-only",
+      "visually-hidden"
+    ]
+  },
+  "pageKinds": [
+    {
+      "kind": "login",
+      "pathPattern": "/(login|signin|sign-in)"
+    },
+    {
+      "kind": "web",
+      "pathPattern": ".*"
+    }
+  ],
+  "objectFromPath": null,
+  "recordIdFromPath": null,
+  "chromeTags": [],
+  "families": {
+    "combobox": {
+      "roles": [
+        "combobox"
+      ]
+    },
+    "checkbox": {
+      "roles": [
+        "checkbox"
+      ],
+      "inputTypes": [
+        "checkbox"
+      ]
+    },
+    "radio": {
+      "roles": [
+        "radio"
+      ],
+      "inputTypes": [
+        "radio"
+      ]
+    },
+    "date": {
+      "inputTypes": [
+        "date",
+        "datetime-local"
+      ]
+    },
+    "textarea": {
+      "tags": [
+        "textarea"
+      ]
+    },
+    "select": {
+      "tags": [
+        "select"
+      ]
+    },
+    "text": {
+      "tags": [
+        "input"
+      ]
+    },
+    "button": {
+      "tags": [
+        "button"
+      ],
+      "roles": [
+        "button",
+        "menuitem",
+        "menuitemcheckbox",
+        "menuitemradio"
+      ],
+      "inputTypes": [
+        "submit",
+        "button",
+        "reset"
+      ],
+      "evidence": "menuitemcheckbox/menuitemradio added S45 2026-09-05: docs/dom-captures/web-ant-design/1-cascader-idle.html's option list items (li[role=menuitemcheckbox]) classified as raw role 'menuitemcheckbox' under web-generic while core.js/salesforce-lightning.v3.json both fold role=menuitem* into button -- caught by test_family_agreement.py (18 divergences, agreement 0.9987 < 1.0 baseline). Matches salesforce-lightning.v3.json's button.roles exactly."
+    },
+    "link": {
+      "tags": [
+        "a"
+      ],
+      "roles": [
+        "link"
+      ]
+    },
+    "tab": {
+      "roles": [
+        "tab"
+      ]
+    },
+    "option": {
+      "roles": [
+        "option"
+      ]
+    },
+    "row": {
+      "roles": [
+        "row"
+      ]
+    },
+    "cell": {
+      "roles": [
+        "gridcell",
+        "cell"
+      ]
+    },
+    "tree": {
+      "roles": [
+        "treeitem"
+      ]
+    },
+    "slider": {
+      "roles": [
+        "slider"
+      ],
+      "inputTypes": [
+        "range"
+      ]
+    },
+    "switch": {
+      "roles": [
+        "switch"
+      ]
+    }
+  },
+  "assistiveClassFragments": [
+    "sr-only",
+    "visually-hidden",
+    "assistive-text"
+  ],
+  "collapsedClassFragments": [
+    "collapsed",
+    "collapse:not(.show)"
+  ],
+  "labelClassFragments": [
+    "form-label",
+    "control-label",
+    "field-label",
+    "label"
+  ],
+  "dupExcludedAttributes": [
+    "type",
+    "role",
+    "class",
+    "tabindex"
+  ],
+  "fieldFamilies": [
+    "text",
+    "textarea",
+    "number",
+    "date",
+    "datetime",
+    "picklist",
+    "combobox",
+    "lookup",
+    "checkbox",
+    "radio",
+    "native-select",
+    "switch",
+    "slider",
+    "file",
+    "rich-text",
+    "password",
+    "email",
+    "phone",
+    "url"
+  ],
+  "structuralRows": {
+    "kind": "grid",
+    "minSiblings": 3,
+    "minCells": 3,
+    "evidence": "BREADTH.md gap 4 (2026-09-05): react-virtualized Grid/Collection cells (style top/left) and span/div row 'tables' carry no roles ; minCells 3 (2026-09-05): 2-cell siblings are label/value pairs (Aura view fields, stat tiles), not rows"
+  },
+  "fieldFallbackLabels": [
+    "name-id-humanised",
+    "nearest-text"
+  ],
+  "note_labelPolicy": "interop T10 2026-09-07: the label POLICY layer, read by tools/interop/resources/pythonDom/element_compiler.py through DomConfiguration. labelPrecedence names are the label_source values the compiler emits; the first rung that resolves wins. Omit a key here and the compiler falls back to its own class attribute.",
+  "labelPrecedence": [
+    "inner_text",
+    "aria_label",
+    "standard_label",
+    "aria_labelledby",
+    "placeholder",
+    "title_attr",
+    "sibling_label_text",
+    "label_span",
+    "assistive_text"
+  ],
+  "descriptionClassFragments": [
+    "help-text",
+    "help-block",
+    "form-text",
+    "hint",
+    "description"
+  ],
+  "requiredMarkerSelectors": [
+    {
+      "aria-hidden": "true"
+    }
+  ],
+  "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
+  "assistiveTextClassFragments": [
+    "slds-assistive-text",
+    "sr-only",
+    "visually-hidden",
+    "slds-hidden"
+  ],
+  "note_assistiveTextClassFragments": "assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
+  "labelSourceCaveats": {
+    "assistive_text": "This label came from SCREEN-READER-ONLY markup (an slds-assistive-text / sr-only span) -- nothing on this control is visible to a sighted person, so a rendered-text search may not find it. Confirm the click landed (read-back or the optical witness) before trusting this step."
+  },
+  "note_labelSourceCaveats": "labelSourceCaveats: a caveat appended to every hint whose locator IS the label, keyed by the labelPrecedence rung that produced that label. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11 / L2-R08): a hint built on assistive text must say so rather than read as if the string were visible on the page.",
+  "innerTextExcludedRoles": [
+    "combobox",
+    "listbox",
+    "textbox",
+    "searchbox",
+    "spinbutton",
+    "slider",
+    "option"
+  ],
+  "note_innerTextExcludedRoles": "innerTextExcludedRoles: roles whose own rendered text is the control's VALUE, not its NAME, so the `inner_text` rung (first, since the wave-2 review close) must never claim them. A Lightning picklist is <button role=\"combobox\" aria-label=\"Industry\">--None--</button>; without this key the field's label became '--None--'. Added by stream P1, 2026-09-07, after its own test caught the regression in the org map's metadata->control routing."
+}

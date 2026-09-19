@@ -1,0 +1,422 @@
+{
+  "host": "react-virtualized",
+  "learnedFrom": [
+    "docs/dom-captures/qweb-hard-site/1-table-top.html",
+    "docs/dom-captures/qweb-hard-site/3-list-top.html"
+  ],
+  "frameworkMarkers": {},
+  "stableAttributeAllowlist": [
+    "role",
+    "title",
+    "href",
+    "aria-label",
+    "viewbox",
+    "name",
+    "type",
+    "tabindex",
+    "aria-current",
+    "id",
+    "alt",
+    "src",
+    "placeholder",
+    "aria-sort",
+    "aria-readonly"
+  ],
+  "unstableAttributePatterns": [
+    "class"
+  ],
+  "undeterminedAttributes": [
+    "aria-colcount",
+    "aria-colindex",
+    "aria-rowcount",
+    "aria-rowindex",
+    "height",
+    "value",
+    "width"
+  ],
+  "noiseClassFragments": [
+    "_10wP4JklI2P0Pd8qWOucP9",
+    "_113CIjCFcgg_BK6pEtLzCZ",
+    "_1PGkdM8zd2QzOiFEWieWrk",
+    "_1gnOcX2kzjwAmJytoLZAux",
+    "_1ygNOJ0-vKjT490fY6Laye",
+    "_2Ej-dP_8UlvuezqmVKT7oj",
+    "_2F2N2luOrTSa1tMUcxFhGG",
+    "_2_apn9ogz6s4KYLEF54Mf4",
+    "_2f31V0AdtHSEeh8SXGAZlg",
+    "_2p-v1iFJ91RQl3ShYmmIAO",
+    "_37wu_ZBUbl-CjoNz0BaCT4",
+    "_3WpDhuXmgMhGpHig_N0Ojk",
+    "_3lafeBRGU3yxyX-Y9Hvohf",
+    "_3r7cg8jlOKfV2jiVyjb_UE",
+    "_4pCEeK0cwkLrdTZM5qzO1"
+  ],
+  "interactiveTags": [
+    "a",
+    "div",
+    "input",
+    "label"
+  ],
+  "containerRoles": [
+    "grid"
+  ],
+  "evidence": {
+    "nNodes": 333,
+    "nCaptures": 2,
+    "topTags": [
+      [
+        "div",
+        199
+      ],
+      [
+        "a",
+        40
+      ],
+      [
+        "li",
+        36
+      ],
+      [
+        "label",
+        16
+      ],
+      [
+        "input",
+        16
+      ],
+      [
+        "svg",
+        11
+      ],
+      [
+        "span",
+        4
+      ],
+      [
+        "body",
+        2
+      ],
+      [
+        "img",
+        2
+      ],
+      [
+        "ul",
+        2
+      ],
+      [
+        "h1",
+        2
+      ],
+      [
+        "small",
+        2
+      ],
+      [
+        "code",
+        1
+      ]
+    ],
+    "attributeVerdicts": {
+      "id": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 2,
+          "distinctValues": 1,
+          "distinctRatio": 0.5,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "class": {
+        "verdict": "unstable",
+        "evidence": {
+          "count": 276,
+          "distinctValues": 47,
+          "distinctRatio": 0.17,
+          "hashedFrac": 0.576,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 0.574
+        }
+      },
+      "alt": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 2,
+          "distinctValues": 1,
+          "distinctRatio": 0.5,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "src": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 2,
+          "distinctValues": 1,
+          "distinctRatio": 0.5,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "href": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 40,
+          "distinctValues": 21,
+          "distinctRatio": 0.525,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 0.81
+        }
+      },
+      "height": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 11,
+          "distinctValues": 2,
+          "distinctRatio": 0.182,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": 0.5
+        }
+      },
+      "viewbox": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 11,
+          "distinctValues": 1,
+          "distinctRatio": 0.091,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "width": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 11,
+          "distinctValues": 2,
+          "distinctRatio": 0.182,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": 0.5
+        }
+      },
+      "aria-current": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 3,
+          "distinctValues": 1,
+          "distinctRatio": 0.333,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "aria-label": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 20,
+          "distinctValues": 13,
+          "distinctRatio": 0.65,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 0.538
+        }
+      },
+      "type": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 5,
+          "distinctValues": 1,
+          "distinctRatio": 0.2,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "title": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 61,
+          "distinctValues": 56,
+          "distinctRatio": 0.918,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.262,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.738,
+          "stableAcrossCaptures": 0.089
+        }
+      },
+      "name": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 11,
+          "distinctValues": 8,
+          "distinctRatio": 0.727,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 0.375
+        }
+      },
+      "value": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 9,
+          "distinctValues": 7,
+          "distinctRatio": 0.778,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": 0.286
+        }
+      },
+      "placeholder": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 2,
+          "distinctValues": 1,
+          "distinctRatio": 0.5,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "aria-colcount": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 1,
+          "distinctValues": 1,
+          "distinctRatio": 1.0,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": null
+        }
+      },
+      "aria-rowcount": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 1,
+          "distinctValues": 1,
+          "distinctRatio": 1.0,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": null
+        }
+      },
+      "role": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 89,
+          "distinctValues": 5,
+          "distinctRatio": 0.056,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": 0.6
+        }
+      },
+      "aria-sort": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 2,
+          "distinctValues": 2,
+          "distinctRatio": 1.0,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": null
+        }
+      },
+      "tabindex": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 4,
+          "distinctValues": 1,
+          "distinctRatio": 0.25,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": 1.0
+        }
+      },
+      "aria-rowindex": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 16,
+          "distinctValues": 16,
+          "distinctRatio": 1.0,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": null
+        }
+      },
+      "aria-colindex": {
+        "verdict": "undetermined",
+        "evidence": {
+          "count": 48,
+          "distinctValues": 3,
+          "distinctRatio": 0.062,
+          "hashedFrac": 0.0,
+          "numericFrac": 1.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 0.0,
+          "stableAcrossCaptures": null
+        }
+      },
+      "aria-readonly": {
+        "verdict": "stable",
+        "evidence": {
+          "count": 1,
+          "distinctValues": 1,
+          "distinctRatio": 1.0,
+          "hashedFrac": 0.0,
+          "numericFrac": 0.0,
+          "auraIdFrac": 0.0,
+          "humanTextFrac": 1.0,
+          "stableAcrossCaptures": null
+        }
+      }
+    }
+  }
+}

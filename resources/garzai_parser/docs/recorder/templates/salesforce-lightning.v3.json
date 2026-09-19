@@ -1,0 +1,1665 @@
+{
+ "keywordRouting": {
+  "_note": "Stream 2A 2026-09-09 (attack plan Phase 2A; essay docs/proposals/challenge-2026-09-08/C2-keyword-assignment.md). THE keyword router, as DATA. A control's DOM family says WHAT it is; fill vs verify vs actuate is the CALLER's INTENT, so it is three named slots here and two element fields (hint_fill / hint_verify) on the parsed element -- never a two-keyword string like 'TypeText / ClickText' baked into one `keyword`, which is what the parser emitted until this table landed. `metadataTypes` routes a DESCRIBE TYPE and WINS over the family when the org map has the field (CLAUDE.md: 'metadata routes the keyword, DOM is the backstop'); it is kept in step with tools/qforce-lite/predict.py:type_to_keyword by tools/recorder/tests/test_keyword_router_contract_2026_09_09.py, which also proves every keyword named here is a real rung in export._CRT_KW_MAP / writer._KW_MAP / library/index.json. A family with no keyword states a `reason` -- the tri-state rule, never silence. `_default` is the safety net: a family nobody has written a row for still yields a stated reason rather than an unexplained blank.",
+  "families": {
+   "text": {
+    "fill": "TypeText",
+    "verify": "VerifyField"
+   },
+   "textarea": {
+    "fill": "TypeText",
+    "verify": "VerifyField"
+   },
+   "number": {
+    "fill": "TypeText",
+    "verify": "VerifyField"
+   },
+   "password": {
+    "fill": "TypeText",
+    "verify": "VerifyField",
+    "why": "a masked text box; the read-back can only see the mask."
+   },
+   "email": {
+    "fill": "TypeText",
+    "verify": "VerifyField"
+   },
+   "phone": {
+    "fill": "TypeText",
+    "verify": "VerifyField"
+   },
+   "url": {
+    "fill": "TypeText",
+    "verify": "VerifyField"
+   },
+   "rich-text": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField",
+    "why": "a contenteditable, not an <input>/<textarea>."
+   },
+   "date": {
+    "fill": "Set Datetime",
+    "verify": "VerifyField",
+    "why": "a bare date field is driveable through Set Datetime (date-only args); the describe type `date` routes to Type Text Clearing in metadataTypes."
+   },
+   "datetime": {
+    "fill": "Set Datetime",
+    "verify": "VerifyField",
+    "why": "one database value, a date input plus a 15-minute time combobox."
+   },
+   "picklist": {
+    "fill": "PickList",
+    "verify": "VerifyField"
+   },
+   "native-select": {
+    "fill": "PickList",
+    "verify": "VerifyField",
+    "why": "a real <select>. NOTE: v3 classifies these under family `select`, so this fieldFamilies entry currently matches nothing -- the row is kept so the name is routed the moment the family is renamed, and the mismatch is stated rather than hidden."
+   },
+   "select": {
+    "fill": "PickList",
+    "verify": "VerifyField",
+    "why": "the family v3 actually assigns to a real <select> (see native-select)."
+   },
+   "combobox": {
+    "fill": "ComboBox",
+    "verify": "VerifyField"
+   },
+   "lookup": {
+    "fill": "Aura Lookup",
+    "verify": "VerifyField"
+   },
+   "checkbox": {
+    "fill": "ClickCheckbox",
+    "verify": "Verify Field State",
+    "why": "ClickCheckbox re-reads the input's `checked` property after clicking (confirm.py doctrine) -- that read-back is what makes it the right rung here and not a blind click."
+   },
+   "radio": {
+    "fill": "ClickCheckbox",
+    "verify": "Verify Field State",
+    "why": "ClickCheckbox re-reads the input's `checked` property after clicking (confirm.py doctrine) -- that read-back is what makes it the right rung here and not a blind click."
+   },
+   "switch": {
+    "fill": "ClickCheckbox",
+    "verify": "Verify Field State",
+    "why": "a role=switch is a checkbox with a switch skin; the checked property is still the state to read back."
+   },
+   "slider": {
+    "fill": null,
+    "verify": null,
+    "reason": "no slider keyword has been proven live -- a drag gesture has no read-back rung yet."
+   },
+   "file": {
+    "fill": "Upload File To Record",
+    "verify": null,
+    "reason": "the upload lands as a ContentDocumentLink; asserting it is a records question, not a field read."
+   },
+   "omni-output": {
+    "fill": null,
+    "verify": "Omni Verify Output Field",
+    "reason": "an OmniScript output field is a rendered value -- nothing to fill."
+   },
+   "omni-text": {
+    "fill": "Omni Type",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-date": {
+    "fill": "Omni Date",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-select": {
+    "fill": "Omni Select",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-radio": {
+    "fill": "Omni Radio",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-checkbox": {
+    "fill": "Omni Checkbox",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-lookup": {
+    "fill": "Omni Lookup",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-typeahead": {
+    "fill": "Omni Typeahead",
+    "verify": "Omni Verify Output Field"
+   },
+   "omni-edit-block": {
+    "fill": null,
+    "verify": null,
+    "act": "Omni Edit Block Add Row",
+    "reason": "an edit block is a repeating ROW container -- its rows are added with Omni Edit Block Add Row and the controls inside carry their own rungs."
+   },
+   "omni-action": {
+    "fill": null,
+    "verify": null,
+    "act": "Omni Click Action",
+    "reason": "an OmniScript action is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "omni-step-nav": {
+    "fill": null,
+    "verify": null,
+    "act": "Omni Next Step",
+    "reason": "step navigation is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "aura-picklist": {
+    "fill": "Aura PickList",
+    "verify": "VerifyField",
+    "why": "real QWeb has no Aura branch -- the plain PickList rung does not drive Aura's open gesture."
+   },
+   "aura-lookup": {
+    "fill": "Aura Lookup",
+    "verify": "VerifyField"
+   },
+   "aura-date": {
+    "fill": "Aura Date",
+    "verify": "VerifyField",
+    "why": "Aura's date input is a native text input with a JS mask."
+   },
+   "grid": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell"
+   },
+   "table": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell"
+   },
+   "row": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell",
+    "why": "a row is addressed by its key column's value; Select Table Row and Click Table Row Action Where take that key."
+   },
+   "rowgroup": {
+    "fill": null,
+    "verify": null,
+    "reason": "a rowgroup is table structure, not a control -- its rows carry the rungs."
+   },
+   "cell": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell"
+   },
+   "columnheader": {
+    "fill": null,
+    "verify": null,
+    "reason": "a column header is an ARGUMENT to the table rungs (the `col` of Get Table Cell Where / Set Table Cell), not a control driven on its own."
+   },
+   "rowheader": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell",
+    "why": "a row header is the row's key cell -- the value the table rungs take as the row key."
+   },
+   "button": {
+    "fill": null,
+    "verify": null,
+    "reason": "a button is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "link": {
+    "fill": null,
+    "verify": null,
+    "reason": "a link is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "tab": {
+    "fill": null,
+    "verify": null,
+    "act": "Open Tab",
+    "reason": "a tab is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "tabpanel": {
+    "fill": null,
+    "verify": null,
+    "reason": "a tab PANEL is the content its tab reveals, not a control."
+   },
+   "tree": {
+    "fill": null,
+    "verify": null,
+    "act": "Click Tree Item",
+    "reason": "a tree item is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "path": {
+    "fill": null,
+    "verify": "Verify Path Stage",
+    "act": "Click Path Stage",
+    "reason": "a path stage is actuated, then asserted with Verify Path Stage."
+   },
+   "progress": {
+    "fill": null,
+    "verify": null,
+    "reason": "a progress marker is rendered status -- assert it as text, never as a field value."
+   },
+   "console-subtab": {
+    "fill": null,
+    "verify": null,
+    "act": "Open Console Subtab",
+    "reason": "a console workspace tab is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "console-tertiary-tab": {
+    "fill": null,
+    "verify": null,
+    "act": "Open Tertiary Tab",
+    "reason": "a tertiary tab is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "utility-bar-item": {
+    "fill": null,
+    "verify": null,
+    "act": "Open Utility Item",
+    "reason": "a utility-bar item is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "split-view-row": {
+    "fill": null,
+    "verify": null,
+    "act": "Select Split View Row",
+    "reason": "a split-view row is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "carousel-slide": {
+    "fill": null,
+    "verify": null,
+    "reason": "a carousel slide is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+   },
+   "menu": {
+    "fill": null,
+    "verify": null,
+    "reason": "a menu is a container; its items are the controls."
+   },
+   "listbox": {
+    "fill": null,
+    "verify": null,
+    "reason": "a listbox is the dropdown a combobox/picklist opens -- drive the control, not its popup."
+   },
+   "option": {
+    "fill": null,
+    "verify": null,
+    "reason": "an option is a VALUE inside a picklist/combobox listbox -- it is the argument to PickList / ComboBox, never a control of its own."
+   },
+   "radiogroup": {
+    "fill": "ClickCheckbox",
+    "verify": "Verify Field State",
+    "why": "the group is driven by clicking the member option."
+   },
+   "pill": {
+    "fill": null,
+    "verify": null,
+    "reason": "a pill displays a chosen value; set it through the control that produced it."
+   },
+   "iframe": {
+    "fill": null,
+    "verify": null,
+    "reason": "an iframe is a FRAME, not a control -- QWeb auto-penetrates frames."
+   },
+   "custom": {
+    "fill": null,
+    "verify": null,
+    "reason": "an unrecognised custom element has no proven keyword -- check SHAPES-GUIDE.md before assuming a click drives it."
+   },
+   "div": {
+    "fill": null,
+    "verify": null,
+    "reason": "layout structure, not a control."
+   },
+   "span": {
+    "fill": null,
+    "verify": null,
+    "reason": "layout structure, not a control."
+   },
+   "li": {
+    "fill": null,
+    "verify": null,
+    "reason": "layout structure, not a control."
+   },
+   "label": {
+    "fill": null,
+    "verify": null,
+    "reason": "a label NAMES a control -- it is the locator argument, not a target."
+   },
+   "presentation": {
+    "fill": null,
+    "verify": null,
+    "reason": "role=presentation is explicitly not a control."
+   },
+   "section": {
+    "fill": null,
+    "verify": null,
+    "reason": "a section is a container."
+   },
+   "region": {
+    "fill": null,
+    "verify": null,
+    "reason": "a region is a container."
+   },
+   "tablist": {
+    "fill": null,
+    "verify": null,
+    "reason": "a tablist is a container; its tabs are the controls."
+   },
+   "_default": {
+    "fill": null,
+    "verify": null,
+    "reason": "no keywordRouting row is declared for this family -- add one once a keyword is proven for the shape. Stated absence, never silence."
+   }
+  },
+  "metadataTypes": {
+   "string": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "textarea": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "email": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "phone": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "url": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "int": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "long": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "double": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "currency": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "percent": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField"
+   },
+   "date": {
+    "fill": "Type Text Clearing",
+    "verify": "VerifyField",
+    "why": "predict.type_to_keyword('date') is 'certain' on type_text_clearing -- a date field is typed as MM/DD/YYYY. Set Datetime is the DOM-family answer for a datepicker that also renders a time sibling, which is a different question from the describe type."
+   },
+   "datetime": {
+    "fill": "Set Datetime",
+    "verify": "VerifyField",
+    "why": "a datetime is a COMPOUND control -- one database value, a date input plus a 15-minute time combobox under one legend."
+   },
+   "picklist": {
+    "fill": "PickList",
+    "verify": "VerifyField"
+   },
+   "multipicklist": {
+    "fill": "Multi Pick List",
+    "verify": "VerifyField",
+    "why": "the dual-listbox shape; never PickList."
+   },
+   "combobox": {
+    "fill": "PickList",
+    "verify": "VerifyField",
+    "why": "describe type `combobox` is a picklist that also accepts free text; pick_list drives the listbox half. The free-text half has no keyword on any org we own."
+   },
+   "boolean": {
+    "fill": "ClickCheckbox",
+    "verify": "Verify Field State"
+   },
+   "encryptedstring": {
+    "fill": "Type Text Clearing",
+    "verify": null,
+    "reason": "the platform returns the MASKED value to describe, SOQL and the rendered form for anyone without View Encrypted Data, so no read-back can prove what landed -- the fill is routed, the assert is COULD-NOT-CHECK."
+   },
+   "address": {
+    "fill": "Set Address",
+    "verify": null,
+    "reason": "a compound address is several sub-fields under one legend; there is no single-value assert rung for it."
+   },
+   "location": {
+    "fill": "Set Geolocation",
+    "verify": null,
+    "reason": "geolocation persistence after Save is could-not-check (BACKLOG-61-EVIDENCE.md SS3); the fill mechanism is live-measured."
+   },
+   "time": {
+    "fill": null,
+    "verify": null,
+    "reason": "no time-only keyword exists. Set Datetime drives a DATE input plus a time combobox, and routing a time field to it would type into a date box that is not there -- predict.type_to_keyword('time') states the same gap."
+   },
+   "base64": {
+    "fill": null,
+    "verify": null,
+    "reason": "a Blob body is never an editable control on a create/edit form -- the platform renders no input for it. A gap by design, not a missing rung."
+   },
+   "id": {
+    "fill": null,
+    "verify": null,
+    "reason": "an Id is never an editable control on a create/edit form."
+   },
+   "reference": {
+    "fill": "ComboBox",
+    "verify": "VerifyField",
+    "why": "the PLAIN-lookup case only. predict.type_to_keyword splits `reference` by API NAME through chains.REFERENCE_SUBKINDS (OwnerId / CreatedById / LastModifiedById / RecordTypeId are not plain lookups and route nowhere); a DOM template has no API name, so this row is allowlisted in the router contract test rather than pretending to make that split."
+   }
+  }
+ },
+ "hostInnerCollapse": {
+  "_why": "interop T16 2026-09-07, read by v3._collapse_host_inner. T14 priced v3's missing dedup pass at 27.1 points of precision: 87 of its 91 false positives were the SAME control emitted twice -- li[role=treeitem] plus the <a> inside it (57 in one Setup nav tree), and a <label> beside the control it captions under a lightning-input-field host (11 in Zoo_Aura_v3). A drop happens ONLY when a second element is provably the same control (nested within maxDepth AND same label, or a caption-family element duplicating a real control under a shared ancestor). Different labels mean different controls -- the tree grid's columnheader contains its column-action button and both survive. Set enabled:false to restore the pre-T16 output byte for byte. | stream V1 2026-09-08 added captionTags: a <label> is a caption because of its TAG. An OmniStudio radio/checkbox option is a <label>+<input> pair under one *-group host, so both halves classify as omni-radio/omni-checkbox and captionFamilies (which keys on FAMILY) never fired -- 5 duplicate false positives appeared the moment collapseToHost was turned off for those groups.",
+  "enabled": true,
+  "maxDepth": 6,
+  "prefer": "inner",
+  "wrapperFamilies": [
+   "tree"
+  ],
+  "captionFamilies": [
+   "label"
+  ],
+  "captionTags": [
+   "label"
+  ]
+ },
+ "name": "salesforce-lightning.v3",
+ "description": "Parser v3 vocabulary for Salesforce Lightning Experience (docs/recorder/PARSER-V3.md). The walker (tools/interop/resources/pythonDom/v3.py) has no application names in it; everything Salesforce-shaped lives here.",
+ "frameworkMarkers": [
+  "lwc-",
+  "data-aura-rendered-by",
+  "slds-"
+ ],
+ "noiseTags": [
+  "script",
+  "style",
+  "template",
+  "noscript",
+  "link",
+  "meta",
+  "svg",
+  "path",
+  "use",
+  "g",
+  "canvas"
+ ],
+ "noiseTagPatterns": [
+  "^lightning-primitive-"
+ ],
+ "noiseClassFragments": [
+  "slds-assistive-text",
+  "slds-hide"
+ ],
+ "unstableAttributePatterns": [
+  "^\\d+:\\d+$",
+  "^lwc-",
+  "^[A-Za-z0-9_-]{20,}$",
+  "^aura-",
+  "^j_id"
+ ],
+ "unstableAttributeNames": [
+  "data-aura-rendered-by",
+  "data-aura-class",
+  "data-rendered-by",
+  "class",
+  "style",
+  "id"
+ ],
+ "stableAttributeRank": [
+  "data-target-selection-name",
+  "data-omni-key",
+  "field-label",
+  "item",
+  "field",
+  "name",
+  "aria-label",
+  "title",
+  "data-testid",
+  "data-test-id",
+  "data-style-id",
+  "data-id",
+  "data-field-name",
+  "data-label",
+  "data-tab-value",
+  "data-value",
+  "placeholder",
+  "alt",
+  "role",
+  "type",
+  "href"
+ ],
+ "regionRules": [
+  {
+   "kind": "omniscript",
+   "tags": [
+    "runtime_omnistudio-omniscript",
+    "runtime_omnistudio-generated-omniscript",
+    "runtime_omnistudio_omniscript-omniscript-container",
+    "omnistudio-omniscript",
+    "c-omniscript"
+   ],
+   "labelFrom": [
+    "attr:data-omni-key",
+    "child:h1",
+    "child:h2",
+    "attr:aria-label"
+   ],
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: docs/dom-captures/fsc7f-omnistudio/03-applicationform-omniscript-postintake.html (runtime_omnistudio-omniscript x1, -generated-omniscript x1, -omniscript-container x1)"
+  },
+  {
+   "kind": "omniscript-step",
+   "tags": [
+    "runtime_omnistudio_omniscript-omniscript-step"
+   ],
+   "labelFrom": [
+    "attr:data-omni-key",
+    "child:h2",
+    "classText:slds-text-heading_medium",
+    "attr:aria-label"
+   ],
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 03-applicationform-omniscript-postintake.html: one omniscript-step host carrying data-omni-key='ApplicationSummary' == OmniProcessElement.Name"
+  },
+  {
+   "kind": "omniscript-block",
+   "tags": [
+    "runtime_omnistudio_omniscript-omniscript-block"
+   ],
+   "labelFrom": [
+    "attr:data-omni-key",
+    "attr:data-test-id"
+   ],
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: predicted from OmniProcessElement Type='Block' (40 rows on fsc7f); the block host seen in captures is the shared runtime_omnistudio_flexcards-block (29 in capture 03)"
+  },
+  {
+   "kind": "flexcard",
+   "tags": [
+    "runtime_omnistudio-flexcard",
+    "runtime_omnistudio-generated-flexcard"
+   ],
+   "tagPatterns": [
+    "^forcegenerated-flex-card"
+   ],
+   "labelFrom": [
+    "attr:data-test-id",
+    "child:h1",
+    "child:h2",
+    "attr:aria-label"
+   ],
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02-home-flexcard-loancalculator.html (4 runtime_omnistudio-flexcard / 4 -generated-flexcard / 4 forcegenerated-flex-card_-digital-lending-*_gen) and 03 (23 each)"
+  },
+  {
+   "kind": "flexcard-state",
+   "tags": [
+    "runtime_omnistudio_flexcards-flex-card-state"
+   ],
+   "classFragments": [
+    "cf-vlocity-state"
+   ],
+   "labelFrom": [
+    "attr:data-test-id"
+   ],
+   "stateFrom": {
+    "active": "attr:data-status",
+    "index": "attr:data-index"
+   },
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02: <runtime_omnistudio_flexcards-flex-card-state class='cf-vlocity-state-0 cf-vlocity-state' data-status='true' data-index='0'> -- data-status is the ONLY signal for which card state is showing; 27 state hosts in capture 03"
+  },
+  {
+   "kind": "flexcard-block",
+   "tags": [
+    "runtime_omnistudio_flexcards-block"
+   ],
+   "labelFrom": [
+    "attr:data-test-id"
+   ],
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02 (10 hosts) / 03 (29 hosts); data-test-id is the FlexCard element name from OmniUiCard PropertySetConfig -- the metadata join anchor for cards"
+  },
+  {
+   "kind": "quick-action",
+   "tags": [],
+   "roles": [],
+   "classFragments": [
+    "runtime_platform_actionsQuickActionWrapper",
+    "forceQuickActionLayout"
+   ],
+   "labelFrom": [
+    "attr:aria-label",
+    "classText:slds-modal__title",
+    "child:h1",
+    "child:h2"
+   ],
+   "evidence": "CUSTOMER-CPQ-SIGNATURES.md 2026-09-05: neo4j-acpdev New Opportunity quick action modal (capture 02, 203/203 recall); dev1/slockard captures to date were record-page or standard-New-modal regions, never a quick-action wrapper"
+  },
+  {
+   "kind": "modal",
+   "tags": [
+    "lightning-modal"
+   ],
+   "roles": [
+    "dialog"
+   ],
+   "classFragments": [
+    "slds-modal"
+   ],
+   "requireAttr": {
+    "aria-modal": "true"
+   },
+   "labelFrom": [
+    "attr:aria-label",
+    "classText:slds-modal__title",
+    "child:h1",
+    "child:h2"
+   ]
+  },
+  {
+   "kind": "section",
+   "tags": [
+    "records-record-layout-section",
+    "force-record-layout-section",
+    "flexipage-component2"
+   ],
+   "classFragments": [
+    "slds-section",
+    "field-section2"
+   ],
+   "labelFrom": [
+    "child:h3",
+    "child:h2",
+    "classText:slds-section__title",
+    "attr:data-target-selection-name"
+   ],
+   "evidence": "breadth 2026-09-05 (docs/recorder/BREADTH.md): field-section2 on 11-copado-user-story-record.html (6) and fsc7f__new-modal__account.html (15)"
+  },
+  {
+   "kind": "related-list",
+   "tags": [
+    "lst-related-list-single-container",
+    "lst-related-list-desktop"
+   ],
+   "classFragments": [
+    "slds-card_related-list-fix",
+    "forceRelatedListCardDesktop"
+   ],
+   "labelFrom": [
+    "classText:slds-card__header-title",
+    "child:h2",
+    "child:h3",
+    "attr:title"
+   ],
+   "evidence": "breadth 2026-09-05 (docs/recorder/BREADTH.md): article/slds-card matched every card and their bodies (fsc7f__record__account 37 related-list regions for 3 real ones; fsc7f__home 12 for 0)"
+  },
+  {
+   "kind": "card",
+   "tags": [
+    "lightning-card",
+    "article"
+   ],
+   "classFragments": [
+    "flexipageCard",
+    "forceBaseCard"
+   ],
+   "labelFrom": [
+    "classText:slds-card__header-title",
+    "child:h2",
+    "child:h3",
+    "attr:title"
+   ],
+   "evidence": "breadth 2026-09-05 (docs/recorder/BREADTH.md): fsc7f__home.html 4 articles = 4 cards, not related lists"
+  },
+  {
+   "kind": "datatable",
+   "tags": [
+    "lightning-datatable",
+    "lightning-tree-grid",
+    "table"
+   ],
+   "roles": [
+    "grid",
+    "treegrid"
+   ],
+   "labelFrom": [
+    "attr:aria-label",
+    "child:caption"
+   ]
+  },
+  {
+   "kind": "list-view",
+   "tags": [
+    "lst-list-view-manager",
+    "lst-object-home"
+   ],
+   "labelFrom": [
+    "child:h1",
+    "classText:slds-page-header__title"
+   ]
+  },
+  {
+   "kind": "carousel",
+   "roles": [
+    "tablist"
+   ],
+   "hostTags": [
+    "lightning-carousel"
+   ],
+   "labelFrom": [
+    "attr:aria-label"
+   ],
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence capture: Zoo_Containers_v3__default.html -- lightning-carousel renders its slide indicators as <ul class='slds-carousel__indicators' role='tablist'> with <a role='tab'> children, the SAME ARIA shape as the real lightning-tabset three cards above it. Structure cannot separate them; the host tag can. Before this rule the page reported 2 'tabset' regions and 6 'tab' elements for 3 real tabs."
+  },
+  {
+   "kind": "tabset",
+   "tags": [
+    "lightning-tabset",
+    "flexipage-tabset2",
+    "lightning-tab-bar"
+   ],
+   "roles": [
+    "tablist"
+   ],
+   "labelFrom": [
+    "attr:aria-label"
+   ]
+  },
+  {
+   "kind": "tabpanel",
+   "roles": [
+    "tabpanel"
+   ],
+   "labelFrom": [
+    "attr:aria-label",
+    "attr:data-label",
+    "attr:aria-labelledby"
+   ]
+  },
+  {
+   "kind": "header",
+   "tags": [
+    "header"
+   ],
+   "classFragments": [
+    "slds-page-header"
+   ],
+   "labelFrom": [
+    "child:h1",
+    "classText:slds-page-header__title"
+   ]
+  },
+  {
+   "kind": "nav",
+   "tags": [
+    "nav",
+    "one-app-nav-bar"
+   ],
+   "labelFrom": [
+    "attr:aria-label"
+   ]
+  },
+  {
+   "kind": "form",
+   "tags": [
+    "form",
+    "records-lwc-record-layout",
+    "records-base-record-form",
+    "records-lwc-detail-panel",
+    "flowruntime-flow",
+    "flowruntime-lwc-body",
+    "flowruntime-base-section"
+   ],
+   "labelFrom": [
+    "attr:aria-label"
+   ],
+   "evidence": "breadth 2026-09-05 (docs/recorder/BREADTH.md): 08-flow-screen.html flowruntime-* tags"
+  },
+  {
+   "kind": "custom-table",
+   "tags": [
+    "sb-le-table",
+    "sb-field-set-table"
+   ],
+   "labelFrom": [
+    "attr:aria-label"
+   ]
+  },
+  {
+   "kind": "footer",
+   "tags": [
+    "records-form-footer",
+    "footer"
+   ],
+   "classFragments": [
+    "slds-modal__footer"
+   ],
+   "labelFrom": []
+  },
+  {
+   "kind": "dual-listbox",
+   "roles": [
+    "group"
+   ],
+   "hostTags": [
+    "lightning-dual-listbox"
+   ],
+   "labelFrom": [
+    "classText:slds-form-element__legend",
+    "attr:aria-label"
+   ],
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence capture: Zoo_Inputs_v3__default.html / __duallistbox_moved_pills3_toast.html -- <lightning-dual-listbox> -> <div role='group' part='dual-listbox'> holding two <ul role='listbox'> columns (data-source-list / data-selected-list). role='group' alone is far too generic to be a region, so the host tag is the requirement; without the region the two listboxes fell to the generic 'menu' rule."
+  },
+  {
+   "kind": "menu",
+   "roles": [
+    "menu",
+    "listbox"
+   ],
+   "classFragments": [
+    "slds-dropdown"
+   ],
+   "labelFrom": [
+    "attr:aria-label"
+   ]
+  },
+  {
+   "kind": "frame",
+   "tags": [
+    "iframe",
+    "frame"
+   ],
+   "labelFrom": [
+    "attr:title",
+    "attr:name"
+   ],
+   "evidence": "BREADTH.md gap 5 (2026-09-05): Setup Classic content lives in a same-origin Visualforce iframe the serializer walks (<!--frame-content-->); v3 walked it but gave it no region"
+  }
+ ],
+ "fieldRules": [
+  {
+   "tags": [
+    "records-record-layout-item",
+    "force-record-layout-item"
+   ],
+   "labelAttr": "field-label",
+   "valueFrom": [
+    "descText:lightning-formatted-text,lightning-formatted-number,lightning-formatted-url,lightning-formatted-email,lightning-formatted-phone,lightning-formatted-rich-text,lightning-formatted-address,lightning-formatted-date-time,records-formula-output,force-lookup,lst-formatted-text",
+    "descAttr:input|value",
+    "classText:slds-form-element__static"
+   ],
+   "apiFrom": [
+    "attr:data-target-selection-name"
+   ]
+  },
+  {
+   "tags": [
+    "lightning-input-field",
+    "lightning-output-field"
+   ],
+   "labelAttr": "field-name",
+   "valueFrom": [
+    "descAttr:input|value",
+    "classText:slds-form-element__static"
+   ],
+   "apiFrom": [
+    "attr:field-name"
+   ]
+  },
+  {
+   "tags": [
+    "sb-field-set-table-item"
+   ],
+   "labelAttr": "item",
+   "valueFrom": [
+    "descText:sb-field"
+   ],
+   "apiFrom": [
+    "attr:item"
+   ]
+  },
+  {
+   "pair": {
+    "labelTag": "dt",
+    "valueTag": "dd"
+   }
+  },
+  {
+   "pair": {
+    "labelClass": "slds-form-element__label",
+    "valueClass": "slds-form-element__control"
+   }
+  }
+ ],
+ "rowRules": [
+  {
+   "kind": "datatable",
+   "rowTags": [
+    "tr"
+   ],
+   "rowRoles": [
+    "row"
+   ],
+   "headerCellTags": [
+    "th"
+   ],
+   "headerRoles": [
+    "columnheader"
+   ],
+   "cellTags": [
+    "td",
+    "th"
+   ],
+   "cellRoles": [
+    "gridcell",
+    "cell",
+    "rowheader"
+   ],
+   "keyCell": "first-link-or-text",
+   "rowKeyAttr": "data-row-key-value",
+   "evidence": "S21b 2026-09-05 (gap S18b-1): lightning-datatable and lightning-tree-grid stamp data-row-key-value on every <tr role='row'> (the component's own key-field value, plus the literal 'HEADER' on the header row). It is the only DOM-stable row identity -- the parser's own ref is position-derived, so inserting child rows made every later row look 'changed'. Evidence capture: Zoo_Containers_v3__tree3_accordion2_vtab2_step4.html (level-1-a, level-2-a, level-3-a, level-3-b, level-2-b, level-1-b with aria-level 1/2/3/3/2/1) vs __default.html (level-1-a, level-1-b, both aria-level 1, aria-expanded false)."
+  },
+  {
+   "kind": "custom-table",
+   "rowTags": [
+    "sb-le-table-row"
+   ],
+   "cellTags": [
+    "sb-le-table-cell"
+   ],
+   "cellLabelAttr": "field-label",
+   "cellApiAttr": "item",
+   "keyCell": "row-text"
+  },
+  {
+   "kind": "dual-listbox",
+   "groupRoles": [
+    "listbox"
+   ],
+   "groupHostTags": [
+    "lightning-dual-listbox"
+   ],
+   "groupSides": [
+    "available",
+    "chosen"
+   ],
+   "groupColumn": "side",
+   "rowRoles": [
+    "option"
+   ],
+   "rowKeyAttr": "data-value",
+   "keyCell": "row-text",
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence capture: __duallistbox_moved_pills3_toast.html -- the source column is always rendered first and the selected column second in the SLDS dueling-list markup, so the sides are POSITIONAL; the columns' own labels are org text ('Zoo Available/Chosen Languages') and cannot be relied on. Options are <div role='option' data-value=..>; moving one re-parents it between the two <ul role='listbox'>s. S36 2026-09-05: role=listbox alone is ambiguous (a combobox dropdown on the customer QLE page false-positived as a 2-row dual-listbox); `groupHostTags` requires an ancestor of the matched groups to be the real host, same guard the family rule already carries for this kind."
+  }
+ ],
+ "signalRules": {
+  "modal": {
+   "roles": [
+    "dialog"
+   ],
+   "classFragments": [
+    "slds-modal"
+   ],
+   "requireAttr": {
+    "aria-modal": "true"
+   },
+   "titleClass": "slds-modal__title"
+  },
+  "toast": {
+   "classFragments": [
+    "slds-notify_toast",
+    "toastContent",
+    "slds-notify--toast"
+   ],
+   "roles": [
+    "status"
+   ]
+  },
+  "banner": {
+   "classFragments": [
+    "slds-form-element__help",
+    "errorsList",
+    "slds-scoped-notification_error",
+    "pageLevelErrors",
+    "slds-notify_alert"
+   ],
+   "roles": [
+    "alert"
+   ]
+  },
+  "busy": {
+   "tags": [
+    "lightning-spinner"
+   ],
+   "classFragments": [
+    "slds-spinner"
+   ],
+   "attr": {
+    "aria-busy": "true"
+   }
+  },
+  "textNoiseClassFragments": [
+   "system-message",
+   "slds-assistive-text"
+  ]
+ },
+ "pageKinds": [
+  {
+   "kind": "flow",
+   "pathPattern": "/flow/|/flowruntime/|/interaction/",
+   "evidence": "breadth 2026-09-05 (docs/recorder/BREADTH.md): 08-flow-screen.html"
+  },
+  {
+   "kind": "new-modal",
+   "pathPattern": "/lightning/o/[^/]+/new"
+  },
+  {
+   "kind": "edit",
+   "pathPattern": "/lightning/r/[^/]+/[^/]+/edit"
+  },
+  {
+   "kind": "record",
+   "pathPattern": "/lightning/r/[^/]+/[^/]+/view"
+  },
+  {
+   "kind": "list",
+   "pathPattern": "/lightning/o/[^/]+/list"
+  },
+  {
+   "kind": "setup",
+   "pathPattern": "/lightning/setup/"
+  },
+  {
+   "kind": "home",
+   "pathPattern": "/lightning/page/home"
+  },
+  {
+   "kind": "custom",
+   "pathPattern": "/lightning/(n|cmp|page)/"
+  }
+ ],
+ "objectFromPath": "/lightning/(?:r|o)/([A-Za-z0-9_]+)/",
+ "recordIdFromPath": "/lightning/r/[A-Za-z0-9_]+/([a-zA-Z0-9]{15,18})/",
+ "chromeTags": [
+  "one-app-nav-bar",
+  "one-appnav",
+  "one-app-launcher-header",
+  "one-lex-onboarding-experiments",
+  "one-lex-onboarding-manager-service-lwc",
+  "one-mask-delegate"
+ ],
+ "families": {
+  "console-subtab": {
+   "requiredAttributes": [
+    "data-tabid"
+   ],
+   "labelAttribute": "title",
+   "evidence": "Stream W8, 2026-09-07. Console WORKSPACE subtab: a.tabHeader.slds-context-bar__label-action[role=tab][data-tabid], label in @title as '<Record Name> | <Object Label>'. Measured live on slockard's Sales Console (/lightning/app/06m7Q000001IqrHQAS); captures docs/dom-captures/slockard/sales-console-live/console-subtab-record.html (1 tab) and console-tertiary-related-contacts.html (2 tabs). Evidence: docs/recorder/evidence/console-families-2026-09-07.md",
+   "beforeHost": true,
+   "classTokens": [
+    "slds-context-bar__label-action"
+   ],
+   "whenClassTokens": [
+    "tabHeader"
+   ]
+  },
+  "console-tertiary-tab": {
+   "requiredAttributes": [
+    "data-tabid"
+   ],
+   "labelAttribute": "title",
+   "evidence": "Stream W8, 2026-09-07. TERTIARY tab inside a console subtab: the SAME element type as console-subtab, discriminated ONLY by the class (slds-tabs_default__link vs slds-context-bar__label-action) -- the two strips are siblings under .oneConsoleTabset, so there is no ancestry to scope by. Measured live on slockard 2026-09-07. Evidence: docs/recorder/evidence/console-families-2026-09-07.md The `tabHeader` guard is what separates a CONSOLE tertiary tab from an ordinary record-page tabset link: both carry slds-tabs_default__link, only the console one also carries tabHeader + data-tabid (measured live on slockard 2026-09-07 -- the record page's activityTab/detailTab links carry neither). CAPTURE COVERAGE: COULD-NOT-CHECK -- no committed capture exercises this family. Measured 2026-09-07: with the tertiary strip demonstrably rendered (Selenium read title='Contacts', class='tabHeader slds-tabs_default__link slds-p-right_small slds-grow', aria-selected='true' on the live page), `up.py --op capture` of that same page contains ZERO 'tabHeader slds-tabs_default__link' -- the serializer does not reach the console's tertiary tab strip, although it does capture the workspace strip on the same page. That is a SERIALIZER gap, named here and in docs/recorder/evidence/console-families-2026-09-07.md section 8, not a claim that the shape is predicted: the RULE is live-proven, the CAPTURE is missing.",
+   "beforeHost": true,
+   "classTokens": [
+    "slds-tabs_default__link"
+   ],
+   "whenClassTokens": [
+    "tabHeader"
+   ]
+  },
+  "utility-bar-item": {
+   "containerClassFragments": [
+    "oneUtilityBarContainer",
+    "oneUtilityBarItem"
+   ],
+   "labelFrom": "descendant span.label",
+   "evidence": "Stream W8, 2026-09-07. Console utility-bar item: div.slds-utility-bar__item.oneUtilityBarItem > button.utilityBarButton, whose aria-label is the EMPTY STRING -- the visible label exists only in the inner span.label.bBody, so an aria-label-driven classification finds nothing and an aria-label read-back passes vacuously. Panel: div.oneUtilityBarPanel[role=dialog][aria-hidden]. Capture docs/dom-captures/slockard/sales-console-live/console-split-view-utility-bar.html (2 oneUtilityBarItem, 1 utilityBarButton). Evidence: docs/recorder/evidence/console-families-2026-09-07.md",
+   "beforeHost": true,
+   "classTokens": [
+    "utilityBarButton"
+   ],
+   "whenClassTokens": [
+    "utilityBarButton"
+   ]
+  },
+  "split-view-row": {
+   "actionClassFragments": [
+    "slds-split-view__list-item-action"
+   ],
+   "recordIdAttribute": "data-recordid",
+   "evidence": "Stream W8, 2026-09-07. Console split-view list row: li[role=row].slds-split-view__list-item containing a.slds-split-view__list-item-action[data-recordid]. NOT role=option -- that docs-shaped guess matches ZERO elements on a real split view (measured: 0 role=option, 45 role=row on docs/dom-captures/slockard/sales-console-live/console-split-view-utility-bar.html). Toggle: button.slds-split-view__toggle-button[aria-expanded]. Evidence: docs/recorder/evidence/console-families-2026-09-07.md",
+   "beforeHost": true,
+   "classTokens": [
+    "slds-split-view__list-item"
+   ],
+   "whenTags": [
+    "li"
+   ]
+  },
+  "omni-select": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02: <runtime_omnistudio_common-combobox> wrapping <input role='combobox' aria-haspopup='listbox' aria-label='Repayment Type' class='slds-input slds-listbox__option-text_entity'>. There is NO <select> and NO <label for> -- QWeb DropDown cannot resolve it and ClickText on the label does not focus it; aria-label is the only label. | classFragment added 2026-09-05 because v3 classifies the FOCUSABLE node, not its custom-element host: matching on runtime_omnistudio_common-combobox alone never fired (measured 0/3 on capture 02, generic 'combobox' won). Adding the control-node classFragment 'slds-listbox__option-text_entity' did NOT fix it either (still 0/3) -- v3 resolves role= before classFragments, so role='combobox' claims the node first. The real fix is a `hostTags` matcher in v3 (application-agnostic: match a family against ancestor custom-element tags). Strict xfail: tools/recorder/tests/test_omnistudio_families.py::test_omni_select_family_needs_hostTags_in_v3",
+   "classFragments": [
+    "slds-listbox__option-text_entity"
+   ],
+   "hostTags": [
+    "runtime_omnistudio_common-combobox"
+   ]
+  },
+  "omni-typeahead": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: was PREDICTED; now captured on dev1 from OmniProcessElement Type='Type Ahead Block' (3 rows on fsc7f); not yet in a capture (was COULD-NOT-CHECK; now captured on dev1) -- the intake scripts that carry it have no internal launcher. | dev1 owned OmniScript Zoo_Omni_Intake (S19, docs/dom-captures/dev1-omnistudio/02-step1-filled.html, 2026-09-05): host tag measured.",
+   "hostTags": [
+    "runtime_omnistudio_omniscript-omniscript-type-ahead-block",
+    "runtime_omnistudio_common-typeahead",
+    "runtime_omnistudio_omniscript-omniscript-typeahead"
+   ]
+  },
+  "omni-lookup": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: was PREDICTED; now captured on dev1 from OmniProcessElement Type='Lookup' (4 rows on fsc7f); was COULD-NOT-CHECK; now captured on dev1, no capture yet. | dev1 owned OmniScript Zoo_Omni_Intake (S19, docs/dom-captures/dev1-omnistudio/02-step1-filled.html, 2026-09-05): host tag measured.",
+   "hostTags": [
+    "runtime_omnistudio_common-lookup",
+    "runtime_omnistudio_omniscript-omniscript-lookup"
+   ]
+  },
+  "omni-date": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02: <runtime_omnistudio_common-date-picker> -> <input type='text' data-id='date-picker-slds-input' aria-label='Start Date (yyyy-MM-dd)'>. It is a TEXT input with the format in the label, not lightning-input[type=date] -- SetDate/native date keywords miss it.",
+   "hostTags": [
+    "runtime_omnistudio_common-date-picker"
+   ]
+  },
+  "omni-radio": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02: <input type='radio' id='omni-radio-0-0-109' name='omni-radio-0' value='Years'>. The option label is the VALUE attribute; there is no label[for], so radio clicks must go through the value, never a for-attribute lookup. | stream V1 2026-09-08: collapseToHost turned OFF. A radio/checkbox GROUP is not one control -- T14's hand-labelled ground truth and v1 both list the group AND every option; collapsing kept only the first input ('Yes', 'Red') and dropped 'No', 'Green', 'Blue' as dup_inputs (3 of the 13 named recall misses, docs/recorder/evidence/v3-decision-2026-09-07.md).",
+   "hostTags": [
+    "runtime_omnistudio_common-radio-group",
+    "runtime_omnistudio_flexcards-flex-radio-input"
+   ],
+   "collapseToHost": false
+  },
+  "omni-checkbox": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: was PREDICTED; now captured on dev1 from OmniProcessElement Type='Checkbox' (5 rows); was COULD-NOT-CHECK; now captured on dev1. | dev1 owned OmniScript Zoo_Omni_Intake (S19, docs/dom-captures/dev1-omnistudio/02-step1-filled.html, 2026-09-05): host tag measured. Multi-select renders a common-checkbox-group inside its omniscript-multiselect host (dev1 02): same family, the nearer host wins. | stream V1 2026-09-08: collapseToHost turned OFF. A radio/checkbox GROUP is not one control -- T14's hand-labelled ground truth and v1 both list the group AND every option; collapsing kept only the first input ('Yes', 'Red') and dropped 'No', 'Green', 'Blue' as dup_inputs (3 of the 13 named recall misses, docs/recorder/evidence/v3-decision-2026-09-07.md).",
+   "hostTags": [
+    "runtime_omnistudio_common-checkbox",
+    "runtime_omnistudio_common-checkbox-group",
+    "runtime_omnistudio_omniscript-omniscript-checkbox",
+    "runtime_omnistudio_omniscript-omniscript-multiselect"
+   ],
+   "collapseToHost": false
+  },
+  "omni-text": {
+   "classFragments": [
+    "vlocity-input"
+   ],
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02: <input class='vlocity-input slds-input' type='currency'|'number' placeholder='Loan Amount'>. type='currency' is not a valid HTML input type (the browser renders text); the LABEL IS THE PLACEHOLDER -- there is no label element at all. | dev1 owned OmniScript Zoo_Omni_Intake (S19, docs/dom-captures/dev1-omnistudio/02-step1-filled.html, 2026-09-05): host tag measured.",
+   "hostTags": [
+    "runtime_omnistudio_common-input",
+    "runtime_omnistudio_common-masked-input",
+    "runtime_omnistudio_flexcards-base-input-element",
+    "runtime_omnistudio_omniscript-omniscript-telephone",
+    "runtime_omnistudio_omniscript-omniscript-email",
+    "runtime_omnistudio_omniscript-omniscript-number",
+    "runtime_omnistudio_omniscript-omniscript-currency"
+   ]
+  },
+  "omni-action": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 02 (8 common-action / 3 flex-action / 2 common-button) and 03 (46 common-action). A FlexCard action is not a <button> at the host level -- the clickable node is inside its shadow root, so ClickText must be allowed to descend.",
+   "hostTags": [
+    "runtime_omnistudio_common-action",
+    "runtime_omnistudio_flexcards-flex-action",
+    "runtime_omnistudio_common-button"
+   ]
+  },
+  "omni-step-nav": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 03: one runtime_omnistudio_common-navigate-action host (data-omni-key 'DEFAULT-CANCEL'). Next/Previous buttons are step-scoped; was PREDICTED; now captured on dev1 shape, not yet clicked live (was COULD-NOT-CHECK; now captured on dev1). | dev1 owned OmniScript Zoo_Omni_Intake (S19, docs/dom-captures/dev1-omnistudio/02-step1-filled.html, 2026-09-05): host tag measured.",
+   "hostTags": [
+    "runtime_omnistudio_common-navigate-action",
+    "runtime_omnistudio_omniscript-omniscript-navigate-action",
+    "runtime_omnistudio_omniscript-omniscript-step-chart-items"
+   ]
+  },
+  "omni-edit-block": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: no Edit Block rows on fsc7f's 23 active scripts (census: 0) -- rule present so the family exists, COULD-NOT-CHECK until an org we own has one (S19). | dev1 owned OmniScript Zoo_Omni_Intake (S19, docs/dom-captures/dev1-omnistudio/02-step1-filled.html, 2026-09-05): host tag measured.",
+   "hostTags": [
+    "runtime_omnistudio_omniscript-omniscript-edit-block",
+    "runtime_omnistudio_omniscript-omniscript-edit-block-new",
+    "runtime_omnistudio_omniscript-omniscript-edit-block-wrapper"
+   ]
+  },
+  "omni-output": {
+   "evidence": "S17 OmniStudio 2026-09-05 (docs/recorder/OMNISTUDIO.md), standard runtime on fsc7f; evidence capture: 03: 187 runtime_omnistudio_common-output-field hosts. READ-ONLY -- never a target; this family exists so the parser emits them as FIELDS (value read-back) and not as controls.",
+   "hostTags": [
+    "runtime_omnistudio_common-output-field"
+   ]
+  },
+  "aura-picklist": {
+   "classFragments": [
+    "forceInputPicklist"
+   ],
+   "evidence": "CUSTOMER-CPQ-SIGNATURES.md 2026-09-05: neo4j-acpdev New Opportunity modal, 4 forceInputPicklist nodes (Stage, Opportunity Currency), trigger a[role=combobox]; must precede 'picklist' in this dict (same classFragment loop, first match wins) so an Aura control never resolves as plain PickList. roles intentionally omitted (role=combobox alone must NOT preempt generic 'combobox' -- classFragment is the only reliable Aura signal) | hostClassFragments added 2026-09-05: the class is on the Aura wrapper div above the focusable node (customer-cpq/02, 03).",
+   "hostClassFragments": [
+    "forceInputPicklist"
+   ],
+   "collapseToHost": false
+  },
+  "aura-lookup": {
+   "classFragments": [
+    "forceSearchInputLookupDesktop"
+   ],
+   "evidence": "CUSTOMER-CPQ-SIGNATURES.md 2026-09-05: neo4j-acpdev New Opportunity modal, 2 forceSearchInputLookupDesktop nodes (Account Name); routes to Aura Lookup keyword, never plain ComboBox | hostClassFragments added 2026-09-05: the class is on the Aura wrapper div above the focusable node (customer-cpq/02, 03).",
+   "hostClassFragments": [
+    "forceSearchInputLookupDesktop"
+   ],
+   "collapseToHost": false
+  },
+  "aura-date": {
+   "classFragments": [
+    "uiInputDate"
+   ],
+   "evidence": "CUSTOMER-CPQ-SIGNATURES.md 2026-09-05: neo4j-acpdev New Opportunity modal, 2 uiInputDate nodes (Close Date); must precede 'date' (which no longer claims uiInputDate) so an Aura date control never resolves as plain SetDate/lightning-input-date; keyword clears with clear_key=CONTROL+a | hostClassFragments added 2026-09-05: the class is on the Aura wrapper div above the focusable node (customer-cpq/02, 03).",
+   "hostClassFragments": [
+    "uiInputDate"
+   ],
+   "collapseToHost": false
+  },
+  "path": {
+   "beforeHost": true,
+   "classTokens": [
+    "slds-path__link"
+   ],
+   "labelAttrs": [
+    "data-tab-name"
+   ],
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence captures: docs/dom-captures/breadth/fsc7f__record__opportunity.html (Aura runtime_sales_pathassistant: <a class='tabHeader slds-path__link' role='option' aria-current data-tab-name=..>) AND Zoo_Containers_v3__default.html (LWC lightning-progress-indicator type='path': <a class='slds-path__link' role='option'> inside a lightning-progress-step host). ONE class covers both. beforeHost=true because the LWC path step shares the `lightning-progress-step` host with the BASE progress step, which is a different control; without it the hostTags rule for `progress` would claim the path. Before this rule all 4 path steps resolved as the generic `option` family, indistinguishable from a picklist option."
+  },
+  "progress": {
+   "classTokens": [
+    "slds-progress__marker"
+   ],
+   "hostTags": [
+    "lightning-progress-step"
+   ],
+   "whenClassTokens": [
+    "slds-progress__marker"
+   ],
+   "collapseToHost": false,
+   "labelAttrs": [
+    "data-label"
+   ],
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence capture: Zoo_Containers_v3__default.html -- base-variant <lightning-progress-indicator> renders <lightning-progress-step> -> <div class='slds-progress__marker' data-label='Zoo Step One' tabindex='0'>. The step's only visible text is inside slds-assistive-text, so before this rule all four steps folded into ONE index line labelled 'Zoo Base Progress Indicator' (identical-count 4) via the nearest-text fallback -- a test could not name a step. data-label is the label; whenClassTokens keeps the host rule off the path variant's <a> (see the `path` family)."
+  },
+  "pill": {
+   "classTokens": [
+    "slds-pill"
+   ],
+   "hostTags": [
+    "lightning-pill"
+   ],
+   "whenClassTokens": [
+    "slds-pill"
+   ],
+   "collapseToHost": false,
+   "keepAlways": true,
+   "actionFrom": "descendant-button",
+   "labelAttrs": [
+    "title"
+   ],
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence capture: Zoo_Inputs_v3__duallistbox_moved_pills3_toast.html -- <lightning-pill> -> <span part='pill' class='slds-pill'> with <span class='slds-pill__label' title='Zoo Tag Alpha'> and a <lightning-button-icon class='slds-pill__remove'> whose inner <button title='Remove Zoo Tag Alpha'> is the action. The pill span carries NO role and NO tabindex, so keepAlways is required or only the Remove buttons reach the index (measured: 3 'Remove Zoo Tag ...' buttons, 0 pills). classTokens not classFragments: 'slds-pill' is a substring of slds-pill__label / __remove / __icon_container."
+  },
+  "carousel-slide": {
+   "hostTags": [
+    "lightning-carousel"
+   ],
+   "whenRoles": [
+    "tab"
+   ],
+   "collapseToHost": false,
+   "evidence": "S21b 2026-09-05 (docs/recorder/ZOO-V3-COMPONENTS.md), owned zoo pages on slockard; evidence capture: Zoo_Containers_v3__default.html -- carousel indicators are <a role='tab'>, byte-identical in ARIA to a real tabset's tabs. Deciding by host tag (lightning-carousel) keeps a real tabset and a carousel on ONE page distinct; whenRoles='tab' keeps the rule off the carousel's own autoplay button and its slide panels, which share the same host."
+  },
+  "picklist": {
+   "tags": [
+    "lightning-combobox",
+    "lightning-picklist",
+    "records-record-picklist",
+    "records-form-picklist"
+   ],
+   "roles": [],
+   "classFragments": [
+    "uiInputSelect"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture. | S29 2026-09-05 (docs/recorder/FAMILY-AGREEMENT.md): ported from tools/recorder/inject/core.js after measuring the two classifiers against 96 captures; the JS side was right and the template had no rule. 66 elements: docs/dom-captures/04-account-new-record-modal.html Industry/Type are <button role='combobox' class='slds-combobox__input slds-input_faux'> inside lightning-base-combobox > lightning-combobox > lightning-picklist > records-form-picklist. The template resolved role=combobox first and answered `combobox` (ComboBox keyword); the control is a PickList. The HOST names it -- the trigger's own role cannot tell a picklist from a lookup. whenRoles guards the host so the field's other descendants (help-info buttons) keep their own family.",
+   "hostTags": [
+    "lightning-combobox",
+    "lightning-picklist",
+    "records-form-picklist",
+    "records-record-picklist"
+   ],
+   "whenRoles": [
+    "combobox"
+   ],
+   "collapseToHost": false
+  },
+  "combobox": {
+   "roles": [
+    "combobox"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "lookup": {
+   "tags": [
+    "force-lookup",
+    "records-record-layout-lookup",
+    "lightning-lookup"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture. | S29 2026-09-05 (docs/recorder/FAMILY-AGREEMENT.md): ported from tools/recorder/inject/core.js after measuring the two classifiers against 96 captures; the JS side was right and the template had no rule. 14 elements: docs/dom-captures/04-account-new-record-modal.html 'Parent Account' (lightning-base-combobox > lightning-grouped-combobox > lightning-lookup-desktop > lightning-lookup) and 'Address Search' (> lightning-lookup-address) are <input role='combobox'> -- indistinguishable from a plain combobox by role alone; the lookup host is decisive.",
+   "hostTags": [
+    "lightning-lookup",
+    "lightning-lookup-desktop",
+    "lightning-lookup-address",
+    "force-lookup",
+    "records-record-layout-lookup"
+   ],
+   "whenRoles": [
+    "combobox"
+   ],
+   "collapseToHost": false
+  },
+  "checkbox": {
+   "roles": [
+    "checkbox"
+   ],
+   "inputTypes": [
+    "checkbox"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "radio": {
+   "roles": [
+    "radio"
+   ],
+   "inputTypes": [
+    "radio"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "date": {
+   "tags": [
+    "lightning-input-date"
+   ],
+   "inputTypes": [
+    "date"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture. | hostTags lightning-datepicker added 2026-09-05: the LWC datepicker input is type=text (S2c; slockard-zoo-v3/edit-modal-standard.html). collapseToHost=false: the input and its calendar button are two QWeb targets (recall 242->238 on Zoo_Base_Inputs when collapsed).",
+   "hostTags": [
+    "lightning-datepicker"
+   ],
+   "collapseToHost": false
+  },
+  "textarea": {
+   "tags": [
+    "textarea",
+    "lightning-textarea"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "select": {
+   "tags": [
+    "select"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "password": {
+   "inputTypes": [
+    "password"
+   ],
+   "evidence": "S29 2026-09-05 | S29 2026-09-05 (docs/recorder/FAMILY-AGREEMENT.md): ported from tools/recorder/inject/core.js after measuring the two classifiers against 96 captures; the JS side was right and the template had no rule. 3 elements (docs/dom-captures/09-garzai-console.html 'Git personal access token', slockard zoo 'Password'): the template had no password family, so every password input read back as `text`."
+  },
+  "file": {
+   "inputTypes": [
+    "file"
+   ],
+   "evidence": "S29 2026-09-05 | S29 2026-09-05 (docs/recorder/FAMILY-AGREEMENT.md): ported from tools/recorder/inject/core.js after measuring the two classifiers against 96 captures; the JS side was right and the template had no rule. 7 elements (fsc7f__record__contact.html / __opportunity.html 'Upload Files Or drop files', <input type='file' class='slds-file-selector__input slds-assistive-text'>): a file input is never TypeText -- it needs the CDP file-chooser protocol."
+  },
+  "number": {
+   "classFragments": [
+    "uiInputSmartNumber",
+    "uiInputNumber"
+   ],
+   "evidence": "S29 2026-09-05 | S29 2026-09-05 (docs/recorder/FAMILY-AGREEMENT.md): ported from tools/recorder/inject/core.js after measuring the two classifiers against 96 captures; the JS side was right and the template had no rule. 6 elements (docs/dom-captures/aura-pack/zoo-aura-inputs.html Quantity/Price, class 'input uiInputSmartNumber'): Aura's smart-number input is an <input type='text'>, so the tag rule answered `text`; the class is the only signal. NOT keyed on type='number' -- core.js does not classify a bare type=number as `number` either, and adding it would have created a NEW divergence."
+  },
+  "text": {
+   "tags": [
+    "input",
+    "lightning-input"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "button": {
+   "tags": [
+    "button",
+    "lightning-button",
+    "lightning-button-icon",
+    "lightning-button-menu"
+   ],
+   "roles": [
+    "button",
+    "menuitem",
+    "menuitemcheckbox",
+    "menuitemradio"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "link": {
+   "tags": [
+    "a"
+   ],
+   "roles": [
+    "link"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "tab": {
+   "roles": [
+    "tab"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "option": {
+   "roles": [
+    "option"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture. | S29 2026-09-05: an <option> inside an Aura ui:inputSelect (docs/dom-captures/aura-pack/zoo-aura-inputs.html, 12 elements) carries no role; v3 answered `option` only through its tag FALLBACK while core.js's chain-wide `uiInputSelect` regex claimed it for `picklist`. The tag is now an explicit rule, so both classifiers say `option` for the same reason -- a descendant of a picklist is not the picklist.",
+   "tags": [
+    "option"
+   ]
+  },
+  "row": {
+   "roles": [
+    "row"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "cell": {
+   "roles": [
+    "gridcell",
+    "cell"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "tree": {
+   "roles": [
+    "treeitem"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  },
+  "slider": {
+   "roles": [
+    "slider"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture. | no capture yet (2026-09-05 sweep of 96 captures): the zoo flow's slider screen is S18d's capture; PREDICTED from role=slider until then."
+  },
+  "switch": {
+   "roles": [
+    "switch"
+   ],
+   "evidence": "Base family (v1/v2 era). Proven by the zoo battery recall 1.0 on 9 slockard tabs (docs/recorder/ZOO-BATTERY.md, 2026-09-05) and the breadth run over 34 captures on dev1/slockard/fsc7f (docs/recorder/BREADTH.md); golden digests pin every capture."
+  }
+ },
+ "assistiveClassFragments": [
+  "slds-assistive-text",
+  "sr-only"
+ ],
+ "collapsedClassFragments": [
+  "slds-is-collapsed"
+ ],
+ "labelClassFragments": [
+  "slds-form-element__label",
+  "form-element__label",
+  "slds-radio__label",
+  "slds-checkbox__label"
+ ],
+ "dupExcludedAttributes": [
+  "type",
+  "role",
+  "class",
+  "tabindex"
+ ],
+ "fieldFamilies": [
+  "text",
+  "textarea",
+  "number",
+  "date",
+  "datetime",
+  "picklist",
+  "combobox",
+  "lookup",
+  "checkbox",
+  "radio",
+  "native-select",
+  "switch",
+  "slider",
+  "file",
+  "rich-text",
+  "password",
+  "email",
+  "phone",
+  "url",
+  "omni-output"
+ ],
+ "structuralRows": {
+  "kind": "grid",
+  "minSiblings": 3,
+  "minCells": 3,
+  "evidence": "BREADTH.md gap 4 (2026-09-05): react-virtualized Grid/Collection cells (style top/left) and span/div row 'tables' carry no roles ; minCells 3 (2026-09-05): 2-cell siblings are label/value pairs (Aura view fields, stat tiles), not rows"
+ },
+ "fieldFallbackLabels": [
+  "name-id-humanised",
+  "nearest-text"
+ ],
+ "note_labelPolicy": "interop T10 2026-09-07: the label POLICY layer, read by tools/interop/resources/pythonDom/element_compiler.py through DomConfiguration. labelPrecedence names are the label_source values the compiler emits; the first rung that resolves wins. Omit a key here and the compiler falls back to its own class attribute.",
+ "note_hintOrderByLabelSource": "interop T17 2026-09-07: mirrors salesforce-lightning.json (see there for full rationale) -- ClickItem before ClickText for title_attr/aria_label labels unless the label is also the element's rendered text.",
+ "hintOrderByLabelSource": {
+  "title_attr": [
+   "ClickItem",
+   "ClickText"
+  ],
+  "aria_label": [
+   "ClickItem",
+   "ClickText"
+  ]
+ },
+ "labelPrecedence": [
+  "inner_text",
+  "aria_label",
+  "standard_label",
+  "aria_labelledby",
+  "placeholder",
+  "title_attr",
+  "sibling_label_text",
+  "label_span",
+  "assistive_text"
+ ],
+ "descriptionClassFragments": [
+  "changeRecordTypeItemDescription",
+  "changeRecordTypeLabel",
+  "slds-form-element__help",
+  "slds-form-element__static",
+  "helpText",
+  "fieldDescription",
+  "record-type-description",
+  "option-description",
+  "item-description"
+ ],
+ "requiredMarkerSelectors": [
+  {
+   "aria-hidden": "true"
+  }
+ ],
+ "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
+ "assistiveTextClassFragments": [
+  "slds-assistive-text",
+  "sr-only",
+  "visually-hidden",
+  "slds-hidden"
+ ],
+ "note_assistiveTextClassFragments": "assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
+ "labelSourceCaveats": {
+  "assistive_text": "This label came from SCREEN-READER-ONLY markup (an slds-assistive-text / sr-only span) -- nothing on this control is visible to a sighted person, so a rendered-text search may not find it. Confirm the click landed (read-back or the optical witness) before trusting this step."
+ },
+ "note_labelSourceCaveats": "labelSourceCaveats: a caveat appended to every hint whose locator IS the label, keyed by the labelPrecedence rung that produced that label. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11 / L2-R08): a hint built on assistive text must say so rather than read as if the string were visible on the page.",
+ "innerTextExcludedRoles": [
+  "combobox",
+  "listbox",
+  "textbox",
+  "searchbox",
+  "spinbutton",
+  "slider",
+  "option"
+ ],
+ "note_innerTextExcludedRoles": "innerTextExcludedRoles: roles whose own rendered text is the control's VALUE, not its NAME, so the `inner_text` rung (first, since the wave-2 review close) must never claim them. A Lightning picklist is <button role=\"combobox\" aria-label=\"Industry\">--None--</button>; without this key the field's label became '--None--'. Added by stream P1, 2026-09-07, after its own test caught the regression in the org map's metadata->control routing.",
+ "groupCaptions": {
+  "_why": "stream V1 2026-09-08, read by v3._group_captions. A radio group, a checkbox group and a dual listbox are ONE field in the layout and one control in a test step, but the group's name lives only in its <legend>/slds-form-element__legend node -- every member input carries the OPTION's name instead, so v3 emitted no element at all for 'Zoo Radio', 'Zoo Multi Select' or 'Zoo Tags' (3 of the 13 recall misses named in docs/recorder/evidence/v3-decision-2026-09-07.md). v1 and T14's hand-labelled ground truth both list the group. The caption inherits the family of the members it captions, so no new family name enters family-map.json, and it is skipped when an element already carries that label. Set enabled:false to restore the pre-V1 output.",
+  "enabled": true,
+  "hostTags": [
+   "runtime_omnistudio_common-radio-group",
+   "runtime_omnistudio_common-checkbox-group",
+   "lightning-dual-listbox"
+  ],
+  "labelTags": [
+   "legend"
+  ],
+  "labelClassFragments": [
+   "slds-form-element__legend"
+  ],
+  "maxDepth": 14,
+  "family": "group"
+ },
+ "ownTextOutranksNearestLabel": {
+  "_why": "stream V1 2026-09-08, read by v3._label. The 'nearest' ancestor scan renamed elements that already say their own name: the dual listbox's chosen options both came back as 'Chosen' (the listbox's legend) instead of 'Billing'/'Onboarding', and the rich-text colour picker came back as 'Zoo Rich Text' (the FIELD's label) instead of 'Choose a color. Current color:'. That is CLAUDE.md's label-vs-value failure in its container form -- 3 of the 13 recall misses in docs/recorder/evidence/v3-decision-2026-09-07.md plus one duplicate false positive. v3's fallback ladder already carried this guard ('a button/link's own text is always the correct signal'); this extends it to the ancestor scan. aria-label, title and label[for] still outrank own text -- only the nearby-form-element-label guess is dropped. | excludeFamilies: a CONTAINER is named by its legend, never by the text of the things inside it -- without this the dual listbox's 'Chosen' side renamed itself 'Billing Onboarding' (seen firing, one control lost). useAssistiveText: the rich-text colour picker has NO visible text at all; its own name is a screen-reader span, which is still ITS name and still outranks the field label six hops up.",
+  "enabled": true,
+  "minChars": 2,
+  "useAssistiveText": true,
+  "excludeFamilies": [
+   "listbox",
+   "select",
+   "grid",
+   "table",
+   "row",
+   "rowgroup",
+   "cell",
+   "tree",
+   "region"
+  ]
+ },
+ "hostInnerKeepsOwnName": {
+  "_why": "stream V1 2026-09-08, read by v3's host-collapse branch. collapseToHost keeps ONE element per component host, which is right for an input and its clear/toggle button -- but wrong when the inner node carries its OWN distinct name. The OmniStudio date picker's icon button is title='Select Date' with aria-label='Zoo Date' (the field's name, inherited), and the typeahead's Edit button is named only by an assistive-text span; both were dropped as dup_inputs and both are separate controls in T14's ground truth AND in v1 (2 of the 13 recall misses in docs/recorder/evidence/v3-decision-2026-09-07.md). A name equal to the host control's own label is NOT a distinct name and is still collapsed, so the input+clear-button case is unchanged. Set enabled:false to restore the pre-V1 output.",
+  "enabled": true,
+  "attrs": [
+   "title"
+  ],
+  "useAssistiveText": true
+ }
+}

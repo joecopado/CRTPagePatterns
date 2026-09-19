@@ -1,0 +1,370 @@
+{
+ "keywordRouting": {
+  "_note": "Stream 2A 2026-09-09. The generic keyword router. Rungs here are the ones whose mechanism is not Salesforce-specific (TypeText / PickList / ComboBox / ClickCheckbox / ClickText / ClickItem / VerifyText). A family whose only proven rung is a Salesforce one carries a stated reason rather than borrowing it -- 12-copado-commit-changes.html parses under THIS template (it carries no Lightning markers), and before this block its inputs fell through to a bare ClickItem with nothing said about why.",
+  "families": {
+   "input_field": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "text": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "textarea": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "number": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "currency": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "percent": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "email": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "url": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "password_field": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "richtext": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true,
+    "why": "a contenteditable is typed into; there is no <input> to set."
+   },
+   "date": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true,
+    "why": "a generic date input is typed as text -- Set Datetime drives Salesforce's two-control compound and does not apply here."
+   },
+   "datetime": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true,
+    "why": "typed as text; the Salesforce compound-control rung is not portable."
+   },
+   "time": {
+    "fill": "TypeText",
+    "verify": "VerifyText",
+    "fillFirst": true,
+    "why": "typed as text."
+   },
+   "dropdown": {
+    "fill": "PickList",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "combobox": {
+    "fill": "ComboBox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "lookup": {
+    "fill": "ComboBox",
+    "verify": "VerifyText",
+    "fillFirst": true,
+    "why": "a type-to-search control; ComboBox must not blur after typing."
+   },
+   "checkbox": {
+    "fill": "ClickCheckbox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "boolean": {
+    "fill": "ClickCheckbox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "toggle": {
+    "fill": "ClickCheckbox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "radio": {
+    "fill": "ClickCheckbox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "radio-group": {
+    "fill": "ClickCheckbox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "checkbox-group": {
+    "fill": "ClickCheckbox",
+    "verify": "VerifyText",
+    "fillFirst": true
+   },
+   "dual_listbox": {
+    "fill": null,
+    "verify": null,
+    "reason": "no platform-neutral keyword is proven for this shape -- the Salesforce rung for it (see salesforce-lightning.json's keywordRouting) is not portable. COULD-NOT-CHECK, not a guess."
+   },
+   "slider": {
+    "fill": null,
+    "verify": null,
+    "reason": "a drag gesture has no read-back rung on any platform we own."
+   },
+   "output_field": {
+    "fill": null,
+    "verify": "VerifyText",
+    "reason": "a rendered read-only value -- nothing to fill; assert its text."
+   },
+   "datatable": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell",
+    "why": "row/col addressing is structural and platform-neutral."
+   },
+   "native_table": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell"
+   },
+   "table_cell": {
+    "fill": "Set Table Cell",
+    "verify": "Verify Table Cell Where",
+    "act": "Click Table Cell"
+   },
+   "column_header": {
+    "fill": null,
+    "verify": null,
+    "reason": "a column header is an ARGUMENT to the table rungs, not a control."
+   },
+   "button": {
+    "fill": null,
+    "verify": null,
+    "reason": "a button is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+   },
+   "link": {
+    "fill": null,
+    "verify": null,
+    "reason": "a link is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+   },
+   "tree": {
+    "fill": null,
+    "verify": null,
+    "reason": "a tree item is actuated by a click rung (ClickText / ClickItem), not filled or asserted as a value."
+   },
+   "pill": {
+    "fill": null,
+    "verify": null,
+    "reason": "a pill shows a chosen value; set it through the control that produced it."
+   },
+   "badge": {
+    "fill": null,
+    "verify": "VerifyText",
+    "reason": "rendered status text -- assert it, never fill it."
+   },
+   "icon": {
+    "fill": null,
+    "verify": null,
+    "reason": "an icon carries no value."
+   },
+   "iframe": {
+    "fill": null,
+    "verify": null,
+    "reason": "an iframe is a FRAME, not a control -- drive what is inside it."
+   },
+   "record_edit_form": {
+    "fill": null,
+    "verify": null,
+    "reason": "a form container, not a control."
+   },
+   "record_view_form": {
+    "fill": null,
+    "verify": null,
+    "reason": "a form container, not a control."
+   },
+   "custom_component": {
+    "fill": null,
+    "verify": null,
+    "reason": "an unrecognised custom element has no proven keyword."
+   },
+   "_default": {
+    "fill": null,
+    "verify": null,
+    "reason": "no keywordRouting row is declared for this family in the generic template -- add one once a platform-neutral keyword is proven. Stated absence, never silence."
+   }
+  }
+ },
+ "name": "web-generic",
+ "host": "web-generic",
+ "description": "v1-shape GENERIC web template (interop T18, 2026-09-07). The v1 parser (DomConfiguration / parse_elements_from_html) used to load salesforce-lightning.json for EVERY page because selection never looked at the markup -- a non-Salesforce page was parsed with Lightning tag lists, Lightning noise rules and Lightning container patterns, and no output said so. This is the template dom_config.select_template picks when a page matches NO candidate's frameworkMarkers. It is deliberately v1-SHAPE (the keys DomConfiguration._TEMPLATE_KEYS reads), not v3-shape: web-generic.v3.json is v3's generic template and shares only ~10 keys with this lineage. Every key present here OVERRIDES the Salesforce-flavoured class defaults in dom_config.py; keys absent fall through, which is why the Salesforce-specific ones are all stated explicitly as empty rather than omitted.",
+ "frameworkMarkers": [],
+ "note_frameworkMarkers": "Intentionally empty -- this template is the NEGATIVE branch of detection (nothing matched), never a positive match of its own. Giving it markers would make selection order-dependent.",
+ "targetTags": [
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  "iframe",
+  "summary",
+  "details",
+  "option",
+  "label"
+ ],
+ "interactiveRoles": [
+  "button",
+  "link",
+  "checkbox",
+  "radio",
+  "tab",
+  "menuitem",
+  "option",
+  "switch",
+  "textbox",
+  "gridcell",
+  "columnheader",
+  "rowheader",
+  "combobox"
+ ],
+ "noiseTags": [],
+ "noiseTagPatterns": [],
+ "noiseRoles": [
+  "presentation",
+  "none",
+  "separator",
+  "progressbar",
+  "status",
+  "log",
+  "alert",
+  "tooltip"
+ ],
+ "noiseClassFragments": [
+  "sr-only",
+  "visually-hidden",
+  "screen-reader-text"
+ ],
+ "shadowWrapperTags": [],
+ "skipElementTypes": [
+  "picklist_option",
+  "internal",
+  "structural"
+ ],
+ "wildcardInteractiveTagPrefixes": [],
+ "systemTextBlacklist": [
+  "Skip to",
+  "Skip to content",
+  "Skip to main content",
+  "Loading...",
+  "Please wait",
+  "Processing"
+ ],
+ "containerPatterns": [
+  "^(div|section|article|main|aside|nav|header|footer|form)$"
+ ],
+ "containerChildThreshold": 3,
+ "containerTextThreshold": 200,
+ "gridRoleValues": [
+  "grid",
+  "treegrid"
+ ],
+ "gridDescendantEmission": {
+  "_why": "No generic-web equivalent of lightning-tree-grid exists, so nothing is exploded. A real <table> is already reached through targetTags/interactiveRoles and _in_grid_container.",
+  "containerTags": [],
+  "rules": []
+ },
+ "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
+ "labelPrecedence": [
+  "inner_text",
+  "aria_label",
+  "standard_label",
+  "aria_labelledby",
+  "placeholder",
+  "title_attr",
+  "sibling_label_text",
+  "label_span",
+  "assistive_text"
+ ],
+ "note_assistiveTextClassFragments": "assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
+ "assistiveTextClassFragments": [
+  "sr-only",
+  "visually-hidden",
+  "screen-reader-text",
+  "slds-assistive-text"
+ ],
+ "note_labelSourceCaveats": "labelSourceCaveats: a caveat appended to every hint whose locator IS the label, keyed by the labelPrecedence rung that produced that label. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11 / L2-R08): a hint built on assistive text must say so rather than read as if the string were visible on the page.",
+ "labelSourceCaveats": {
+  "assistive_text": "This label came from SCREEN-READER-ONLY markup (an slds-assistive-text / sr-only span) -- nothing on this control is visible to a sighted person, so a rendered-text search may not find it. Confirm the click landed (read-back or the optical witness) before trusting this step."
+ },
+ "note_innerTextExcludedRoles": "innerTextExcludedRoles: roles whose own rendered text is the control's VALUE, not its NAME, so the `inner_text` rung (first, since the wave-2 review close) must never claim them. A Lightning picklist is <button role=\"combobox\" aria-label=\"Industry\">--None--</button>; without this key the field's label became '--None--'. Added by stream P1, 2026-09-07, after its own test caught the regression in the org map's metadata->control routing.",
+ "innerTextExcludedRoles": [
+  "combobox",
+  "listbox",
+  "textbox",
+  "searchbox",
+  "spinbutton",
+  "slider",
+  "option"
+ ],
+ "labelClassFragments": [
+  "form-label",
+  "control-label",
+  "field-label"
+ ],
+ "descriptionClassFragments": [
+  "help-text",
+  "form-text",
+  "field-description",
+  "hint"
+ ],
+ "requiredMarkerSelectors": [
+  {
+   "aria-hidden": "true"
+  }
+ ],
+ "dynamicValuePatterns": {
+  "_why": "2026-09-12, mapping robotic.copado.com (Angular). web-generic declared NO rules, so a generic web app got only the small hardcoded UNSTABLE_VALUE set and every framework-generated attribute passed as clean. These are per-BUILD markers -- Angular view encapsulation (_ngcontent-/_nghost-) and Vue scoped styles (data-v-<hash>) -- and they appear as attribute NAMES with an empty value, which is why review_table also had to scan names, not just quoted values. React's own runtime adds no such attribute.",
+  "attributes": [
+   "id",
+   "name",
+   "for",
+   "class",
+   "aria-controls",
+   "aria-labelledby",
+   "data-testid"
+  ],
+  "prefixes": [
+   "_ngcontent-",
+   "_nghost-",
+   "ng-tns-c",
+   "ng-star-inserted-"
+  ],
+  "patterns": [
+   "^data-v-[0-9a-f]{6,}$",
+   "^[a-z][a-z0-9]*(-[a-z0-9]+)*-\\d+$",
+   "^[0-9a-f]{32}$",
+   "^[A-Za-z][A-Za-z0-9]*_\\d{10,}$",
+   "^\\d+(?:\\.\\d+)?\\s*(?:ms|s)$",
+   "^(?:Today|Yesterday|Just now)$",
+   "^\\d+\\s*/\\s*\\d+\\s+nodes?$",
+   "^\\d{1,2}:\\d{2}(?::\\d{2})?(?:\\s*[AaPp]\\.?[Mm]\\.?)?$",
+   "^\\d+\\s*(?:min|hr|hour|minute|sec|second)s?(?:\\s+ago)?$"
+  ],
+  "_why_text_volatility": "2026-09-12, measured on robotic.copado.com: the xpath ladder's preceding-text rung anchored 4 of 14 exported steps on values that change every run -- `10.0s` and `5.2s` (node DURATIONS) and `Today`. They passed the `clean` column because the declared patterns only described generated ATTRIBUTE values, never volatile TEXT. Such a step reviews green against the capture and fails on the next run, which is the vacuous pass this column exists to prevent. These describe values that are volatile by nature rather than by framework, so they belong to every web app, not one."
+ }
+}

@@ -1,0 +1,1037 @@
+{
+  "keywordRouting": {
+    "_note": "Stream 2A 2026-09-09 (attack plan Phase 2A; essay docs/proposals/challenge-2026-09-08/C2-keyword-assignment.md). THE keyword router, as DATA. A control's DOM family says WHAT it is; fill vs verify vs actuate is the CALLER's INTENT, so it is three named slots here and two element fields (hint_fill / hint_verify) on the parsed element -- never a two-keyword string like 'TypeText / ClickText' baked into one `keyword`, which is what the parser emitted until this table landed. `metadataTypes` routes a DESCRIBE TYPE and WINS over the family when the org map has the field (CLAUDE.md: 'metadata routes the keyword, DOM is the backstop'); it is kept in step with tools/qforce-lite/predict.py:type_to_keyword by tools/recorder/tests/test_keyword_router_contract_2026_09_09.py, which also proves every keyword named here is a real rung in export._CRT_KW_MAP / writer._KW_MAP / library/index.json. A family with no keyword states a `reason` -- the tri-state rule, never silence. `_default` is the safety net: a family nobody has written a row for still yields a stated reason rather than an unexplained blank.",
+    "families": {
+      "input_field": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "the label-based field-resolution chain TypeText already uses. The fill rung is offered from ANY resolved label source -- CLAUDE.md's locator doctrine ranks aria-label SECOND on the ladder, and gating TypeText to standard_label/aria_labelledby left 80 aria-label-only inputs recommending ClickItem."
+      },
+      "text": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "textarea": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "number": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "currency": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "percent": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "email": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "url": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField"
+      },
+      "password_field": {
+        "fill": "TypeText",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "a masked text box; the mechanism is type-a-string. The read-back can only see the mask, so treat a VerifyField pass on it as COULD-NOT-CHECK."
+      },
+      "richtext": {
+        "fill": "Type Text Clearing",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "lightning-quill's contenteditable -- there is no <input>/<textarea>, and type_text_clearing's rich-text branch reads .innerText back off the contenteditable."
+      },
+      "dropdown": {
+        "fill": "PickList",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "PickList resolves via a scoped lightning-combobox xpath keyed on the field's label -- structurally unique by construction."
+      },
+      "dropdown_select": {
+        "fill": "DropDown",
+        "fillFirst": true,
+        "verify": "VerifySelectedOption",
+        "why": "a native <select> (familyVariants whenTagIs select): QWeb DropDown by label. Measured 2026-09-10 on Zoo_Nightmare_Inputs: PickList does not select it, DropDown Territory Southwest / DropDown Escalation Regions EMEA land (user: 'this should have been a dropdown')."
+      },
+      "combobox": {
+        "fill": "ComboBox",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "a type-to-search control with a live-filtered dropdown; ComboBox must not blur after typing, which is TypeText's default and closes the list."
+      },
+      "lookup": {
+        "fill": "Aura Lookup",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "lightning-lookup / force-lookup is the reference-field shape; the SELECT step needs the server-side-filtered result list, never a plain type."
+      },
+      "date": {
+        "fill": "Set Datetime",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "offered because a bare date field is also driveable through Set Datetime (date-only args). For the describe type `date`, metadataTypes routes to Type Text Clearing, which is predict.type_to_keyword's own answer."
+      },
+      "datetime": {
+        "fill": "Set Datetime",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "lightning-datetimepicker is a COMPOUND control -- one database value, a date input plus a 15-minute time combobox under one legend."
+      },
+      "time": {
+        "fill": null,
+        "verify": null,
+        "reason": "no time-only keyword exists -- Set Datetime drives a DATE input plus a time combobox, and this shape has no date box. Same stated gap as predict.type_to_keyword('time')."
+      },
+      "checkbox": {
+        "fill": "ClickCheckbox",
+        "fillFirst": true,
+        "verify": "Verify Field State",
+        "why": "ClickCheckbox re-reads the input's `checked` property after clicking (confirm.py doctrine) -- that read-back is what makes it the right rung here and not a blind click."
+      },
+      "boolean": {
+        "fill": "ClickCheckbox",
+        "fillFirst": true,
+        "verify": "Verify Field State",
+        "why": "ClickCheckbox re-reads the input's `checked` property after clicking (confirm.py doctrine) -- that read-back is what makes it the right rung here and not a blind click."
+      },
+      "toggle": {
+        "fill": "ClickCheckbox",
+        "fillFirst": true,
+        "verify": "Verify Field State",
+        "why": "a lightning-input type=toggle is a checkbox with a switch skin; the checked property is still the state to read back."
+      },
+      "radio": {
+        "fill": "ClickCheckbox",
+        "fillFirst": true,
+        "verify": "Verify Field State",
+        "why": "ClickCheckbox re-reads the input's `checked` property after clicking (confirm.py doctrine) -- that read-back is what makes it the right rung here and not a blind click. A radio input and a checkbox input are both VALUE_CAPTURE_TYPES, so the same mechanism is real for both. An OmniScript radio GROUP is a different shape -- see omni_radio."
+      },
+      "radio-group": {
+        "fill": "ClickCheckbox",
+        "fillFirst": true,
+        "verify": "Verify Field State",
+        "why": "the group is driven by clicking the member option; the read-back is the member input's checked property."
+      },
+      "checkbox-group": {
+        "fill": "ClickCheckbox",
+        "fillFirst": true,
+        "verify": "Verify Field State",
+        "why": "same mechanism as a single checkbox, once per member."
+      },
+      "omni_radio": {
+        "fill": "Omni Radio",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "an OmniScript radio group has no label[for]; Omni Radio resolves the input by its VALUE attribute inside the omni host and re-reads which values ended up checked."
+      },
+      "dual_listbox": {
+        "fill": "Multi Pick List",
+        "fillFirst": true,
+        "verify": "VerifyField",
+        "why": "the dual-listbox is the multi-select picklist shape; PickList drives only one half of it."
+      },
+      "output_field": {
+        "fill": null,
+        "verify": "VerifyField",
+        "reason": "a read-only rendered value (lightning-formatted-* / slds-form-element__static) -- there is nothing to fill. The read form is qforce_lite.get_field_value; VerifyField is its exportable assert rung."
+      },
+      "record_view_form": {
+        "fill": null,
+        "verify": null,
+        "reason": "a form CONTAINER, not a control -- its output fields are the controls, and each carries its own routing."
+      },
+      "record_edit_form": {
+        "fill": null,
+        "verify": null,
+        "reason": "a form CONTAINER, not a control -- its input fields are the controls, and each carries its own routing."
+      },
+      "datatable": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "lightning-datatable / lightning-tree-grid resolves by real row/col coordinates; UseTable the grid first."
+      },
+      "native_table": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "a real <table>: same row/col addressing as a datatable."
+      },
+      "table_cell": {
+        "fill": "Set Table Cell",
+        "verify": "Verify Table Cell Where",
+        "act": "Click Table Cell",
+        "why": "a cell is addressed by its row key and column label, never by its own text -- real Salesforce rows repeat identical text."
+      },
+      "column_header": {
+        "fill": null,
+        "verify": null,
+        "reason": "a column header is an ARGUMENT to the table rungs (the `col` of Get Table Cell Where / Set Table Cell), not a control driven on its own. Clicking one sorts the grid -- that is ClickText on the header label, and it is a navigation gesture, not a field."
+      },
+      "tree": {
+        "fill": null,
+        "verify": null,
+        "act": "Click Tree Item",
+        "reason": "a tree item is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert. Click Tree Item is its actuate rung: it reads aria-expanded / aria-selected back and raises rather than passing on a click that did not take."
+      },
+      "console-subtab": {
+        "fill": null,
+        "verify": null,
+        "act": "Open Console Subtab",
+        "reason": "a console workspace tab is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+      },
+      "console-tertiary-tab": {
+        "fill": null,
+        "verify": null,
+        "act": "Open Tertiary Tab",
+        "reason": "a tertiary tab inside a console subtab is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+      },
+      "utility-bar-item": {
+        "fill": null,
+        "verify": null,
+        "act": "Open Utility Item",
+        "reason": "a utility-bar item is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+      },
+      "split-view-row": {
+        "fill": null,
+        "verify": null,
+        "act": "Select Split View Row",
+        "reason": "a split-view row is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+      },
+      "button": {
+        "fill": null,
+        "verify": null,
+        "reason": "a button is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+      },
+      "link": {
+        "fill": null,
+        "verify": null,
+        "reason": "a link is actuated by a click rung (ClickText / ClickItem, both already offered as locator options); it holds no value to fill or assert."
+      },
+      "pill": {
+        "fill": null,
+        "verify": null,
+        "reason": "a pill displays a chosen value and is removed by its own remove button; it is set through the control that produced it (a lookup or a multi-select), never filled directly."
+      },
+      "badge": {
+        "fill": null,
+        "verify": null,
+        "reason": "a badge is rendered status text -- assert it with VerifyText on the page, never as a field value."
+      },
+      "icon": {
+        "fill": null,
+        "verify": null,
+        "reason": "an icon carries no value; the control it decorates is the target."
+      },
+      "slider": {
+        "fill": null,
+        "verify": null,
+        "reason": "no slider keyword has been proven live on any org we own -- a drag gesture has no read-back rung yet. COULD-NOT-CHECK, not a guess."
+      },
+      "iframe": {
+        "fill": null,
+        "verify": null,
+        "reason": "an iframe is a FRAME, not a control. QWeb auto-penetrates frames, so drive the controls inside it; frame keywords exist only to de-duplicate."
+      },
+      "custom_component": {
+        "fill": null,
+        "verify": null,
+        "reason": "an unrecognised custom element has no proven keyword. Check SHAPES-GUIDE.md for a newer match, or add its tag to customComponentTagKeywords once a keyword is proven -- never assume ClickText/ClickItem drive it correctly."
+      },
+      "omniscript_element": {
+        "fill": null,
+        "verify": null,
+        "reason": "the OmniScript element WRAPPER, not the control inside it; the omni-* families carry the real rungs."
+      },
+      "_default": {
+        "fill": null,
+        "verify": null,
+        "reason": "no keywordRouting row is declared for this family -- add one once a keyword is proven for the shape. Stated absence, never silence."
+      }
+    },
+    "metadataTypes": {
+      "string": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "textarea": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "email": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "phone": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "url": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "int": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "long": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "double": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "currency": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "percent": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField"
+      },
+      "date": {
+        "fill": "Type Text Clearing",
+        "verify": "VerifyField",
+        "why": "predict.type_to_keyword('date') is 'certain' on type_text_clearing -- a date field is typed as MM/DD/YYYY. Set Datetime is the DOM-family answer for a datepicker that also renders a time sibling, which is a different question from the describe type."
+      },
+      "datetime": {
+        "fill": "Set Datetime",
+        "verify": "VerifyField",
+        "why": "a datetime is a COMPOUND control -- one database value, a date input plus a 15-minute time combobox under one legend."
+      },
+      "picklist": {
+        "fill": "PickList",
+        "verify": "VerifyField"
+      },
+      "multipicklist": {
+        "fill": "Multi Pick List",
+        "verify": "VerifyField",
+        "why": "the dual-listbox shape; never PickList."
+      },
+      "combobox": {
+        "fill": "PickList",
+        "verify": "VerifyField",
+        "why": "describe type `combobox` is a picklist that also accepts free text; pick_list drives the listbox half. The free-text half has no keyword on any org we own."
+      },
+      "boolean": {
+        "fill": "ClickCheckbox",
+        "verify": "Verify Field State"
+      },
+      "encryptedstring": {
+        "fill": "Type Text Clearing",
+        "verify": null,
+        "reason": "the platform returns the MASKED value to describe, SOQL and the rendered form for anyone without View Encrypted Data, so no read-back can prove what landed -- the fill is routed, the assert is COULD-NOT-CHECK."
+      },
+      "address": {
+        "fill": "Set Address",
+        "verify": null,
+        "reason": "a compound address is several sub-fields under one legend; there is no single-value assert rung for it."
+      },
+      "location": {
+        "fill": "Set Geolocation",
+        "verify": null,
+        "reason": "geolocation persistence after Save is could-not-check (BACKLOG-61-EVIDENCE.md SS3); the fill mechanism is live-measured."
+      },
+      "time": {
+        "fill": null,
+        "verify": null,
+        "reason": "no time-only keyword exists. Set Datetime drives a DATE input plus a time combobox, and routing a time field to it would type into a date box that is not there -- predict.type_to_keyword('time') states the same gap."
+      },
+      "base64": {
+        "fill": null,
+        "verify": null,
+        "reason": "a Blob body is never an editable control on a create/edit form -- the platform renders no input for it. A gap by design, not a missing rung."
+      },
+      "id": {
+        "fill": null,
+        "verify": null,
+        "reason": "an Id is never an editable control on a create/edit form."
+      },
+      "reference": {
+        "fill": "ComboBox",
+        "verify": "VerifyField",
+        "why": "the PLAIN-lookup case only. predict.type_to_keyword splits `reference` by API NAME through chains.REFERENCE_SUBKINDS (OwnerId / CreatedById / LastModifiedById / RecordTypeId are not plain lookups and route nowhere); a DOM template has no API name, so this row is allowlisted in the router contract test rather than pretending to make that split."
+      }
+    }
+  },
+  "host": "salesforce-lightning",
+  "description": "Extracted 2026-09-05 from tools/interop/resources/pythonDom/dom_config.py's hard-coded constants. This is the DEFAULT template -- DomConfiguration() loads this file when present and falls back to the identical hard-coded values baked into dom_config.py when it is missing. Byte-equivalence with pre-refactor parser output on every capture under docs/dom-captures/** is required (tools/recorder/tests/templates/test_byte_equivalence.py). 2026-09-07 (iframe descent, docs/recorder/COPADO-GAPS-2026-09-07.md, REVIEW-BRIEF-NEXT.md row C4c): targetTags += 'iframe', promoted from v2 (salesforce-lightning.v2.json) where it was already measured a clean win (+6 elements across 22 captures, all 4 VF-iframe census misses fixed, 2 harmless duplicates, zero noise regression) -- promoting it to v1 is required for the iframe shell tag to classify at all under the default template, which the iframe-descent fix (component_classifier.py's 'iframe' family, iframe_descent.py) depends on. Goldens regenerated in the same commit (`capture_catalogue.py --write`).",
+  "frameworkMarkers": {
+    "lightning": [
+      "lightning-",
+      "lwc-",
+      "data-aura-rendered-by",
+      "data-aura-class",
+      "slds-"
+    ],
+    "note": "Salesforce Lightning is synthetic shadow DOM -- see docs/specs/sf-dom-patterns.md. CONSULTED BY DomConfiguration since interop T18 (2026-09-07): dom_config.select_template matches these substrings against the page's own markup when no template param and no GARZAI_DOM_TEMPLATE are given, and selects web-generic.json when none of them appear. The bare 'c-' marker that used to be in this list was REMOVED -- as a raw substring it matches ordinary class names on any site, so it would have made every page look like Lightning. 'lwc-'/'slds-' are v3's own proven markers (salesforce-lightning.v3.json), kept identical on purpose so the two lineages detect the same pages."
+  },
+  "noiseTags": [
+    "lightning-icon",
+    "lightning-badge",
+    "lightning-pill",
+    "lightning-spinner",
+    "lightning-progress-indicator",
+    "lightning-helptext",
+    "lightning-formatted-text",
+    "lightning-formatted-url",
+    "lightning-formatted-date-time",
+    "lightning-formatted-number",
+    "lightning-formatted-phone",
+    "lightning-formatted-email",
+    "lightning-formatted-rich-text",
+    "lightning-primitive-icon",
+    "lightning-avatar",
+    "lightning-primitive-cell-types",
+    "lightning-primitive-datatable-iedbug",
+    "lightning-message-context-consumer",
+    "lightning-message-context-provider",
+    "lightning-relative-date-time",
+    "lightning-lookup-data-source",
+    "lightning-lookup-metadata-service"
+  ],
+  "noiseTagPatterns": [
+    "^lightning-primitive-"
+  ],
+  "noiseRoles": [
+    "presentation",
+    "none",
+    "separator",
+    "progressbar",
+    "status",
+    "log",
+    "alert",
+    "tooltip"
+  ],
+  "noiseClassFragments": [
+    "slds-assistive-text",
+    "slds-hide",
+    "slds-is-collapsed",
+    "forceRecordCoverPhoto",
+    "slds-col--padded",
+    "slds-resize-handle",
+    "slds-drag-handle",
+    "slds-th__action-icon"
+  ],
+  "shadowWrapperTags": [
+    "lightning-lookup",
+    "lightning-lookup-desktop",
+    "lightning-lookup-address",
+    "lightning-grouped-combobox",
+    "lightning-base-combobox",
+    "lightning-datepicker",
+    "lightning-input",
+    "lightning-textarea",
+    "lightning-combobox",
+    "lightning-picklist",
+    "lightning-input-address",
+    "lightning-input-name",
+    "lightning-input-field",
+    "lightning-input-rich-text",
+    "lightning-input-location",
+    "lightning-button",
+    "lightning-button-icon",
+    "lightning-button-menu",
+    "lightning-button-icon-stateful",
+    "lightning-button-group",
+    "lightning-button-stateful",
+    "lightning-popup",
+    "lst-list-view-manager-pin-button",
+    "lst-list-view-manager-settings-menu",
+    "lst-list-view-manager-display-switcher",
+    "lst-list-view-picker",
+    "lightning-layout",
+    "lightning-layout-item",
+    "lightning-card",
+    "lightning-accordion",
+    "lightning-accordion-section",
+    "lightning-tab",
+    "lightning-tabset",
+    "lightning-tree",
+    "lightning-tree-grid",
+    "lightning-progress-indicator",
+    "lightning-progress-step"
+  ],
+  "skipElementTypes": [
+    "picklist_option",
+    "internal",
+    "structural"
+  ],
+  "systemTextBlacklist": [
+    "Skip to",
+    "Sorry to interrupt",
+    "CSS Error",
+    "Reload Page",
+    "dismissError",
+    "auraErrorReload",
+    "Skip to Navigation",
+    "Skip to Main Content",
+    "Accessibility Mode",
+    "Loading...",
+    "Please wait",
+    "Processing"
+  ],
+  "containerPatterns": [
+    "^c-.*-(builder|wizard|container|wrapper|layout|page|manager|configurator)$",
+    "^flexipage-",
+    "^lightning-(layout|card|accordion|tab|tabset)",
+    "^(div|section|article|main|aside|nav|header|footer|form)$"
+  ],
+  "containerChildThreshold": 3,
+  "containerTextThreshold": 200,
+  "wildcardInteractiveTagPrefixes": [
+    "lightning-",
+    "c-"
+  ],
+  "gridRoleValues": [
+    "grid",
+    "treegrid"
+  ],
+  "gridDescendantEmission": {
+    "_why": "interop T16 2026-09-07. A lightning-tree-grid's descendants are swallowed so a data grid's cell text is not reported twice (once as the container's compiled rows, once loose). T14 measured what that costs: 0 of 18 hand-labelled controls in the Zoo tree grid -- no column header, no cell, no caret, no column-action button. These rules say which descendants come back out and where each one's label comes from. `compile: true` runs the normal compiler, so a button/link keeps its real family and its qforce_hints; the other rules synthesise a labelled, hintless element (a cell is not a control to click). Read by DomConfiguration.GRID_DESCENDANT_EMISSION -> capture_orchestration._emit_grid_descendants.",
+    "containerTags": [
+      "lightning-tree-grid",
+      "lightning-datatable"
+    ],
+    "rules": [
+      {
+        "compile": true,
+        "tags": [
+          "button",
+          "a"
+        ]
+      },
+      {
+        "family": "column_header",
+        "tags": [
+          "th"
+        ],
+        "roles": [
+          "columnheader"
+        ],
+        "labelFrom": [
+          "aria-label",
+          "title"
+        ]
+      },
+      {
+        "family": "table_cell",
+        "tags": [
+          "th",
+          "td"
+        ],
+        "roles": [
+          "rowheader",
+          "gridcell"
+        ],
+        "labelFrom": [
+          "data-label",
+          "data-cell-value",
+          "text"
+        ],
+        "valueFrom": [
+          "text",
+          "data-cell-value"
+        ],
+        "skipIfDescendantTags": [
+          "a"
+        ],
+        "_why_data_label": "2026-09-11 (hc-provider-contract audit): a grid cell was labelled with its VALUE ('Draft', '6/23/2026, 9:00 AM'); a cell's NAME is its column (@data-label on a lightning-datatable cell, the column header on an Aura grid) and its text is the value -- exactly the {column} UseTable / GetCellText needs; the value is kept on element_details.value"
+      }
+    ],
+    "_why_2026_09_10": "six of seventeen industry-page audits: lightning-datatable (related lists), Aura table[role=grid] (list views, console Home 'Today's Tasks', action-plan items) swallowed 60-90 controls per page -- row links, Preview, row-action menus, Mark Complete, checkboxes, sort headers -- and produced one unlocatable native_table row with calls: []. containerRoles matches the container by ROLE (gridRoleValues already names them) so the same rules that recovered the Zoo tree grid apply.",
+    "containerRoles": [
+      "grid",
+      "treegrid"
+    ],
+    "_why_2026_09_11": "six of seventeen industry-page audits (2026-09-10): lightning-datatable related lists and Aura table[role=grid] list views / console Home task lists / action-plan items swallowed 60-90 controls per page (row links, Preview, row-action menus, Mark Complete, checkboxes, sort headers) and produced one unlocatable native_table row with calls: []. containerRoles matches the container by ROLE. Landed 2026-09-11 once the anchor accounting stopped pairing the Click Table Cell placeholder key with anchor texts (it had made every row's own name non-unique the moment the row link was emitted)."
+  },
+  "recordLayoutFieldRules": {
+    "_why": "Phase 1B 2026-09-09 (docs/proposals/challenge-2026-09-08/C1-dom-extraction.md): a record-DETAIL page's per-field container (records-record-layout-item, added to targetTags below) classifies as 'output_field' ONLY when a descendant carries a test-id__output-root marker class (the read-mode shape) -- read by component_classifier.ComponentClassifier._record_layout_field_family, never a tag-name literal. An edit-mode records-record-layout-item (no such marker) classifies 'structural' instead (dropped, exactly as it was before this key existed) -- its real editable control is a separate tag, unaffected.",
+    "containerTags": [
+      "records-record-layout-item",
+      "records-highlights-details-item",
+      "runtime_omnistudio_common-output-field"
+    ],
+    "readModeMarkerClassFragments": [
+      "test-id__output-root",
+      "slds-text-title",
+      "field-value"
+    ],
+    "family": "output_field",
+    "labelClassFragmentsByTag": {
+      "records-highlights-details-item": [
+        "slds-text-title"
+      ],
+      "runtime_omnistudio_common-output-field": [
+        "slds-form-element__label"
+      ]
+    },
+    "_why_flexcard": "2026-09-11 (fsc-person-account + fsc-business-account audits): an OmniStudio FlexCard read field -- runtime_omnistudio_common-output-field with <label class='slds-form-element__label'> and a div.field-value -- produced 0 rows, so the Insurance Agent Console account pages had NO read surface (26 and 14 rendered values invisible to GetFieldValue). Same rule as the record layout item: the container classifies output_field when a descendant carries a read-mode marker class.",
+    "_why_highlights": "2026-09-10 (seven of seventeen industry-page audits): the highlights panel's compact-layout fields -- records-highlights-details-item with <p class='slds-text-title' title='Priority'> and the value slotted in (lightning-formatted-text) -- produced NO row on any record page; Priority/Status/Case Number, Premium Amount, Financial Account Number, Account Owner were invisible to GetFieldValue/VerifyField. The label class fragment is per tag so slds-text-title (a heading class elsewhere) labels nothing but this container."
+  },
+  "structuralContainerRules": [
+    {
+      "family": "dual_listbox",
+      "containerClassFragments": [
+        "slds-dueling-list"
+      ],
+      "requiredDescendantRole": "listbox",
+      "minDescendantRoleCount": 2,
+      "labelFromPrecedingClassFragment": "slds-form-element__label",
+      "skipIfInsideTags": [
+        "lightning-dual-listbox"
+      ],
+      "_why": "2026-09-10 (user, Zoo_Nightmare_Inputs 'Entitled Services'): a hand-built SLDS dueling list has no lightning-dual-listbox host -- two ul[role=listbox] under Available/Selected with unnamed move controls between them -- and produced NO row. Read by capture_orchestration (candidate pass) and component_classifier._structural_container_family; the family routes to the same dual_listbox keywords as the base component."
+    }
+  ],
+  "targetTags": [
+    "button",
+    "a",
+    "input",
+    "select",
+    "textarea",
+    "runtime_omnistudio_common-output-field",
+    "lightning-button",
+    "lightning-button-icon",
+    "lightning-button-menu",
+    "lightning-input",
+    "lightning-combobox",
+    "lightning-dual-listbox",
+    "lightning-checkbox",
+    "lightning-checkbox-group",
+    "lightning-radio-group",
+    "lightning-slider",
+    "lightning-toggle",
+    "lightning-textarea",
+    "lightning-pill",
+    "lightning-badge",
+    "lightning-record-edit-form",
+    "lightning-record-view-form",
+    "lightning-input-field",
+    "lightning-output-field",
+    "c-omniscript",
+    "c-omni-input",
+    "c-omni-select",
+    "c-omni-button",
+    "iframe",
+    "records-record-layout-item",
+    "records-highlights-details-item"
+  ],
+  "interactiveRoles": [
+    "button",
+    "link",
+    "checkbox",
+    "radio",
+    "tab",
+    "menuitem",
+    "option",
+    "switch",
+    "textbox",
+    "gridcell",
+    "columnheader",
+    "rowheader",
+    "combobox"
+  ],
+  "note_targetTagsAndInteractiveRoles": "F2 (2026-09-05): moved from local variables inside tools/interop/resources/pythonDom/capture_orchestration.py's parse_elements_from_html onto DomConfiguration so they are template-driven. Values here are verbatim what v1 hard-coded before the move -- byte-equivalence is unaffected. See salesforce-lightning.v2.json for the widened lists that fix the label/option/iframe/treeitem/tabpanel misses found by tools/recorder/template.py audit (docs/recorder/TEMPLATES.md section 7).",
+  "stableAttributeAllowlist": [
+    "aria-label",
+    "data-target-selection-name",
+    "data-tabid",
+    "name",
+    "placeholder",
+    "title",
+    "role",
+    "data-field-type",
+    "data-id",
+    "data-test-id",
+    "readonly",
+    "disabled",
+    "aria-disabled"
+  ],
+  "unstableAttributePatterns": [
+    "^data-aura-rendered-by$",
+    "^\\d+:\\d+$",
+    "^[0-9a-f]{6,}$"
+  ],
+  "note_dropdownAndRowControlSignatures": "DROPDOWN_SIGNATURES and ROW_CONTROL_SIGNATURES in dom_config.py contain Python lambdas (attribute predicates) and are NOT JSON-serializable -- they stay hard-coded in dom_config.py itself, unaffected by from_template(). Everything else that was a plain constant is represented above.",
+  "note_labelPolicy": "interop T10 2026-09-07: the label POLICY layer, read by tools/interop/resources/pythonDom/element_compiler.py through DomConfiguration. labelPrecedence names are the label_source values the compiler emits; the first rung that resolves wins. Omit a key here and the compiler falls back to its own class attribute.",
+  "note_hintOrderByLabelSource": "interop T17 2026-09-07: per-label_source RUNG ORDER for qforce_hints.locator_options, read by DomElementCompiler._get_qforce_hints through DomConfiguration. A label_source key's list is the keyword priority order used ONLY when the label string is not also present in the element's own rendered text (identification.rendered_text) -- title_attr/aria_label are ACCESSIBLE NAMES, not rendered text, so ClickText (a rendered-text search) is the wrong first rung for them; ClickItem (attribute-value match) goes first. Finding: 06-setup-permission-sets.html's 41 'Expand' carets (button title=\"Expand\", label_source title_attr) offered ClickText first. A label_source omitted here keeps the hints in their generation order.",
+  "hintOrderByLabelSource": {
+    "title_attr": [
+      "ClickItem",
+      "ClickText"
+    ],
+    "aria_label": [
+      "ClickItem",
+      "ClickText"
+    ]
+  },
+  "labelPrecedence": [
+    "inner_text",
+    "aria_label",
+    "standard_label",
+    "aria_labelledby",
+    "form_element_label",
+    "placeholder",
+    "title_attr",
+    "sibling_label_text",
+    "label_span",
+    "assistive_text"
+  ],
+  "labelClassFragments": [
+    "slds-form-element__label",
+    "slds-radio__label",
+    "slds-checkbox__label"
+  ],
+  "descriptionClassFragments": [
+    "changeRecordTypeItemDescription",
+    "changeRecordTypeLabel",
+    "slds-form-element__help",
+    "slds-form-element__static",
+    "helpText",
+    "fieldDescription",
+    "record-type-description",
+    "option-description",
+    "item-description"
+  ],
+  "requiredMarkerSelectors": [
+    {
+      "aria-hidden": "true"
+    }
+  ],
+  "familyKeywords": {
+    "output_field": {
+      "keyword": "GetFieldValue",
+      "call_template": "get_field_value(\"{locator}\")  # read-back; verify_field(\"{locator}\", \"<expected>\") to assert",
+      "why": "output_field is a read-only rendered value (lightning-formatted-*/slds-form-element__static) -- qforce_lite.get_field_value / qforce_lite.verify_field are the real read-back getters (GetFieldValue/VerifyField), never a click/type keyword.",
+      "caveats": [
+        "Confirm this is the field's real label, not its currently displayed value -- get_field_value resolves by label text, the same chain TypeText uses."
+      ]
+    },
+    "datatable": {
+      "keyword": "Click Table Cell",
+      "call_template": "click_table_cell(row=<N>, col=\"<column label>\")  # UseTable first",
+      "why": "lightning-datatable/lightning-tree-grid resolves by real row/col coordinates (garzai_tables.robot: Click Table Cell / Get Table Cell Where / Table Row Count) -- the same structural mechanism the in_grid branch above already uses for individual cells; a table-LEVEL hint was previously never offered at all.",
+      "caveats": [
+        "Anchor/UseTable the specific grid first if more than one renders on the page."
+      ]
+    },
+    "radio": {
+      "keyword": "ClickCheckbox",
+      "call_template": "click_checkbox(\"{locator}\", \"on\")",
+      "why": "qforce_lite.click_checkbox re-reads the input's checked property after the click -- the same faux-span-safe, state-verifying mechanism already proven for Lightning checkbox inputs, real for radio inputs too (both are VALUE_CAPTURE_TYPES). P1 scorecard measured 48/48 radio controls surfacing a plain click keyword (ClickText/ClickItem, no read-back) as their FIRST hint before this branch existed.",
+      "caveats": [
+        "Omni/OmniStudio radio groups use the dedicated 'Omni Radio' keyword instead (no label[for], value-attribute only) -- this hint is for a plain Lightning/LEX radio input."
+      ]
+    },
+    "tree": {
+      "keyword": "Click Tree Item",
+      "call_template": "click_tree_item(\"{locator}\")  # expand=True for a group's chevron instead of a leaf's own link",
+      "why": "Setup's navigation tree (role='tree'/li[role='treeitem'], the onesetupNavTreeNode markup) blocked a Setup page in all 5 orgs app_scan_report.py scanned (stream B7, 2026-09-07) -- no keyword ever routed this family. tools/qforce-lite/keywords_tree.py's click_tree_item() reads back aria-expanded/aria-selected through confirm.py and raises rather than passing on a click that did not take.",
+      "caveats": [
+        "A LEAF item's own <a> navigates on click; a PARENT/group item's <a> is href='javascript:void(0)' and only its sibling button[title='Expand'] does anything -- pass expand=True for a parent, never for a leaf (click_tree_item raises TreeItemNotActionable if the two are mismatched)."
+      ]
+    },
+    "console-subtab": {
+      "keyword": "Open Console Subtab",
+      "call_template": "open_console_subtab(\"{locator}\")",
+      "why": "A Lightning CONSOLE workspace tab is a.tabHeader.slds-context-bar__label-action[role=tab][data-tabid] whose label lives in @title as '<Record Name> | <Object Label>'. keywords_console.open_console_subtab reads BOTH aria-selected on the re-queried tab AND the landed URL against the tab's own href -- a console tab can highlight while the content pane stays on the previous record, so aria-selected alone is a vacuous pass. ClickText is the discouraged fallback: it carries no read-back and the record name also renders in the header and in every split-view row.",
+      "caveats": [
+        "The tab strip carries wsTabBarHidden while only ONE workspace tab is open -- the <a role=tab> exists and is clickable but is not visible, so never gate this on visibility."
+      ]
+    },
+    "console-tertiary-tab": {
+      "keyword": "Open Tertiary Tab",
+      "call_template": "open_tertiary_tab(\"{locator}\", record_id=\"<18-char id>\", sobject=\"<Object>\", relationship=\"<RelName>\")  # URL-first",
+      "why": "A tertiary tab inside a console subtab is the SAME element type as a workspace tab and differs only by class (slds-tabs_default__link vs slds-context-bar__label-action); the two strips are siblings under .oneConsoleTabset, so scoping by ancestry does not work. URL-first is preferred where the related tab has a direct URL (/lightning/r/<obj>/<id>/related/<rel>/view, CLAUDE.md's standing directive); the click form is the fallback.",
+      "caveats": [
+        "An ordinary record-page tabset link also carries slds-tabs_default__link but carries neither tabHeader nor data-tabid -- that pair is the discriminator.",
+        "Navigating to the related URL from inside a console sometimes opens a SIBLING WORKSPACE tab rather than a tertiary one; open_tertiary_tab returns level='tertiary'|'workspace' and never equates the two."
+      ]
+    },
+    "utility-bar-item": {
+      "keyword": "Open Utility Item",
+      "call_template": "open_utility_item(\"{locator}\")",
+      "why": "The console utility-bar button's aria-label is the EMPTY STRING, so an aria-label locator finds nothing and an aria-label read-back compares '' to '' and passes vacuously. The visible label exists only in span.label.bBody, and keywords_console.open_utility_item reads state back through aria-expanded, then a .oneUtilityBarPanel with aria-hidden='false', then RAISES UtilityStateUnreadable (COULD-NOT-CHECK) rather than passing.",
+      "caveats": [
+        "An app can render the utility container with no items at all -- that is COULD-NOT-CHECK, not a locator bug."
+      ]
+    },
+    "split-view-row": {
+      "keyword": "Select Split View Row",
+      "call_template": "select_split_view_row(\"{locator}\")",
+      "why": "A console split-view row is li[role='row'].slds-split-view__list-item containing a.slds-split-view__list-item-action[data-recordid] -- NOT role='option', which matches ZERO elements on a real split view (measured). keywords_console.select_split_view_row proves the click by comparing that data-recordid with the id in the landed URL: 'a record opened' is not 'THIS record opened'.",
+      "caveats": [
+        "The selected-class half is tri-state: where the org renders neither slds-is-selected nor aria-selected on the row, the keyword reports selected_state='could-not-check' instead of assuming it."
+      ]
+    },
+    "dropdown_select": {
+      "keyword": "DropDown",
+      "call_template": "drop_down(\"{locator}\", \"<option text>\")",
+      "why": "A native <select>: real QWeb DropDown resolves it by its label and selects the option by text; VerifySelectedOption reads it back. PickList (a lightning-combobox trigger keyed on the label) does not select a native <select> -- measured 2026-09-10.",
+      "caveats": [
+        "When the label is a cousin of the <select> (no label[for]), DropDown by label still resolved on Zoo_Nightmare_Inputs; the anchored xpath (unique heading -> following::select) is the backup."
+      ]
+    },
+    "omni_radio": {
+      "keyword": "Omni Radio",
+      "call_template": "omni_radio(\"<data-omni-key of the OmniScript field>\", \"{locator}\")",
+      "why": "An OmniScript radio group has no label[for] -- qforce_lite.keywords_omni.omni_radio resolves the input by its VALUE attribute inside the omni host and re-reads which values ended up checked (_confirm_readback), which is the only mechanism proven for this shape. ClickCheckbox's faux-span pattern is for a plain Lightning/LEX radio input, as its own caveat says.",
+      "caveats": [
+        "The first argument is the OmniScript field's data-omni-key, not the visible label -- read it off the c-omni-* host, never guess it.",
+        "{locator} must be the radio's VALUE attribute; on this shape the rendered label and the value coincide, which is not guaranteed."
+      ]
+    }
+  },
+  "note_familyKeywords": "family -> the GarzAI keyword hint _get_qforce_hints offers for it (dom_config.py FAMILY_KEYWORDS, element_compiler._hints_for_family). THIS KEY OVERRIDES THE CLASS DEFAULT WHOLESALE -- it must always be the full union, never just the newest families; writing only the four console families here wiped T12's five and turned tests/templates/test_family_keyword_hints_2026_09_07.py red (stream W8, 2026-09-07).",
+  "containerAnchors": {
+    "_why": "interop T20 2026-09-07 (user rule): every control inside a row / card / fieldset carries the container's anchor. NARROWED by stream 1C 2026-09-08 (D4 narrowed, docs/DECISIONS.md; evidence docs/recorder/evidence/anchor-live-proof-2026-09-08.md + docs/proposals/challenge-2026-09-08/C5-rf-qweb-vs-xpath.md Challenge 3): T20's 'every control that CAN have one' measured out to 2,727/3,115 self-anchors and 8,323 anchors over the 144-capture corpus on a control whose label was already unique on the page (group_size 1) -- pure cost, per CLAUDE.md's own 'a control that occurs once needs none'. `onlyWhenRepeated` (default true) gates anchor emission on group_size > 1; `own_label` is retired as a rung entirely (a repeated control never anchors on itself -- B_SELF_UNIQUE). `scopes` declares how a container is recognised and where its anchor text comes from; `anchoredKeywords` is the set of hint keywords whose real QWeb signature takes anchor=. Set enabled:false to restore the pre-T20 output byte for byte; set onlyWhenRepeated:false to restore the pre-1C 'anchor every control' behaviour.",
+    "enabled": true,
+    "onlyWhenRepeated": true,
+    "maxAncestorDepth": 12,
+    "anchorMinLen": 2,
+    "anchorMaxLen": 60,
+    "scopes": [
+      {
+        "scope": "row",
+        "tags": [
+          "tr"
+        ],
+        "roles": [
+          "row"
+        ],
+        "anchorPreference": [
+          "data_label_cell",
+          "link_text",
+          "header_cell",
+          "cell_text"
+        ],
+        "dataLabelPreference": [
+          "Name",
+          "Account Name",
+          "Contact Name",
+          "Title",
+          "Subject",
+          "Case Number",
+          "Opportunity Name",
+          "Full Name",
+          "Label"
+        ]
+      },
+      {
+        "scope": "card",
+        "tags": [
+          "article"
+        ],
+        "classFragments": [
+          "slds-card",
+          "slds-box"
+        ],
+        "anchorPreference": [
+          "heading"
+        ],
+        "headingClassFragments": [
+          "slds-text-heading_",
+          "slds-text-title_caps",
+          "slds-card__header-title"
+        ],
+        "_why_headings": "2026-09-10 (Zoo_Nightmare_Inputs): the four milestone cards and the three pricing boxes are slds-box, not slds-card, and their headings are a span.slds-text-heading_small / p.slds-text-title_caps, not h1-h6 -- the review's xpath ladder anchored on exactly those texts (card headings x12, cousin headings x3 in raw_had)."
+      },
+      {
+        "scope": "fieldset",
+        "tags": [
+          "fieldset"
+        ],
+        "anchorPreference": [
+          "legend"
+        ]
+      },
+      {
+        "scope": "index",
+        "unconditional": true,
+        "_why": "stream A3 2026-09-08: the LAST rung. QWeb's `anchor` parameter is documented as 'Text near the element to be clicked or index' (QWeb/keywords/text.py:357,929, `anchor: str = \"1\"`), so a NUMERIC anchor is index mode. It names no container, so it is always available -- declared here rather than hard-coded so tools/guards/anchor_policy.py reads the same definition the compiler uses."
+      }
+    ],
+    "anchoredKeywords": [
+      "ClickItem",
+      "ClickText",
+      "ClickCheckbox",
+      "Click Table Cell",
+      "TypeText",
+      "ComboBox",
+      "Aura Lookup",
+      "GetFieldValue",
+      "Set Datetime"
+    ]
+  },
+  "dynamicValuePatterns": {
+    "_why": "interop T20 2026-09-07 (user finding). The ClickItem rung offered click_item(\"lgt-datatable-1-options-1\", tag=\"input\") as 'a stable attribute value (name)' -- a counter-shaped GENERATED name. The runtime-garbage test existed for `id` only (j_id..., input-142); every other attribute the hint ladder may cite bypassed it. These patterns are attribute-agnostic and every citing site asks the same question. False positives measured on docs/dom-captures (docs/recorder/evidence/interop-T20-2026-09-07.md): real API names (Zoo_Text__c, AccountId) are not all-lowercase-hyphen-counter shaped and do not match. wave-2 close stream P3 2026-09-07 (F9; L2-R27, L2-R05b, L2-R18): two more generated SHAPES the counter pattern cannot match, both measured as PRIMARY locators -- a 32-hex token (data-target-selection-name=\"181c7013df09423d8f755b49c067f6f3\" on the App Launcher button, whose own title=\"App Launcher\" sat unused) and an epoch-suffixed name (vfFrameId_1788626362477, a per-render Visualforce frame name at anchored_unique confidence). 88 hex + 21 vfFrameId_ offenders over the frozen 112-capture corpus before, 0 after, 0 real API names lost (docs/recorder/evidence/wave2-close-P3-2026-09-07.md).",
+    "attributes": [
+      "id",
+      "name",
+      "for",
+      "aria-controls",
+      "aria-labelledby",
+      "data-target-selection-name",
+      "field-label",
+      "data-label",
+      "data-value"
+    ],
+    "prefixes": [
+      "help-message-",
+      "error-message-",
+      "label-",
+      "listbox-",
+      "dropdown-element-",
+      "tooltip-",
+      "slds-combobox-",
+      "slds-listbox-"
+    ],
+    "patterns": [
+      "^\\d+:\\d+;[a-z]$",
+      "(^|:)j_id\\d+(:|$)",
+      "^[a-z][a-z0-9]*(-[a-z0-9]+)*-\\d+$",
+      "^[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*-\\d+$",
+      "^ctab\\d+$",
+      "^tabOperation-",
+      "^tooltip-bubble_",
+      "^check-button-label-\\d+(-\\d+)*$",
+      "^[0-9a-f]{32}$",
+      "^[A-Za-z][A-Za-z0-9]*_\\d{10,}$"
+    ]
+  },
+  "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
+  "assistiveTextClassFragments": [
+    "slds-assistive-text",
+    "sr-only",
+    "visually-hidden",
+    "slds-hidden",
+    "tooltip-invisible",
+    "slds-indicator_unsaved"
+  ],
+  "note_assistiveTextClassFragments": "assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
+  "familyVariants": [
+    {
+      "family": "dropdown",
+      "variant": "dropdown_select",
+      "whenTagIs": [
+        "select"
+      ],
+      "match": "any"
+    },
+    {
+      "family": "link",
+      "variant": "console-subtab",
+      "whenAttrsMatch": {
+        "role": "^tab$",
+        "data-tabid": "^ctab\\d+$"
+      },
+      "match": "all",
+      "_why": "2026-09-11 (hc-um-case, hc-patient-console, fsc-household-group, fsc-financial-account audits): the console workspace tabs are a.tabHeader[role=tab][data-tabid=ctabN]; familyKeywords.console-subtab (Open Console Subtab, aria-selected + landed-URL read-back) existed and was never reached because no variant key could see attributes. 4-12 rows per console page."
+    },
+    {
+      "family": "radio",
+      "variant": "omni_radio",
+      "whenIdentificationMatches": {
+        "name": "^omni-radio-\\d+$"
+      },
+      "whenContextKeys": [
+        "omni_step"
+      ],
+      "match": "any"
+    }
+  ],
+  "note_familyVariants": "familyVariants: routes a control to a VARIANT entry of familyKeywords instead of the family default. Keys: family, variant, whenIdentificationMatches ({field: regex} over `identification`), whenContextKeys (context keys whose presence marks the variant), whenTagIs (the control's REAL html tag, 2026-09-10: a native <select> is the dropdown_select variant -> DropDown), match ('any' default, or 'all'). Added by the wave-2 review close (stream P1, 2026-09-07, finding F21): an OmniScript radio group was routed to ClickCheckbox against the 'radio' family's own caveat. The omni marker lives here as DATA.",
+  "labelSourceCaveats": {
+    "assistive_text": "This label came from SCREEN-READER-ONLY markup (an slds-assistive-text / sr-only span) -- nothing on this control is visible to a sighted person, so a rendered-text search may not find it. Confirm the click landed (read-back or the optical witness) before trusting this step."
+  },
+  "note_labelSourceCaveats": "labelSourceCaveats: a caveat appended to every hint whose locator IS the label, keyed by the labelPrecedence rung that produced that label. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11 / L2-R08): a hint built on assistive text must say so rather than read as if the string were visible on the page.",
+  "innerTextExcludedRoles": [
+    "combobox",
+    "listbox",
+    "textbox",
+    "searchbox",
+    "spinbutton",
+    "slider",
+    "option"
+  ],
+  "note_innerTextExcludedRoles": "innerTextExcludedRoles: roles whose own rendered text is the control's VALUE, not its NAME, so the `inner_text` rung (first, since the wave-2 review close) must never claim them. A Lightning picklist is <button role=\"combobox\" aria-label=\"Industry\">--None--</button>; without this key the field's label became '--None--'. Added by stream P1, 2026-09-07, after its own test caught the regression in the org map's metadata->control routing.",
+  "substringCollisions": {
+    "_why": "stream A3 2026-09-08 (user rule): partial_match=False was pinned ONLY on ClickText (clickTextExactWhenPrefixOf / clickTextCollisionSources). QWeb's default is SUBSTRING matching for every text-resolving keyword -- the partial_match kwarg is documented in the installed source at input_.py:215 (TypeText), checkbox.py:87 (ClickCheckbox), dropdown.py:111 (DropDown/PickList) and element.py:82 (ClickItem/ClickElement). So type_text(\"Name\", ...) on the Zoo pages also matches \"Name (secondary)\", while the EXACT repeat counter says group_size 1 and no anchor is emitted at all. A locator that is a proper substring of another rendered string on the same page therefore counts as REPEATED (so the anchor ladder runs and containerAnchors' index rung guarantees an anchor), and every keyword in partialMatchKeywords also carries partial_match=False. Measured over the frozen 112-capture corpus: 1378 bare hints on an accepting keyword -> 0. Set enabled:false to restore the pre-A3 output byte for byte.",
+    "enabled": true,
+    "sources": [
+      "label_text",
+      "rendered_text"
+    ],
+    "minLen": 2,
+    "partialMatchKeywords": [
+      "TypeText",
+      "ClickCheckbox",
+      "PickList",
+      "ComboBox",
+      "ClickItem",
+      "ClickText",
+      "ClickElement"
+    ]
+  },
+  "formElementLabel": {
+    "_why": "2026-09-10 (user, Zoo_Nightmare_Inputs): the standard SLDS form element -- <div class=slds-form-element><div class=slds-form-element__label-wrapper><label class=slds-form-element__label>X</label></div><div class=slds-form-element__control>...<input></div></div> -- carries NO for= and the label is neither an ancestor nor a descendant of the control, so standard_label/label_span never read it: every one of the page's 26 inputs, selects and checkboxes parsed with no label (review raw_had: cousin labels x19). The rung climbs to the nearest form-element ancestor and reads its label element; a form element with no label of its own (the Approved Budget from/to pair) climbs to the next one. An input INSIDE the label wrapper (the readonly helper beside Contract Term) is not the control and gets no label.",
+    "containerClassFragment": "slds-form-element",
+    "excludeContainerClassFragments": [
+      "slds-form-element__control",
+      "slds-form-element__label-wrapper",
+      "slds-form-element__help",
+      "slds-form-element__icon",
+      "slds-form-element__static",
+      "slds-form-element__row"
+    ],
+    "labelClassFragments": [
+      "slds-form-element__label",
+      "slds-checkbox__label",
+      "slds-radio__label"
+    ],
+    "targetInsideExcludedClassFragments": [
+      "slds-form-element__label-wrapper",
+      "slds-form-element__help-preview"
+    ],
+    "climbWhenUnlabelled": true,
+    "maxClimb": 8,
+    "containerRowsNeverClaimIt": true,
+    "targetTags": [
+      "input",
+      "select",
+      "textarea"
+    ],
+    "_why_targetTags": "2026-09-10 late (twelve industry-page audits): the rung labelled the inline-edit PENCIL with the field's name -- <button title=\"Edit Name\"> inside the field's slds-form-element read 'Name' (56 rows on 4 pages, measured CAUGHT-BUG live: click_text('Name', index=2) lands elsewhere) and every output field gained a phantom group_size 2. The rung is for the CONTROL the label names: a native form control, or a custom wrapper around exactly one. Buttons and links inside a form element keep their own title/text.",
+    "wrapperMayBeTarget": true
+  },
+  "note_stableAttributeAllowlist_readonly": "2026-09-10 (Zoo_Nightmare_Inputs / Data Template): readonly, disabled and aria-disabled are kept so a reader can tell the readonly helper beside 'Contract Term' and the auto-generated 'API Name' from a typeable field; they are state, never a locator.",
+  "note_assistiveTextClassFragments_2026_09_10": "tooltip-invisible (span[role=tooltip] behind an icon button, read as 'visible' inner_text on 4 industry pages) and slds-indicator_unsaved (the unsaved-changes '*': state, never a name) are screen-reader-only. Aura's camelCase assistiveText was tried and backed out the same night: it turned a datatable's fallback label into a bare '*' (the iframe label census); a Copado-page fix stream owns it.",
+  "labelMaxLen": 100,
+  "labelValueRejectPatterns": ["^\\[object \\w+\\]$"],
+  "chromeContainers": {
+    "_why": "2026-09-11 (fsc-action-plan, hc-um-case, hc-patient-console, fsc-household-group audits: 'the region is inverted' -- the console workspace tab strip, its Actions/Close buttons and the in-app guidance panel were region=page (20-32 rows per console page) while the record's highlights action bar and quick actions were region=chrome). Region is decided by the NEAREST ancestor that carries one of these class fragments or tag prefixes; page fragments and chrome fragments are both listed so the nearer one wins, never the outer.",
+    "chromeClassFragments": ["oneConsoleTabset", "navexConsoleTabset", "slds-context-bar", "appNavItems", "oneUtilityBar", "forceToastManager", "oneAppNavContainer", "slds-global-header", "nux-coachmark", "runtime_thp_learning", "oneHelpMenu", "forceSearchAssistantDesktop"],
+    "chromeTagPrefixes": ["one-appnav", "one-app-nav-bar", "one-app-launcher", "oneheader", "one-global", "forcesearch", "one-utility", "one-app-nav-bar-menu", "navexconsole"],
+    "pageClassFragments": ["flexipagePage", "forceHighlightsPanel", "oneRecordHomeFlexipage", "slds-card", "tabs__content", "slds-tabs_default__content", "forceRecordLayout", "oneRecordActionWrapper", "forceActionsContainer"],
+    "pageTagPrefixes": ["flexipage", "forcegenerated-", "records-", "force-record", "runtime_industries", "runtime_omnistudio", "vlocity"]
+  },
+  "note_labelValueRejectPatterns": "2026-09-11: lightning-datatable stamps data-cell-value with a stringified JS object for formatted cells (`[object Object]`, 22 cells on the health90 Contract page); a value matching one of these is never a label and the rung falls through to the cell's visible text.",
+  "note_labelMaxLen": "2026-09-10: the inner_text rung had a literal 60-char ceiling that returned NO label (and no call) for 74-86-char links on six industry pages; every rung now truncates at this length instead."
+}

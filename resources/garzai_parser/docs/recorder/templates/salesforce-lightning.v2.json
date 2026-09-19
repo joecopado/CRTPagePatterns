@@ -1,0 +1,401 @@
+{
+  "host": "salesforce-lightning.v2",
+  "description": "F2 (2026-09-05): v2 widens targetTags/interactiveRoles from evidence in tools/recorder/template.py audit (docs/recorder/TEMPLATES.md section 7), but ONLY the two additions that measured a clean win (recall up, noise flat) across all 22 saved captures: targetTags += iframe; interactiveRoles += tabpanel. Net across all 22 captures: kept 1172->1176 (+4), noise-kept 612->614 (+2), size +0.58%. label, option, and treeitem were tried and REJECTED after measurement -- each one raised noise faster than recall (see TEMPLATES.md section 7 for the exact before/after numbers on each). This is the coordinator's 'a v2 that raises recall by adding junk fails' bar, applied literally: everything that failed it was cut, not shipped with a caveat. v1 (salesforce-lightning.json) stays the default until the user opts in via DomConfiguration(template='salesforce-lightning.v2') or GARZAI_DOM_TEMPLATE=salesforce-lightning.v2.",
+  "frameworkMarkers": {
+    "lightning": [
+      "lightning-",
+      "lwc-",
+      "data-aura-rendered-by",
+      "data-aura-class",
+      "slds-"
+    ],
+    "note": "Salesforce Lightning is synthetic shadow DOM -- see docs/specs/sf-dom-patterns.md. CONSULTED BY DomConfiguration since interop T18 (2026-09-07): dom_config.select_template matches these substrings against the page's own markup when no template param and no GARZAI_DOM_TEMPLATE are given, and selects web-generic.json when none of them appear. The bare 'c-' marker was REMOVED -- as a raw substring it matches ordinary class names on any site."
+  },
+  "noiseTags": [
+    "lightning-icon",
+    "lightning-badge",
+    "lightning-pill",
+    "lightning-spinner",
+    "lightning-progress-indicator",
+    "lightning-helptext",
+    "lightning-formatted-text",
+    "lightning-formatted-url",
+    "lightning-formatted-date-time",
+    "lightning-formatted-number",
+    "lightning-formatted-phone",
+    "lightning-formatted-email",
+    "lightning-formatted-rich-text",
+    "lightning-primitive-icon",
+    "lightning-avatar",
+    "lightning-primitive-cell-types",
+    "lightning-primitive-datatable-iedbug",
+    "lightning-message-context-consumer",
+    "lightning-message-context-provider",
+    "lightning-relative-date-time"
+  ],
+  "noiseTagPatterns": [
+    "^lightning-primitive-"
+  ],
+  "noiseRoles": [
+    "presentation",
+    "none",
+    "separator",
+    "progressbar",
+    "status",
+    "log",
+    "alert",
+    "tooltip"
+  ],
+  "noiseClassFragments": [
+    "slds-assistive-text",
+    "slds-hide",
+    "slds-is-collapsed",
+    "forceRecordCoverPhoto",
+    "slds-col--padded",
+    "slds-resize-handle",
+    "slds-drag-handle",
+    "slds-th__action-icon"
+  ],
+  "shadowWrapperTags": [
+    "lightning-input",
+    "lightning-textarea",
+    "lightning-combobox",
+    "lightning-picklist",
+    "lightning-input-address",
+    "lightning-input-name",
+    "lightning-input-field",
+    "lightning-input-rich-text",
+    "lightning-input-location",
+    "lightning-button",
+    "lightning-button-icon",
+    "lightning-button-menu",
+    "lightning-button-icon-stateful",
+    "lightning-button-group",
+    "lightning-button-stateful",
+    "lightning-popup",
+    "lst-list-view-manager-pin-button",
+    "lst-list-view-manager-settings-menu",
+    "lst-list-view-manager-display-switcher",
+    "lst-list-view-picker",
+    "lightning-layout",
+    "lightning-layout-item",
+    "lightning-card",
+    "lightning-accordion",
+    "lightning-accordion-section",
+    "lightning-tab",
+    "lightning-tabset",
+    "lightning-tree",
+    "lightning-tree-grid",
+    "lightning-progress-indicator",
+    "lightning-progress-step"
+  ],
+  "skipElementTypes": [
+    "picklist_option"
+  ],
+  "systemTextBlacklist": [
+    "Skip to",
+    "Sorry to interrupt",
+    "CSS Error",
+    "Reload Page",
+    "dismissError",
+    "auraErrorReload",
+    "Skip to Navigation",
+    "Skip to Main Content",
+    "Accessibility Mode",
+    "Loading...",
+    "Please wait",
+    "Processing"
+  ],
+  "containerPatterns": [
+    "^c-.*-(builder|wizard|container|wrapper|layout|page|manager|configurator)$",
+    "^flexipage-",
+    "^lightning-(layout|card|accordion|tab|tabset)",
+    "^(div|section|article|main|aside|nav|header|footer|form)$"
+  ],
+  "containerChildThreshold": 3,
+  "containerTextThreshold": 200,
+  "wildcardInteractiveTagPrefixes": [
+    "lightning-",
+    "c-"
+  ],
+  "gridRoleValues": [
+    "grid",
+    "treegrid"
+  ],
+  "gridDescendantEmission": {
+    "_why": "interop T16 2026-09-07. A lightning-tree-grid's descendants are swallowed so a data grid's cell text is not reported twice (once as the container's compiled rows, once loose). T14 measured what that costs: 0 of 18 hand-labelled controls in the Zoo tree grid -- no column header, no cell, no caret, no column-action button. These rules say which descendants come back out and where each one's label comes from. `compile: true` runs the normal compiler, so a button/link keeps its real family and its qforce_hints; the other rules synthesise a labelled, hintless element (a cell is not a control to click). Read by DomConfiguration.GRID_DESCENDANT_EMISSION -> capture_orchestration._emit_grid_descendants.",
+    "containerTags": [
+      "lightning-tree-grid"
+    ],
+    "rules": [
+      {
+        "compile": true,
+        "tags": [
+          "button",
+          "a"
+        ]
+      },
+      {
+        "family": "column_header",
+        "tags": [
+          "th"
+        ],
+        "roles": [
+          "columnheader"
+        ],
+        "labelFrom": [
+          "aria-label",
+          "title"
+        ]
+      },
+      {
+        "family": "table_cell",
+        "tags": [
+          "th",
+          "td"
+        ],
+        "roles": [
+          "rowheader",
+          "gridcell"
+        ],
+        "labelFrom": [
+          "data-cell-value",
+          "text"
+        ],
+        "skipIfDescendantTags": [
+          "a"
+        ]
+      }
+    ]
+  },
+  "targetTags": [
+    "button",
+    "a",
+    "input",
+    "select",
+    "textarea",
+    "lightning-button",
+    "lightning-button-icon",
+    "lightning-button-menu",
+    "lightning-input",
+    "lightning-combobox",
+    "lightning-dual-listbox",
+    "lightning-checkbox",
+    "lightning-checkbox-group",
+    "lightning-radio-group",
+    "lightning-slider",
+    "lightning-toggle",
+    "lightning-textarea",
+    "lightning-pill",
+    "lightning-badge",
+    "lightning-record-edit-form",
+    "lightning-record-view-form",
+    "lightning-input-field",
+    "lightning-output-field",
+    "c-omniscript",
+    "c-omni-input",
+    "c-omni-select",
+    "c-omni-button",
+    "iframe"
+  ],
+  "interactiveRoles": [
+    "button",
+    "link",
+    "checkbox",
+    "radio",
+    "tab",
+    "menuitem",
+    "option",
+    "switch",
+    "textbox",
+    "gridcell",
+    "columnheader",
+    "rowheader",
+    "combobox",
+    "tabpanel"
+  ],
+  "note_targetTagsAndInteractiveRoles": "Added over v1 (measured clean wins only): targetTags += iframe (+6 elements across 22 captures, all 4 VF-iframe census misses fixed, 2 extra harmless duplicates); interactiveRoles += tabpanel (fixes the 6/6 role=tabpanel census misses). REJECTED after measurement: 'label' (+124 parsed elements for only +5 net kept -- most captured <label> elements don't uniquely identify against the census the way their associated input already did, so it was almost pure duplication); 'option' (native <option> values are already folded into the parent <select>'s metadata.available_options, element_compiler.py L737-747 -- adding the tag duplicated data already present); 'treeitem' (+56 <li role=treeitem> elements on setup-permission-sets.html alone for only +4 net kept there -- most Setup nav-tree items were already reachable by text match through the surrounding capture). See docs/recorder/TEMPLATES.md section 7 for the full before/after table.",
+  "stableAttributeAllowlist": [
+    "aria-label",
+    "data-target-selection-name",
+    "name",
+    "placeholder",
+    "title",
+    "role",
+    "data-field-type",
+    "data-id",
+    "data-test-id"
+  ],
+  "unstableAttributePatterns": [
+    "^data-aura-rendered-by$",
+    "^\\d+:\\d+$",
+    "^[0-9a-f]{6,}$"
+  ],
+  "note_dropdownAndRowControlSignatures": "DROPDOWN_SIGNATURES and ROW_CONTROL_SIGNATURES in dom_config.py contain Python lambdas (attribute predicates) and are NOT JSON-serializable -- they stay hard-coded in dom_config.py itself, unaffected by from_template(). Everything else that was a plain constant is represented above.",
+  "note_labelPolicy": "interop T10 2026-09-07: the label POLICY layer, read by tools/interop/resources/pythonDom/element_compiler.py through DomConfiguration. labelPrecedence names are the label_source values the compiler emits; the first rung that resolves wins. Omit a key here and the compiler falls back to its own class attribute.",
+  "note_hintOrderByLabelSource": "interop T17 2026-09-07: mirrors salesforce-lightning.json (see there for full rationale) -- ClickItem before ClickText for title_attr/aria_label labels unless the label is also the element's rendered text.",
+  "hintOrderByLabelSource": {
+    "title_attr": [
+      "ClickItem",
+      "ClickText"
+    ],
+    "aria_label": [
+      "ClickItem",
+      "ClickText"
+    ]
+  },
+  "labelPrecedence": [
+    "inner_text",
+    "aria_label",
+    "standard_label",
+    "aria_labelledby",
+    "placeholder",
+    "title_attr",
+    "sibling_label_text",
+    "label_span",
+    "assistive_text"
+  ],
+  "labelClassFragments": [
+    "slds-form-element__label",
+    "slds-radio__label",
+    "slds-checkbox__label"
+  ],
+  "descriptionClassFragments": [
+    "changeRecordTypeItemDescription",
+    "changeRecordTypeLabel",
+    "slds-form-element__help",
+    "slds-form-element__static",
+    "helpText",
+    "fieldDescription",
+    "record-type-description",
+    "option-description",
+    "item-description"
+  ],
+  "requiredMarkerSelectors": [
+    {
+      "aria-hidden": "true"
+    }
+  ],
+  "dynamicValuePatterns": {
+    "_why": "interop T20 2026-09-07 (user finding). The ClickItem rung offered click_item(\"lgt-datatable-1-options-1\", tag=\"input\") as 'a stable attribute value (name)' -- a counter-shaped GENERATED name. The runtime-garbage test existed for `id` only (j_id..., input-142); every other attribute the hint ladder may cite bypassed it. These patterns are attribute-agnostic and every citing site asks the same question. False positives measured on docs/dom-captures (docs/recorder/evidence/interop-T20-2026-09-07.md): real API names (Zoo_Text__c, AccountId) are not all-lowercase-hyphen-counter shaped and do not match. wave-2 close stream P3 2026-09-07 (F9; L2-R27, L2-R05b, L2-R18): two more generated SHAPES the counter pattern cannot match, both measured as PRIMARY locators -- a 32-hex token (data-target-selection-name=\"181c7013df09423d8f755b49c067f6f3\" on the App Launcher button, whose own title=\"App Launcher\" sat unused) and an epoch-suffixed name (vfFrameId_1788626362477, a per-render Visualforce frame name at anchored_unique confidence). 88 hex + 21 vfFrameId_ offenders over the frozen 112-capture corpus before, 0 after, 0 real API names lost (docs/recorder/evidence/wave2-close-P3-2026-09-07.md).",
+    "attributes": [
+      "id",
+      "name",
+      "for",
+      "aria-controls",
+      "aria-labelledby",
+      "data-target-selection-name",
+      "field-label",
+      "data-label",
+      "data-value"
+    ],
+    "prefixes": [
+      "help-message-",
+      "error-message-",
+      "label-",
+      "listbox-",
+      "dropdown-element-",
+      "tooltip-",
+      "slds-combobox-",
+      "slds-listbox-"
+    ],
+    "patterns": [
+      "^\\d+:\\d+;[a-z]$",
+      "(^|:)j_id\\d+(:|$)",
+      "^[a-z][a-z0-9]*(-[a-z0-9]+)*-\\d+$",
+      "^check-button-label-\\d+(-\\d+)*$",
+      "^[0-9a-f]{32}$",
+      "^[A-Za-z][A-Za-z0-9]*_\\d{10,}$"
+    ]
+  },
+  "containerAnchors": {
+    "_why": "interop T20 2026-09-07 (user rule, strengthened by the coordinator the same day): EVERY control inside a row / card / fieldset carries the container's anchor BY DEFAULT -- not only when identical duplicates are detected -- and every ClickItem carries an anchor whenever one exists, because a QWeb ClickItem without an anchor is 'quite dead' and with one is a strong relative resolver. `scopes` declares how a container is recognised and where its anchor text comes from; `anchoredKeywords` is the set of hint keywords whose real QWeb signature takes anchor=. Set enabled:false to restore the pre-T20 output byte for byte.",
+    "enabled": true,
+    "maxAncestorDepth": 12,
+    "anchorMinLen": 2,
+    "anchorMaxLen": 60,
+    "scopes": [
+      {
+        "scope": "row",
+        "tags": [
+          "tr"
+        ],
+        "roles": [
+          "row"
+        ],
+        "anchorPreference": [
+          "data_label_cell",
+          "link_text",
+          "header_cell",
+          "cell_text"
+        ],
+        "dataLabelPreference": [
+          "Name",
+          "Account Name",
+          "Contact Name",
+          "Title",
+          "Subject",
+          "Case Number",
+          "Opportunity Name",
+          "Full Name",
+          "Label"
+        ]
+      },
+      {
+        "scope": "card",
+        "tags": [
+          "article"
+        ],
+        "classFragments": [
+          "slds-card"
+        ],
+        "anchorPreference": [
+          "heading"
+        ]
+      },
+      {
+        "scope": "fieldset",
+        "tags": [
+          "fieldset"
+        ],
+        "anchorPreference": [
+          "legend"
+        ]
+      }
+    ],
+    "anchoredKeywords": [
+      "ClickItem",
+      "ClickText",
+      "ClickCheckbox",
+      "ClickTableCell / GetTableCell",
+      "TypeText",
+      "TypeText / ClickText",
+      "ComboBox",
+      "Aura Lookup",
+      "GetFieldValue",
+      "set_datetime"
+    ]
+  },
+  "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
+  "assistiveTextClassFragments": [
+    "slds-assistive-text",
+    "sr-only",
+    "visually-hidden",
+    "slds-hidden"
+  ],
+  "note_assistiveTextClassFragments": "assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
+  "labelSourceCaveats": {
+    "assistive_text": "This label came from SCREEN-READER-ONLY markup (an slds-assistive-text / sr-only span) -- nothing on this control is visible to a sighted person, so a rendered-text search may not find it. Confirm the click landed (read-back or the optical witness) before trusting this step."
+  },
+  "note_labelSourceCaveats": "labelSourceCaveats: a caveat appended to every hint whose locator IS the label, keyed by the labelPrecedence rung that produced that label. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11 / L2-R08): a hint built on assistive text must say so rather than read as if the string were visible on the page.",
+  "innerTextExcludedRoles": [
+    "combobox",
+    "listbox",
+    "textbox",
+    "searchbox",
+    "spinbutton",
+    "slider",
+    "option"
+  ],
+  "note_innerTextExcludedRoles": "innerTextExcludedRoles: roles whose own rendered text is the control's VALUE, not its NAME, so the `inner_text` rung (first, since the wave-2 review close) must never claim them. A Lightning picklist is <button role=\"combobox\" aria-label=\"Industry\">--None--</button>; without this key the field's label became '--None--'. Added by stream P1, 2026-09-07, after its own test caught the regression in the org map's metadata->control routing."
+}
