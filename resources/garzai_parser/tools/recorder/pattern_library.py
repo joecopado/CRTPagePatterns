@@ -181,6 +181,70 @@ def recipe(entry: dict, row: dict, value: str) -> tuple[list[str], list[str]]:
     return render(entry.get('keyword_form') or []), render(entry.get('xpath_form') or [])
 
 
+# ------------------------------------------------------- roster order (LOOP 3 / A4, 2026-09-20)
+# The locator roster's per-platform order, measured once from the live verdicts already in
+# docs/recorder/review/*/review.json and recorded under library.json['roster_order'] (never
+# derived live -- this reads the committed measurement, docs/audit/roster-order-2026-09-20.md).
+# Consumed ONLY when GZ_ROSTER_BY_PLATFORM=1 (default OFF): the composer keeps emitting the
+# parser's keyword hint first everywhere until that flag is set, and even then only for a
+# platform the measurement actually covers (a platform with status COULD-NOT-CHECK, e.g.
+# OmniStudio, or one absent from the table, is never overridden -- the caller's own default form
+# stands, per D13/D14: a hint describes, it never overrides silently).
+def platform_of(org: str | None, url: str | None) -> str | None:
+    """Classify (org, url) into the same buckets docs/audit/roster-order-2026-09-20.md measured:
+    'copado_own' (Copado's own CI/CD app pages -- na.devops.copado.com, or a
+    copado__/copado_labs__ managed-package object rendered in Lightning),
+    'lightning_standard' (a standard Salesforce object/tab, no Copado package involved).
+    Never guesses 'omnistudio' or 'visualforce' -- those are COULD-NOT-CHECK in the table and
+    the caller's default form is left alone regardless of what this returns for them."""
+    u = url or ''
+    if 'devops.copado.com' in u or '/en/data-template-management' in u or '/en/commit/' in u:
+        return 'copado_own'
+    if 'copado__' in u or 'copado_labs__' in u:
+        return 'copado_own'
+    if org in ('cicd', 'cicd-demo'):
+        return 'copado_own'
+    if 'force.com' in u or '/lightning/' in u:
+        return 'lightning_standard'
+    return None
+
+
+def roster_order_for_platform(platform: str | None, library_path: str = LIBRARY) -> list[dict]:
+    """The measured tier order for one platform, or [] when the platform is None, unmeasured, or
+    marked COULD-NOT-CHECK in the table."""
+    if not platform:
+        return []
+    try:
+        doc = json.load(open(library_path)).get('roster_order') or {}
+    except FileNotFoundError:
+        return []
+    entry = (doc.get('platforms') or {}).get(platform) or {}
+    if entry.get('status') == 'COULD-NOT-CHECK':
+        return []
+    return entry.get('order') or []
+
+
+def roster_form_for_platform(platform: str | None, default: str = 'keyword',
+                             library_path: str = LIBRARY) -> str:
+    """'keyword' or 'xpath' -- which GROUP (tools/recorder/crt_override/compose_live.py's binary
+    `form` choice) the top-ranked tier for this platform belongs to, per
+    library.json['roster_order']['tier_groups']. Returns `default` (today's fixed behaviour,
+    keyword first) when there is no measurement for this platform, so an unmeasured platform is
+    never silently reordered."""
+    order = roster_order_for_platform(platform, library_path)
+    if not order:
+        return default
+    top_tier = order[0].get('tier')
+    try:
+        groups = json.load(open(library_path)).get('roster_order', {}).get('tier_groups') or {}
+    except FileNotFoundError:
+        groups = {}
+    for group_name, tiers in groups.items():
+        if top_tier in tiers:
+            return group_name
+    return default
+
+
 def find_pattern_args(entry: dict, node) -> dict:
     """Values the recipe needs from the capture (bs4 node): ancestor attributes named by the entry,
     e.g. {"host_id": {"ancestor": "cds-select-input", "attr": "id"}}."""

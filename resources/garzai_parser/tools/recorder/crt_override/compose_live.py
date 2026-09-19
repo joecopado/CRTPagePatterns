@@ -471,7 +471,7 @@ def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_optio
     used to keep the label form ALONE (2026-09-19 run 5: "why are absolute paths coming up as
     backup options?"), which is right for the PRIMARY backup but wrong for "never drop a stock
     line the pair absorbed": both now stand, dormant, never as a live step. `stock_filter` is the
-    typed filter-box keystroke a SENTINEL-armed pick absorbed (F143-3/F143-4, build n8) -- there is
+    typed filter-box keystroke a SENTINEL-armed pick absorbed (F146-3/F146-4, build n8) -- there is
     none for a plain click-only pick (Alt-click or a gesture-free literal), so it is optional and
     slots in between the opener and the option, matching recording order: opener, filter, option."""
     lab = omni_label(label)
@@ -914,7 +914,7 @@ DOM_TYPE_GENERATOR = {
     'text': ('Gz Unique Text', []),
     'search': ('Gz Unique Text', []),
 }
-# F143-2 (F146-1/-2): the describer's `familyOf()` (descriptor.py) NEVER returns 'picklist',
+# F146-2 (F146-1/-2): the describer's `familyOf()` (descriptor.py) NEVER returns 'picklist',
 # 'combobox', 'date', 'datetime', 'number', 'email', 'textarea' or 'search' -- it collapses every
 # <input> (including <textarea> and a `role=searchbox`) to 'input_field', and everything OmniStudio
 # renders as a custom element falls to its own `return tag` fallback (the RAW tag name, e.g.
@@ -973,7 +973,7 @@ def _pick_cells(label, options) -> tuple:
 
 def _datetime_note(meta) -> str:
     """The disclosure a `datetime` field's metadata carries wherever `Gz Date` is chosen for it --
-    F143-6 (F146-6): it used to appear only on the `asdf` (auto/metadata) path and vanish on the
+    F146-6 (F146-6): it used to appear only on the `asdf` (auto/metadata) path and vanish on the
     explicit `@@date+N` and receiving-keyword/host doors, which compose the byte-identical value
     with no sign only half the field is generated."""
     if meta and str(meta.get('type') or '').casefold() == 'datetime':
@@ -985,7 +985,7 @@ def _datetime_note(meta) -> str:
 def generator_door(kind, receiving, lab, desc=None, options=None, meta=None) -> tuple:
     """(cells, why) when the RECEIVING KEYWORD or a descriptor HOST fact names the generator before
     metadata or the DOM type get a vote, or (None, None) to let the caller fall through to
-    `generator_call`'s metadata / DOM-type / family ladder (F143-1, the root defect).
+    `generator_call`'s metadata / DOM-type / family ladder (F146-1, the root defect).
 
     `Omni Date` / `Omni Select` are OmniStudio's own compound keywords, and a date-picker or
     combobox HOST -- named by the element's own xpath, `_OMNI_DATE_PICKER` / `_OMNI_COMBOBOX` --
@@ -1022,7 +1022,7 @@ def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=Fa
     ...) -- see `generator_door`, which this consults FIRST, ahead of metadata."""
     lab = omni_label(label)
     args = list(args or [])
-    # F143-7 (F146-7): the EXPLICIT `@@` grammar overriding the metadata type is deliberate and
+    # F146-7 (F146-7): the EXPLICIT `@@` grammar overriding the metadata type is deliberate and
     # tested (`@@text 40` in an email field) -- but it used to override `SF_TYPE_NO_GENERATOR` too,
     # the table whose entire purpose is to say a type has NO honest generator, silently: `@@unique`
     # in a lookup composed a run-stamped string with no sign the type had ever been consulted. The
@@ -1066,7 +1066,7 @@ def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=Fa
     if kind != 'auto':
         return None, 'unknown sentinel kind %r' % kind
 
-    # THE RECEIVING KEYWORD / HOST DOOR ANSWERS FIRST (F143-1), before metadata or the DOM type get
+    # THE RECEIVING KEYWORD / HOST DOOR ANSWERS FIRST (F146-1), before metadata or the DOM type get
     # a vote: it is the one door a generic `type="text"` cannot fool.
     door_cells, door_why = generator_door(kind, receiving, lab, desc=desc, options=options, meta=meta)
     if door_why is not None:
@@ -1085,7 +1085,7 @@ def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=Fa
             if kw == 'Gz Date' and iso:
                 cells = cells + ['--iso']
             length_why = ''
-            # F143-10: the org map's `length` sits on every embedded field entry and used to be
+            # F146-10: the org map's `length` sits on every embedded field entry and used to be
             # dropped on the floor -- a `string` field of length 10 composed the identical call as
             # one of length 80, so a short Salesforce text field truncates the value (and the run
             # stamp inside it) BY THE BROWSER, with no console line at all. `Gz Unique Text` takes
@@ -1246,7 +1246,7 @@ def generated_data_lines(composed, label=None, fields=None, desc=None, options=N
     if not cells:
         full_why = '%s, but %s (%s)' % (why, gen_why, meta_why)
         marked = composed
-        # F143-5 (F146-5): a `@@pick`/`asdf` this door could not resolve to a real option used to
+        # F146-5 (F146-5): a `@@pick`/`asdf` this door could not resolve to a real option used to
         # ship UNMARKED -- the disclosure lived only in `why`, a surface the PANE never shows, while
         # the six characters `@@pick` (or `asdf`) reached the recorded line exactly as if nobody had
         # noticed. That is precisely what `Gz Sentinel Verdict` calls a landed sentinel when it
@@ -1411,6 +1411,20 @@ def _recipe_step_for(parsed: Parsed, target_path: str) -> tuple[dict | None, str
     return None, None
 
 
+def _roster_form(form: str, org: str | None, url: str | None) -> str:
+    """LOOP 3 / A4 (2026-09-20): when GZ_ROSTER_BY_PLATFORM=1 and the caller left `form` at its
+    default 'keyword', consult the measured per-platform roster order
+    (docs/recorder/patterns/library.json['roster_order'], docs/audit/roster-order-2026-09-20.md)
+    and use its top tier's group instead. Default OFF -- with the flag unset this is a no-op and
+    every existing caller is byte-identical to before this function existed. An explicit
+    form='xpath'/'both' from the caller is NEVER overridden (that is the caller's own choice, same
+    doctrine as D14: a hint describes, it never overrides silently)."""
+    if form != 'keyword' or os.environ.get('GZ_ROSTER_BY_PLATFORM') != '1':
+        return form
+    platform = PL.platform_of(org, url)
+    return PL.roster_form_for_platform(platform, default=form)
+
+
 def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: str,
                          rendered: str, form: str = 'keyword', descriptor: dict | None = None) -> dict:
     """html in, line out -- no driver, no network, no org contact.
@@ -1420,6 +1434,7 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
     {'line', 'xpath_line', 'row', 'why', ...}: `line` is the step to record, '' means record
     nothing, None means let the recorder's own line stand.
     """
+    form = _roster_form(form, org, url)
     t0 = time.time()
     parsed = parse_capture(html, url, org)
     out = {'line': None, 'xpath_line': None, 'row': None, 'why': None,
@@ -1510,6 +1525,7 @@ def compose_batch(html: str, url: str | None, org: str | None, form: str = 'keyw
     {'rows': <every parsed row>, 'composed': [(row, result), ...], 'page_key', 'parse_ms',
      'batch_ms'} -- one `composed` entry per row that carries an identity xpath.
     """
+    form = _roster_form(form, org, url)
     t0 = time.time()
     parsed = parse_capture(html, url, org)
     path_by_n, owner_by_path = _owner_index(parsed)

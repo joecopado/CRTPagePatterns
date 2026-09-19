@@ -439,5 +439,149 @@
       ],
       "status": "measured-failure-only"
     }
-  ]
+  ],
+  "roster_order": {
+    "_about": "LOOP 3 / A4 (2026-09-20): per-platform locator-roster order, measured from the live verdicts already recorded in docs/recorder/review/*/review.json (the keyword track: row.live.keyword against calls[0] -- tier1 label keyword when calls[0].keyword != 'ClickItem', tier2 attribute keyword when it is 'ClickItem'; the xpath track: row.xpath.live against row.xpath.rung, grouped tier3 anchored-on-text-or-attribute (unique_preceding_text/text_node/text_tag/scoped_text/sibling_scope/stable_attr/scoped_attr/scoped_attr_positional), tier4 parent-label (label_association/scoped_label), tier5 positional (structural/positional_last_resort). Ranked by the 95% Wilson LOWER BOUND (tools/benchmark/metrics.wilson), not the raw rate, among tiers with n(pass+bug)>=10; a tier under 10 is listed last with note 'n too small'. Full measurement: docs/audit/roster-order-2026-09-20.md, atoms: docs/audit/roster-order/atoms-2026-09-20.jsonl. CAVEAT carried forward from that report: the xpath track's rung was already filtered for uniqueness before being live-tested (row.xpath.rung is the FIRST ladder rung that was unique_in_capture); the keyword track's hint (calls[0]) carries no equivalent pre-filter. tier3 ranking #1 on every platform here is consistent with that construction bias as well as with a real effect, and this measurement cannot separate the two. Consumed by tools/recorder/pattern_library.py:roster_form_for_platform() only when GZ_ROSTER_BY_PLATFORM=1 (default OFF, D-2026-09-20). No entry here is prescriptive: it describes what was measured, same doctrine as the locator hints themselves (D14).",
+    "tier_groups": {
+      "keyword": [
+        "tier1_label_keyword",
+        "tier2_attribute_keyword"
+      ],
+      "xpath": [
+        "tier3_anchored_xpath",
+        "tier4_parent_label_xpath",
+        "tier5_positional_xpath"
+      ]
+    },
+    "platforms": {
+      "copado_own": {
+        "order": [
+          {
+            "tier": "tier3_anchored_xpath",
+            "wilson_lb": 0.9841,
+            "pass_rate": 0.9972,
+            "n": 352
+          },
+          {
+            "tier": "tier5_positional_xpath",
+            "wilson_lb": 0.9229,
+            "pass_rate": 1.0,
+            "n": 46
+          },
+          {
+            "tier": "tier2_attribute_keyword",
+            "wilson_lb": 0.8183,
+            "pass_rate": 0.9231,
+            "n": 52
+          },
+          {
+            "tier": "tier1_label_keyword",
+            "wilson_lb": 0.7772,
+            "pass_rate": 0.8341,
+            "n": 205
+          },
+          {
+            "tier": "tier4_parent_label_xpath",
+            "wilson_lb": 0.7575,
+            "pass_rate": 1.0,
+            "n": 12
+          }
+        ],
+        "today_fixed_order_top": "tier1_label_keyword",
+        "measured_top": "tier3_anchored_xpath",
+        "differs_from_fixed_order": true
+      },
+      "lightning_standard": {
+        "order": [
+          {
+            "tier": "tier3_anchored_xpath",
+            "wilson_lb": 0.9917,
+            "pass_rate": 1.0,
+            "n": 460
+          },
+          {
+            "tier": "tier1_label_keyword",
+            "wilson_lb": 0.9496,
+            "pass_rate": 0.9722,
+            "n": 360
+          },
+          {
+            "tier": "tier2_attribute_keyword",
+            "wilson_lb": 0.9442,
+            "pass_rate": 1.0,
+            "n": 65
+          },
+          {
+            "tier": "tier4_parent_label_xpath",
+            "wilson_lb": 0.7719,
+            "pass_rate": 1.0,
+            "n": 13
+          },
+          {
+            "tier": "tier5_positional_xpath",
+            "wilson_lb": null,
+            "pass_rate": 1.0,
+            "n": 6,
+            "note": "n too small (<10)"
+          }
+        ],
+        "today_fixed_order_top": "tier1_label_keyword",
+        "measured_top": "tier3_anchored_xpath",
+        "differs_from_fixed_order": true
+      },
+      "lightning_standard_industry": {
+        "order": [
+          {
+            "tier": "tier3_anchored_xpath",
+            "wilson_lb": 0.9905,
+            "pass_rate": 0.9956,
+            "n": 1378
+          },
+          {
+            "tier": "tier2_attribute_keyword",
+            "wilson_lb": 0.9742,
+            "pass_rate": 0.9898,
+            "n": 394
+          },
+          {
+            "tier": "tier1_label_keyword",
+            "wilson_lb": 0.9376,
+            "pass_rate": 0.9563,
+            "n": 641
+          },
+          {
+            "tier": "tier5_positional_xpath",
+            "wilson_lb": 0.8865,
+            "pass_rate": 1.0,
+            "n": 30
+          },
+          {
+            "tier": "tier4_parent_label_xpath",
+            "wilson_lb": 0.8713,
+            "pass_rate": 1.0,
+            "n": 26
+          }
+        ],
+        "today_fixed_order_top": "tier1_label_keyword",
+        "measured_top": "tier3_anchored_xpath",
+        "differs_from_fixed_order": true
+      },
+      "omnistudio": {
+        "order": [],
+        "today_fixed_order_top": "tier1_label_keyword",
+        "measured_top": null,
+        "differs_from_fixed_order": null,
+        "status": "COULD-NOT-CHECK",
+        "reason": "0 of 47 review.json files are an OmniStudio page. The only OmniStudio-specific evidence on disk is docs/recorder/evidence/walk-fsc7f-omni-2026-09-19/pair-log.json (fsc7f GarzAI_Omni_Launcher, 28 served pairs, 18 VERIFIED-PASS / 2 CAUGHT-BUG / 8 proposal-unverified executed via dedicated 'omni_type'/'Omni ...' keywords), which bypasses the label/attribute/xpath roster entirely (a compound control gets ONE dedicated keyword, not a tier choice), so it cannot supply a roster ranking."
+      },
+      "visualforce": {
+        "order": [],
+        "today_fixed_order_top": "tier1_label_keyword",
+        "measured_top": null,
+        "differs_from_fixed_order": null,
+        "status": "COULD-NOT-CHECK",
+        "reason": "0 of 47 review.json files reference /apex/ or Visualforce; no page in this corpus is Visualforce."
+      }
+    }
+  }
 }
