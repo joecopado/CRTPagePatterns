@@ -38,25 +38,25 @@ PORT = 18077
 CALL = "this.pushStep(r,event,ctx?this.handler.getXPathForElement(ctx):undefined)"
 REPL = "window.__gzCompose(this,r,event,ctx)"
 JS = r"""
-;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};window.__gzPending={};var HOLD=900;
+;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};window.__gzPending={};window.__gzPendingEl={};var HOLD=900;
 function axp(el){var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return '/html[1]/'+p.join('/')}
 function ask(body){body.frame=(window!==window.top);try{body.frame_path=location.pathname}catch(e){body.frame_path=''}return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(function(res){return res.json()})}
 function enqueue(fn){window.__gzQ=window.__gzQ.then(fn).catch(function(e){console.log('gz queue',e)})}
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
- try{if(ctx&&ctx.nodeType===1){var k=axp(ctx);window.__gzSeen[k]=Date.now();if(window.__gzPending[k]){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k]}}}catch(e){}
- enqueue(function(){return ask({rendered:r,xpath:x}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
+ var alt;try{if(ctx&&ctx.nodeType===1){alt=axp(ctx);window.__gzSeen[alt]=Date.now();Object.keys(window.__gzPending).forEach(function(k){var pe=window.__gzPendingEl[k];if(k===alt||(pe&&(pe===ctx||pe.contains(ctx)||ctx.contains(pe)))){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k];delete window.__gzPendingEl[k];window.__gzSeen[k]=Date.now()}})}}catch(e){}
+ enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
 function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.target;if(!tg||tg.nodeType!==1)return;var el=tg;
  if(kind==='click'){el=tg.closest('button,a,[role="button"],[role="option"],[role="tab"],[role="menuitem"],[role="checkbox"],input,select,option,[class*="zn-arrow"],lightning-button-icon,lightning-button,lightning-icon')||tg}
  var self=window.__gzRec;if(!self){console.log('gz safety-net: no recorder instance yet');return}
- var k=axp(el);var now=Date.now();if(window.__gzSeen[k]&&now-window.__gzSeen[k]<1500)return;if(window.__gzPending[k])clearTimeout(window.__gzPending[k]);
+ var k=axp(el);var now=Date.now();if(window.__gzSeen[k]&&now-window.__gzSeen[k]<1500)return;if(window.__gzPending[k])clearTimeout(window.__gzPending[k]);window.__gzPendingEl[k]=el;
  var value=(kind==='change')?(el.type==='checkbox'?(el.checked?'on':'off'):(el.value!==undefined?String(el.value):'')):undefined;
- window.__gzPending[k]=setTimeout(function(){delete window.__gzPending[k];if(window.__gzSeen[k]&&Date.now()-window.__gzSeen[k]<1500+HOLD)return;window.__gzSeen[k]=Date.now();
+ window.__gzPending[k]=setTimeout(function(){delete window.__gzPending[k];delete window.__gzPendingEl[k];if(window.__gzSeen[k]&&Date.now()-window.__gzSeen[k]<1500+HOLD)return;window.__gzSeen[k]=Date.now();
   enqueue(function(){return ask({rendered:'',xpath:k,synthetic:true,kind:kind,value:value,tag:el.tagName.toLowerCase(),etype:(el.type||''),text:(el.textContent||'').trim().slice(0,80)}).then(function(j){if(j&&j.line){self.pushStep(j.line,ev,k);(j.backups||[]).forEach(function(b){self.pushStep(b,ev,k)})}})})},HOLD)}catch(e){}}
 document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18i frames+dedupe+budget", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-18j alt-path+containment", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -399,6 +399,12 @@ class _H(BaseHTTPRequestHandler):
             if xp:
                 drv = _driver()
                 tgt = drv.find_elements("xpath", xp)
+                if not tgt and req.get("alt_xpath"):
+                    # the recorder's path (shadow-aware, slot segments) often resolves to nothing in the
+                    # driver on Lightning pages (3 of 5 on Setup, 2026-09-18); ours is a plain DOM walk
+                    tgt = drv.find_elements("xpath", req["alt_xpath"])
+                    if tgt:
+                        decision["why"] = "their xpath resolved to nothing; ours did"
                 if tgt and _is_duplicate(drv, tgt[0]):
                     line = ""; decision["why"] = "duplicate: the same element was served %d ms ago" % int((time.time() - _LAST["t"]) * 1000); tgt = []
                 if tgt:
