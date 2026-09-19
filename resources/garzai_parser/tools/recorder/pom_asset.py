@@ -59,6 +59,7 @@ import metadata_dom_parity as PARITY                        # noqa: E402
 from pom import keys as K                                   # noqa: E402
 from pom.store import Store, element_id, stable_attrs       # noqa: E402
 from pom import store as STORE_MOD                          # noqa: E402  -- apply_capture_stamp
+from pom import scope as SCOPE_MOD                          # noqa: E402  -- the ONE base-state name
 
 ASSET_VERSION = 1
 SOURCE_CAPTURE = 'capture'
@@ -108,12 +109,16 @@ _STAMP = re.compile(r'<!--\s*state:\s*(?P<state>.*?)\s*\|\s*entered_via:\s*(?P<v
 
 
 def state_stamp(head: str) -> dict:
-    """{state, entered_via, host_url} off a capture header. Never raises, never invents."""
+    """{state, entered_via, host_url} off a capture header. Never raises, never invents.
+
+    The base state is reported under its ONE name (`pom.scope.BASE_STATE`, `page`). Captures on
+    disk are stamped with the legacy `default`; they are READ through `normalize_state` and never
+    rewritten, which is what makes the 106 base-state index entries reachable again (B1)."""
     m = _STAMP.search(head or '')
     if not m:
-        return {'state': 'default', 'entered_via': 'unknown', 'host_url': '',
+        return {'state': SCOPE_MOD.BASE_STATE, 'entered_via': 'unknown', 'host_url': '',
                 'state_stamp_present': False}
-    return {'state': (m.group('state') or 'default').strip() or 'default',
+    return {'state': SCOPE_MOD.normalize_state((m.group('state') or '').strip()),
             'entered_via': (m.group('via') or 'unknown').strip() or 'unknown',
             'host_url': (m.group('host') or '').strip(),
             'state_stamp_present': True}

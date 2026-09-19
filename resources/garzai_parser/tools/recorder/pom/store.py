@@ -128,7 +128,15 @@ def element_id(family: str | None, label: str | None, container: str | None, att
     return "|".join(parts)
 
 
+# THE SENTINEL, not a state name. A session step whose `state` is this named NO state; it is what
+# `merge_session` tests against before filing a member. Keeping it distinct from BASE_STATE is B1's
+# fix: one word meant both "no state" and "the page itself", and the writer and the reader each
+# picked a different one (0 records named `default`, 18 named `page`, 106 of 198 capture-index
+# entries keyed `default` and unreachable -- docs/audit/challenge-2026-09-19b/scope-held-out.md).
 DEFAULT_STATE = "default"
+# THE ONE NAME of the base state, everywhere: records, capture index, writers, readers.
+BASE_STATE = SCOPE.BASE_STATE
+is_base_state = SCOPE.is_base_state
 # A step that carries an ELEMENT. `verify` is here and deliberately NOT in LEADS_TO_KINDS: a
 # VerifyText proves a label was on the page, it never took you anywhere.
 ELEMENT_KINDS = ("click", "type", "change", "key", "verify")
@@ -544,7 +552,8 @@ def _norm_label(s: str | None) -> str:
 
 
 def _scope_for_capture(rec: dict, state: str | None, capture_path: str | None,
-                       id_map: dict | None) -> tuple[dict | None, set, str | None]:
+                       id_map: dict | None, driven_tab: str | None = None,
+                       base_path: str | None = None) -> tuple[dict | None, set, str | None]:
     """(scopes by FINAL element id, chrome ids to keep OUT of the state, note).
 
     THE ONE PLACE scope is computed (2026-09-19). Both capture writers -- `pom_asset.build_record`
@@ -567,8 +576,21 @@ def _scope_for_capture(rec: dict, state: str | None, capture_path: str | None,
     except OSError as e:                                    # pragma: no cover - unreadable file
         return None, set(), "capture unreadable: %s" % e
     kind = ((rec.get("states") or {}).get(state or "") or {}).get("kind")
+    # The inline-edit rung needs the page's own base capture to diff against; `find_base_capture`
+    # picks it out of the same crawl directory by its header, and a caller that already knows the
+    # path (migrate_scope has the whole capture index) hands it in.
+    base_html = None
+    if base_path is None and capture_path:
+        base_path = SCOPE.find_base_capture(capture_path)
+    if base_path and os.path.exists(base_path) and \
+            os.path.abspath(base_path) != os.path.abspath(capture_path):
+        try:
+            base_html = open(base_path, errors="replace").read()
+        except OSError:                                     # pragma: no cover - unreadable file
+            base_html = None
     raw = SCOPE.scopes_for_capture(html, state=state, kind=kind,
-                                   element_id=element_id, stable_attrs=stable_attrs)
+                                   element_id=element_id, stable_attrs=stable_attrs,
+                                   driven_tab=driven_tab, base_html=base_html)
     chrome_raw = SCOPE.transient_ids(html, element_id=element_id, stable_attrs=stable_attrs)
     m = id_map or {}
     chrome = {m.get(k, k) for k in chrome_raw}
@@ -615,11 +637,11 @@ def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: st
 
     Returns what it did, so the caller can print it.
     """
-    out = {"state": state or DEFAULT_STATE, "entered_via": entered_via or UNKNOWN_ENTERED_VIA,
+    out = {"state": SCOPE.normalize_state(state), "entered_via": entered_via or UNKNOWN_ENTERED_VIA,
            "host_url": host_url or "", "wrote": [], "gap": None}
     stamp = stamp or _iso(now())
     known_via = bool(entered_via) and entered_via != UNKNOWN_ENTERED_VIA
-    named_state = bool(state) and state != DEFAULT_STATE
+    named_state = not is_base_state(state)
     this_key = (rec.get("page") or {}).get("key")
 
     host_key, host_rec = None, None
@@ -670,8 +692,14 @@ def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: st
     # resolve against, and the page's own controls lived only inside the tab and modal states that
     # had leaked them. The base state is entered by NAVIGATING to the page, so it never takes an
     # `entered_via` -- the old `page` state's opener was `button|Dismiss||`, a toast dismissal.
-    state_name = state if named_state else DEFAULT_STATE
-    scopes, chrome, scope_note = _scope_for_capture(rec, state_name, capture_path, id_map)
+    state_name = state if named_state else BASE_STATE
+    # The label the state was entered via is what picks the right tabset on a two-tabset record
+    # page -- 36 of 60 held-out captures have two selected tabs and no tab state on one of them
+    # could be scoped before (held-out audit 2026-09-19). The state's own name is the fallback: the
+    # crawler names a tab state after the tab.
+    scopes, chrome, scope_note = _scope_for_capture(
+        rec, state_name, capture_path, id_map,
+        driven_tab=(entered_via if known_via else None) or (state if named_state else None))
 
     ps = page_state(rec, state_name)
     ps["n_seen"] = (ps.get("n_seen") or 0) + 1

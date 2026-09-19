@@ -41,6 +41,7 @@ Offline and pure: the caller hands it capture HTML. No browser, no org, no store
 from __future__ import annotations
 
 import os
+import re as _re
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -53,10 +54,44 @@ for _p in ("tools/interop/resources/pythonDom", "tools/benchmark"):
 OWN = "own"
 SHELL = "shell"
 
-# The state name a capture carries when it is the page itself (crawl.py CAPTURE_DEFAULT_STATE and
-# store.DEFAULT_STATE). A literal here so this module imports nothing from store -- store imports
-# this one, and a cycle would break every reader.
-DEFAULT_STATE = "default"
+# ---------------------------------------------------------------- THE BASE STATE HAS ONE NAME
+# B1 (held-out audit, 2026-09-19): the base state was written under TWO names. `crawl.py` drove the
+# page with `HOST_STATE = "page"` (merge_session wrote that into every record) while it STAMPED its
+# base captures `default` (`store.DEFAULT_STATE`, the sentinel merge_session uses for "this step
+# named no state"). `migrate_scope.capture_index` then keyed base captures `(key, "default")` and
+# `plan_record` looked up `(key, "page")`, so the two never met: measured store-wide, **0 records
+# carried a state named `default` and 18 carried `page`, while 106 of 198 index entries were
+# `default`** -- every base state in the store permanently COULD-NOT-CHECK, with 14/12/3 stamped
+# base captures sitting unread on disk for the three held-out records.
+#
+# `page` is the ONE name, for three reasons that are facts rather than taste:
+#   1. it is what all 18 stored records already carry, so the migration rewrites no record and is
+#      a safety net rather than a rewrite of the store;
+#   2. `default` is ALREADY taken -- `store.DEFAULT_STATE` is merge_session's sentinel for "the
+#      step named no state", and a name that means both "no state" and "the base state" is the
+#      ambiguity that produced B1. Distinct words for distinct facts;
+#   3. the base state's `kind` is already `page` (`apply_capture_stamp`), and crawl.py's own
+#      comment beside HOST_STATE already said `default` was the wrong name for it.
+BASE_STATE = "page"
+
+# What a capture may be STAMPED with and still mean the base state. `default` is the legacy stamp:
+# every capture on disk before 2026-09-19 carries it, and they are read, never rewritten.
+BASE_STATE_ALIASES = (BASE_STATE, "default")
+
+# Back-compat alias. `DEFAULT_STATE` used to be this module's name for the base state; it is kept
+# so an older caller still imports, and it now points at the ONE name.
+DEFAULT_STATE = BASE_STATE
+
+
+def is_base_state(name) -> bool:
+    """True when this state name means "the page itself" -- empty, `page`, or the legacy `default`
+    stamp. The ONE place that question is answered, so a reader and a writer cannot disagree."""
+    return (not name) or name in BASE_STATE_ALIASES
+
+
+def normalize_state(name):
+    """The canonical name for a state: every base-state spelling collapses onto `page`."""
+    return BASE_STATE if is_base_state(name) else name
 
 # `[role=dialog]` is worn by Lightning's "New user experience" coachmark on a great many pages;
 # without excluding it every fsc7f capture reads AMBIGUOUS (measured 2026-09-19).
@@ -103,38 +138,157 @@ def find_dialog_subtree(soup):
     return None, "dialog ladder", "no dialog or menu subtree in this capture"
 
 
-def find_tab_subtree(soup):
-    """The selected tab's panel: [role=tab][aria-selected=true] -> aria-controls -> its tabpanel.
-    A page with two tabsets has two selected tabs and reads COULD-NOT-CHECK, which is the honest
-    answer (fsc7f's Account page is exactly that)."""
+def _norm(s) -> str:
+    return " ".join(str(s or "").split()).casefold()
+
+
+def text_of(node) -> str:
+    """The node's text, TEMPLATE-SAFE.
+
+    **`get_text()` is empty over most of a Lightning capture** and gives no sign of it. The capture
+    serializer wraps every shadow root in `<template>`, and bs4 4.15 marks strings inside one
+    `TemplateString`, which is NOT in `interesting_string_types` -- so `get_text()` skips them
+    silently. Measured 2026-09-19 on dev1's Account view: the selected tab's `contents` is
+    `['Details']` and `get_text(' ', strip=True)` is `''`. `TemplateString` is a `str` subclass, so
+    walking `descendants` and keeping the `str` ones reads what a person sees."""
+    return " ".join(str(x) for x in node.descendants if isinstance(x, str))
+
+
+def _tab_label(node) -> str:
+    """What a person reads on a tab. `data-label` is Lightning's own copy of the visible tab text
+    and survives the template wrapper; the text, aria-label and title follow it."""
+    return _norm(node.get("data-label") or text_of(node) or node.get("aria-label")
+                 or node.get("title") or "")
+
+
+def find_tab_subtree(soup, driven_tab=None):
+    """The DRIVEN tab's panel: the selected tab whose label the state was entered via ->
+    aria-controls -> its tabpanel.
+
+    TWO TABSETS IS THE STANDARD RECORD PAGE, not an fsc7f quirk (held-out audit 2026-09-19:
+    **36 of 60** held-out captures carry two selected tabs -- a details tabset and a related-list
+    tabset -- so "1 selected tab" made every standard Salesforce record page COULD-NOT-CHECK and
+    no tab state on one could ever be scoped). `driven_tab` is the label the state was entered via
+    (or the state's own name); when exactly one selected tab carries it, that is the tabset the
+    interaction happened in and the other tabset is page shell. With no label to go on, or a label
+    that names none of them (or more than one), this still refuses to guess."""
     tabs = soup.select("[role=tab][aria-selected=true]")
-    if len(tabs) != 1:
-        return None, "[role=tab][aria-selected=true]", "%d selected tabs" % len(tabs)
+    sel = "[role=tab][aria-selected=true]"
+    if not tabs:
+        return None, sel, "0 selected tabs"
+    if len(tabs) > 1:
+        want = _norm(driven_tab)
+        if not want:
+            return None, sel, ("%d selected tabs and no driven tab label to choose between them"
+                               % len(tabs))
+        hit = [t for t in tabs if _tab_label(t) == want]
+        if len(hit) != 1:
+            return None, sel, ("%d selected tabs and the driven label %r names %d of them"
+                               % (len(tabs), driven_tab, len(hit)))
+        tabs, sel = hit, "%s naming %r" % (sel, driven_tab)
     ctl = tabs[0].get("aria-controls")
     if not ctl:
-        return None, "[role=tab][aria-selected=true]", "selected tab has no aria-controls"
+        return None, sel, "selected tab has no aria-controls"
     panels = [n for n in soup.select("[role=tabpanel]") if n.get("id") == ctl]
     if len(panels) != 1:
         return None, "[role=tabpanel]#%s" % ctl, "%d panels" % len(panels)
-    return (panels[0],
-            "[role=tab][aria-selected=true] -> aria-controls -> [role=tabpanel]#%s" % ctl, "ok")
+    return panels[0], "%s -> aria-controls -> [role=tabpanel]#%s" % (sel, ctl), "ok"
 
 
-def find_state_subtree(soup, kind=None):
-    """(node, selector, note) for a NAMED state. `kind` is the state's stored kind when the record
-    has one (`modal`/`panel`, written by merge_session), else None and the shape is read off the
-    capture itself: a capture taken in a modal state HAS the dialog open; one taken in a tab state
-    does not."""
+# ------------------------------------------------------------------ LIGHTNING INLINE-EDIT FORM
+# B2 (held-out audit, 2026-09-19). 13 held-out states named `Edit <Field> menu` and kinded `panel`
+# resolved to NO subtree at all: the page is not a menu and holds no dialog. Clicking a field's
+# pencil puts the WHOLE record detail form into edit mode. Measured on dev1's Account view:
+# the base capture is 125,795 B with **0 `<input>`** and 0 record-layout-items holding an editable
+# child; `Edit-Phone-menu.html` is 170,708 B with **18 `<input>`**, 34 `lightning-input`, a Save
+# and **14** record-layout-items that gained an editable child -- and no `[role=dialog]`,
+# `[role=menu]`, `.slds-modal` or `.slds-popover` anywhere. The ladder simply had no rung for it.
+#
+# The signature is a GROWTH, not an absolute: slockard's Zoo Case base capture already holds 1
+# editable item (a related-list search box), so "has an editable item" would call its base state
+# form mode. The rung therefore diffs against the page's own base capture and takes only the items
+# that BECAME editable, plus the edit footer that carries Save/Cancel.
+_FORM_ITEM = "records-record-layout-item, force-record-layout-item"
+_EDITABLE = ("input, textarea, select, lightning-input, lightning-textarea, lightning-combobox, "
+             "lightning-picklist, lightning-lookup, lightning-grouped-combobox, "
+             "lightning-input-field, lightning-datepicker, lightning-timepicker")
+# The inline-edit footer. `div.center-align-buttons` nests inside `div.footer-full-width`, so
+# _outermost leaves one node. Measured present on all 13 inline-edit captures and on NO base,
+# menu or view capture of the same four pages.
+_FORM_FOOTER = "div.footer-full-width, div.center-align-buttons"
+
+
+def _editable_items(soup):
+    """{a key that survives a re-render: the item node} for every record-layout-item holding an
+    editable control. The key is the field label the item declares, never a generated id."""
+    out = {}
+    for i, n in enumerate(soup.select(_FORM_ITEM)):
+        if not n.select(_EDITABLE):
+            continue
+        lab = n.get("field-label")
+        if not lab:
+            lt = n.select_one(".slds-form-element__label, span.test-id__field-label")
+            lab = text_of(lt) if lt else ""       # template-safe: see `text_of`
+        out[_norm(lab) or "item#%d" % i] = n
+    return out
+
+
+def find_form_subtrees(soup, base_soup=None):
+    """([node, ...], selector, note) for Lightning inline-edit form mode, or (None, sel, why).
+
+    The state's own controls are the record-layout-items that BECAME editable plus the edit
+    footer; everything else on the page -- the highlights panel, the tab bar, the related lists,
+    the nav -- is shell. With no base capture to diff against, every editable item counts and the
+    note says so, because over-including there is visible in the note rather than silent."""
+    footer = _outermost(soup.select(_FORM_FOOTER))
+    items = _editable_items(soup)
+    if not footer or not items:
+        return None, _FORM_FOOTER, "no inline-edit form in this capture"
+    if base_soup is None:
+        return (list(items.values()) + footer, "%s + %s" % (_FORM_ITEM, _FORM_FOOTER),
+                "form mode, no base capture to diff against -- every editable item counted")
+    was = set(_editable_items(base_soup))
+    grew = [n for k, n in items.items() if k not in was]
+    if not grew:
+        return None, _FORM_ITEM, ("an edit footer is present but no record region became editable "
+                                  "versus the base capture")
+    return (grew + footer, "%s that became editable + %s" % (_FORM_ITEM, _FORM_FOOTER),
+            "form mode, %d of %d record region(s) became editable" % (len(grew), len(items)))
+
+
+def find_state_subtree(soup, kind=None, driven_tab=None, base_soup=None):
+    """(nodes, selector, note) for a NAMED state -- `nodes` is a LIST (inline-edit form mode is
+    several record regions plus a footer) or None for COULD-NOT-CHECK.
+
+    `kind` is the state's stored kind when the record has one (`modal`/`panel`, written by
+    merge_session), else None and the shape is read off the capture itself. `driven_tab` is the
+    label the state was entered via, which is what picks the right tabset on a two-tabset page.
+    `base_soup` is the page's own base capture, needed only by the inline-edit rung.
+
+    The crawler kinds an inline-edit state `panel` (it was reached by clicking `Edit <Field>`), so
+    the form rung has to sit behind the dialog ladder on the `panel` path too -- it is tried when
+    the dialog ladder finds nothing, never when it finds something."""
     if kind in ("modal", "panel"):
-        return find_dialog_subtree(soup)
+        node, sel, note = find_dialog_subtree(soup)
+        if node is not None:
+            return [node], sel, note
+        if note.startswith("AMBIGUOUS"):
+            return None, sel, note
+        nodes, fsel, fnote = find_form_subtrees(soup, base_soup)
+        return (nodes, fsel, fnote) if nodes else (None, sel, note)
     if kind == "tab":
-        return find_tab_subtree(soup)
+        node, sel, note = find_tab_subtree(soup, driven_tab)
+        return ([node] if node is not None else None), sel, note
     node, sel, note = find_dialog_subtree(soup)
     if node is not None:
-        return node, sel, note
+        return [node], sel, note
     if note.startswith("AMBIGUOUS"):
         return None, sel, note
-    return find_tab_subtree(soup)
+    nodes, fsel, fnote = find_form_subtrees(soup, base_soup)
+    if nodes:
+        return nodes, fsel, fnote
+    node, tsel, tnote = find_tab_subtree(soup, driven_tab)
+    return ([node] if node is not None else None), tsel, tnote
 
 
 # A TOAST IS NOT PART OF THE PAGE. Lightning's toast manager renders a transient notification
@@ -155,56 +309,149 @@ def transient_ids(html: str, *, element_id=None, stable_attrs=None) -> set:
 
 
 # --------------------------------------------------------------------------- the scope map
-def _control_ids(html, element_id, stable_attrs):
-    """Raw element ids for every LABEL-BEARING control in this html -- the same denominator
-    `pom_asset.controls()` uses, so both halves are comparable to the store by construction."""
+def _control_rows(html, element_id, stable_attrs):
+    """[(element id, identity-minus-container key)] for every LABEL-BEARING control in this html --
+    the same denominator `pom_asset.controls()` uses, so both halves are comparable to the store by
+    construction.
+
+    The KEY drops the `container` segment, and that is what makes the subtree split work. A
+    control's container is read off its surroundings, so the SAME control mints one id when the
+    whole page is parsed and another when its subtree is parsed alone
+    (`input_field|Billing City||name=city` vs `...|Billing Address|name=city`). Family, label and
+    stable attributes do not move."""
     from capture_orchestration import parse_elements_from_html
     import metadata_dom_parity as PARITY
-    out = set()
+    out = []
     for e in parse_elements_from_html(html):
         label = ((e.get("identification") or {}).get("label_text")) or ""
         if not PARITY.norm(label):
             continue
         det = e.get("element_details") or {}
-        out.add(element_id(e.get("element_type"), label,
-                           (e.get("context") or {}).get("section") or "",
-                           stable_attrs(det.get("attributes") or {})))
+        fam = e.get("element_type")
+        at = stable_attrs(det.get("attributes") or {})
+        # the key is the SAME id with an empty container -- canonical, hashable, and identical
+        # for a control whether the whole page or only its subtree was parsed
+        out.append((element_id(fam, label, (e.get("context") or {}).get("section") or "", at),
+                    element_id(fam, label, "", at)))
     return out
 
 
+def _control_ids(html, element_id, stable_attrs):
+    """Just the ids. Kept because readers outside this module use it."""
+    return {i for i, _k in _control_rows(html, element_id, stable_attrs)}
+
+
+def _split(html, nodes, element_id, stable_attrs):
+    """(inside ids, outside ids) over the ids the capture ITSELF mints.
+
+    **The document is parsed ONCE, from the bytes on disk.** Re-serializing a capture through bs4
+    and parsing that instead loses controls silently: measured 2026-09-19 on slockard's Zoo Case
+    inline-edit capture, `str(soup)` parsed **138** controls where the file parses **174** -- the
+    36 missing ones are a CKEditor toolbar (`Align Left`, `Bold (Cmd+B)`, ...) whose `<a
+    href="javascript:void('Align Left')">` does not survive the round trip. Those 36 were members
+    of the state with no scope at all and nothing said why.
+
+    So the subtrees are parsed alone -- which is safe, because only the CONTAINER segment of an id
+    moves -- and matched back onto the page's own ids by the identity-minus-container key. A
+    control whose family, label and stable attributes match one inside the subtree is inside: two
+    such controls in different containers are the same control as far as every locator rung is
+    concerned, and `own` is this codebase's standing tie-break for a control that is in both."""
+    rows = _control_rows(html, element_id, stable_attrs)
+    by_key: dict = {}
+    for i, k in rows:
+        by_key.setdefault(k, set()).add(i)
+    inside: set = set()
+    for n in nodes:
+        for _i, k in _control_rows("<html><body>%s</body></html>" % str(n),
+                                   element_id, stable_attrs):
+            inside |= by_key.get(k, set())
+    whole = {i for i, _k in rows}
+    return inside, whole - inside
+
+
+def capture_header(path):
+    """{path, host, state, entered_via} off a capture's header, or None. Header bytes only."""
+    try:
+        head = open(path, errors="replace").read(4000)
+    except OSError:
+        return None
+
+    def one(k):
+        m = _re.search(r"<!--\s*%s:\s*(.*?)\s*-->" % k, head)
+        return (m.group(1).strip() if m else "")
+    m = _re.search(r"<!--\s*state:\s*(?P<s>.*?)\s*\|\s*entered_via:\s*(?P<v>.*?)\s*[|-]", head)
+    return {"path": one("path"), "host": one("host"),
+            "state": (m.group("s") if m else ""), "entered_via": (m.group("v") if m else "")}
+
+
+def find_base_capture(capture_path):
+    """The base-state capture of the SAME page, beside this one on disk, or None.
+
+    Matched on the captures' own headers (`path:` + `host:` + the state stamp), never by splitting
+    a filename on dots -- a state name may contain one. The one entered by `nav` wins: that is the
+    page as it was LANDED, before any state left residue in it (a `default-after-Edit-Zoo-Phone`
+    capture is stamped base and is still in form mode, measured 2026-09-19). Used only by the
+    inline-edit rung, the one rung that needs to know what the page looked like before."""
+    if not capture_path:
+        return None
+    d = os.path.dirname(os.path.abspath(capture_path))
+    hdr = capture_header(capture_path)
+    if not hdr:
+        return None
+    cands = []
+    for name in sorted(os.listdir(d)):
+        if not name.endswith(".html"):
+            continue
+        p = os.path.join(d, name)
+        if os.path.abspath(p) == os.path.abspath(capture_path):
+            continue
+        h = capture_header(p)
+        if not h or h["path"] != hdr["path"] or h["host"] != hdr["host"]:
+            continue
+        if not is_base_state(h["state"]):
+            continue
+        cands.append((0 if _norm(h["entered_via"]) == "nav" else 1, os.path.getmtime(p), p))
+    return min(cands)[2] if cands else None
+
+
 def scopes_for_capture(html: str, *, state: str | None, kind: str | None = None,
-                       element_id=None, stable_attrs=None) -> dict | None:
+                       element_id=None, stable_attrs=None, driven_tab=None,
+                       base_html: str | None = None) -> dict | None:
     """{raw element id -> "own"|"shell"} for one capture, or **None** for COULD-NOT-CHECK.
 
     `element_id`/`stable_attrs` are `pom.store`'s, passed in so the ids are minted by exactly the
     code the writer uses and this module needs no import from store.
 
-    * named state -- `own` = parsed from the state's own subtree; `shell` = the page with that
-      subtree removed, so the page underneath keeps its context and its ids do not shift.
-    * base state (`default`, or no state) -- the page's own controls are `own`; anything inside a
-      dialog that happened to be open is **not** the base state's, and is `shell`.
+    * named state -- `own` = parsed from the state's own subtree(s); `shell` = the page with those
+      subtrees removed, so the page underneath keeps its context and its ids do not shift.
+    * base state (`page`, the legacy `default` stamp, or no state) -- the page's own controls are
+      `own`; anything inside a dialog, or in an inline-edit form, that happened to be open is
+      **not** the base state's, and is `shell`.
     * unresolvable subtree -- None, and the caller writes no `scope` key at all.
     """
     from bs4 import BeautifulSoup
     if element_id is None or stable_attrs is None:          # pragma: no cover - programmer error
         raise TypeError("scopes_for_capture needs store.element_id and store.stable_attrs")
     soup = BeautifulSoup(html, "html.parser")
-    if bool(state) and state != DEFAULT_STATE:
-        node, _sel, _note = find_state_subtree(soup, kind)
-        if node is None:
+    base_soup = BeautifulSoup(base_html, "html.parser") if base_html else None
+    if not is_base_state(state):
+        nodes, _sel, _note = find_state_subtree(soup, kind, driven_tab, base_soup)
+        if not nodes:
             return None
-        inside = _control_ids("<html><body>%s</body></html>" % str(node), element_id, stable_attrs)
-        node.decompose()
-        outside = _control_ids(str(soup), element_id, stable_attrs)
+        inside, outside = _split(html, nodes, element_id, stable_attrs)
     else:
         node, _sel, note = find_dialog_subtree(soup)
-        if node is None and note.startswith("AMBIGUOUS"):
-            return None
-        if node is not None:
-            outside = _control_ids("<html><body>%s</body></html>" % str(node),
-                                   element_id, stable_attrs)
-            node.decompose()
-            inside = _control_ids(str(soup), element_id, stable_attrs)
+        nodes = [node] if node is not None else None
+        if node is None:
+            if note.startswith("AMBIGUOUS"):
+                return None
+            # a base capture taken while the page was still in inline-edit form mode is the same
+            # case as a dialog left open: the form is not the page's own (measured 2026-09-19 --
+            # every `default-after-Edit-Zoo-<Field>` capture is still in form mode)
+            nodes, _fsel, _fnote = find_form_subtrees(soup, None)
+        if nodes:
+            # the dialog or form left open is NOT the base state's own -- the halves swap
+            outside, inside = _split(html, nodes, element_id, stable_attrs)
         else:
             inside, outside = _control_ids(html, element_id, stable_attrs), set()
     return dict([(k, OWN) for k in inside] + [(k, SHELL) for k in outside if k not in inside])
