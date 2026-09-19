@@ -633,7 +633,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-19n3 syntax", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-19n4 bundle", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
