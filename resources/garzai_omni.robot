@@ -55,6 +55,7 @@ Library           QWeb
 # the same mechanism the source template uses for this exact file.
 Library           ${CURDIR}/garzai_omni/keywords_omni.py    WITH NAME    OmniRaw
 Library           Collections    # Append To List in Gz Omni Verdict below
+Resource          ${CURDIR}/garzai_data.robot    # Gz Sentinel Verdict: a read-back that IS a sentinel is CAUGHT-BUG, never a quiet pass
 
 
 *** Variables ***
@@ -80,6 +81,14 @@ Gz Omni Verdict
     ...                It NEVER upgrades a verdict -- a pass is only ever printed for a read-back
     ...                the Python actually returned.
     [Arguments]    ${keyword}    ${key}    ${asked}    ${status}    ${result}
+    # THE SENTINEL-LANDED VERDICT (build n7, 2026-09-19), checked BEFORE the PASS branch: an
+    # `asdf` that was typed AND read back matches itself, so the Python's own read-back returns
+    # PASS and this would print VERIFIED-PASS over a record now holding the literal sentinel.
+    # It never upgrades a verdict; it only refuses to let one through.
+    ${landed}=    Gz Sentinel Verdict    ${keyword}('${key}')    ${result}
+    IF    ${landed}
+        RETURN    ${NONE}
+    END
     IF    '${status}' == 'PASS'
         Log To Console    VERIFIED-PASS: ${keyword}('${key}'): read back '${result}' -- matches '${asked}'
         RETURN    ${result}

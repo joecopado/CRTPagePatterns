@@ -527,3 +527,90 @@ Every other entry in the library — `clarity-lookup`, `native-select-dropdown`,
 `count-suffixed-button`, `clarity-offcanvas-close`, `lightning-modal-cancel-and-close`,
 `tab-with-count-in-same-node`, `repeated-label-member`, `save-never-live` — is instantiated by at
 least one suite in this repo and is documented in full above.
+
+---
+
+## Generated data: the typed sentinel, and the two click markers
+
+Added 2026-09-19 with build `2026-09-19n7 data`. Full keyword reference in `docs/SUITES.md` §9;
+the resource is `resources/garzai_data.robot`.
+
+This is a **value** pattern, not a locator pattern — but it changes what the locator patterns above
+put on the line, so it belongs beside them.
+
+### Why a literal value is a latent failure
+
+Every recorded value is a literal. A second run of the same recording types the same name into the
+same field and the org rejects it on a duplicate rule; a recorded date drifts into the past and the
+field rejects that too. Neither is a locator problem and no locator pattern fixes it. The user named
+it on 2026-09-19: *"Every value is hard-coded, so the second run fails on duplication rules."*
+
+### The three ways a value becomes generated
+
+1. **A typed sentinel.** `asdf` in the field means "generate for this field's type"; the `@@` grammar
+   (`@@email`, `@@phone`, `@@pick`, `@@unique <base>`, `@@date+N`, `@@int <min> <max>`, `@@text <len>`)
+   overrides the type. Nothing else is a sentinel — `asdfasdf`, `test` and `qwer` are values people
+   type on purpose.
+   A DATE USES THIS PATH, NOT THE PICKER (user, 2026-09-19). The format is decided by the keyword
+   that receives the value: `Omni Date` gets `Gz Date    +N    --iso` (`YYYY-MM-DD`, its own
+   documented input), a plain `TypeText` gets `Gz Date    +N` (`MM/DD/YYYY`, the default — the org
+   map carries field types, not the user's locale, so a non-US org puts `--iso` on the line). On an
+   OmniStudio date picker the typed sentinel still routes to `Omni Date`, because a typed value is
+   measured not to commit on that widget.
+
+   NOT SEEN AT ALL on a native number input (currency/percent/number — the browser drops the
+   letters, so no change event carries `asdf`) or an OmniScript masked input. Keydown detection is
+   NOT YET IMPLEMENTED and is the first item of the next loop.
+2. **An Alt-click**, for controls that are clicked rather than typed into. The override's
+   capture-phase listener and its `pushStep` call site both read `event.altKey`, and the page-side
+   describer carries the OPEN listbox's own options at event time, so an Alt-clicked option needs no
+   metadata: the valid values are the values the page was showing. An Alt-clicked calendar day
+   becomes an OFFSET from today, computed at compose time.
+3. **Neither** — every plain pick and every plain date ships with a dormant `Comment    generate:`
+   pair beneath it, promoted by deleting two cells, exactly like a backup line.
+
+### How the generator is chosen (metadata routes it; the DOM is the backstop)
+
+The same order the rest of this repo follows — CLAUDE.md, *"Metadata routes the keyword, DOM is the
+backstop"*:
+
+| Salesforce field type | Generator |
+|---|---|
+| `email` | `Gz Email` |
+| `phone` | `Gz Phone` |
+| `date` | `Gz Date    +30` |
+| `datetime` | `Gz Date    +30` — the DATE half only, said out loud (a datetime is a compound control; routing it is BACKLOG 80) |
+| `picklist`, `multipicklist`, `combobox` | `Gz Pick` with the map's own values |
+| `int` / `double` / `percent` / `currency` | `Gz Number` with a range per type |
+| `string`, `textarea`, `encryptedstring` | `Gz Unique Text    <label>` |
+| `url`, `reference`, `boolean`, `address`, `base64`, `id`, `time` | **no generator** — each names why |
+
+A field the build embedded no metadata for falls to the descriptor's input `type`, then its parser
+family; a `lookup` family gets no generator at all, because its value must name a record that
+EXISTS. Which door answered is always in the decision's `why`, so metadata and DOM are never
+confused for each other in the record.
+
+A picklist longer than 12 values is elided on the line and the elision is **disclosed** with both
+counts and the cap's name — an instrument may elide, it may never elide silently.
+
+### The sentinel-landed verdict
+
+A value read back off the page that is itself a sentinel means the rule never fired and a literal
+`asdf` went into the record. Every read-back path asks that question BEFORE comparing, because a
+sentinel compared against itself matches perfectly and the comparison would print VERIFIED-PASS over
+a wrong record — the green-signal-is-not-a-correct-result failure in its newest costume. The verdict
+is `CAUGHT-BUG: sentinel landed`, never a quiet pass, in `TypeText`, `Verify Input Value` and
+`Gz Omni Verdict`.
+
+### Read-back lines follow the variable
+
+When a sentinel is rewritten to a variable, the dormant `#   verify: Verify Input Value    <label>
+<value>` line beneath it is retargeted to the same variable. Left alone it would assert that `asdf`
+landed — the exact thing the verdict above exists to catch, written into the pane as advice.
+
+### The run stamp
+
+`Gz Run Stamp` mints one `yyyymmdd-hhmmss-rand4` per run and every text-shaped generated value
+carries it, so a cleanup **step** (never a Suite Teardown — CRT Live Testing skips Teardown) can
+delete everything the run created by tag. A phone, a number, a date and a picklist value cannot
+carry it, and the resource says so rather than implying they can.

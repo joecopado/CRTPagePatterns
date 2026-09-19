@@ -558,6 +558,46 @@ function omniKey(el){ var cur = el, h = 0;
     if (OMNI_KEY_ELEMENT_RX.test(t)) return null;     /* the element host itself, keyless */
     cur = up(cur); h++; }
   return cur ? OMNI_KEY_CAP : null; }   /* stopped ON THE CAP, not on a boundary: say which */
+/* THE OPEN LISTBOX'S OWN OPTIONS, AT EVENT TIME (build n7, 2026-09-19).
+   A click-recorded control cannot carry a typed sentinel, so an ALT-CLICK on an option means "any
+   valid value here" -- and the only moment the set of valid values is visible is while the listbox
+   is OPEN, which is exactly when the pick fires. Run 8's own decisions already proved the page
+   holds them: decision 21's `ul` carried the text `-- No Value --USAUKAustraliaNew ZealandK`, one
+   run-on string nothing could split. This reads them as a LIST instead.
+   Three doors, in order: the element IS an option (its own listbox is an ancestor); the element
+   OWNS a listbox by `aria-controls` (the combobox input, whose listbox is a sibling, not a
+   parent); or the element is a native `<select>`. Anything else gets null -- a plain `<input>`
+   that happens to sit inside a `<ul>` is not a picklist and must not acquire one's options.
+   THE CAP IS DISCLOSED, never silent: `options_capped` carries the true count. */
+var OPTION_CAP = 40;
+var OPTION_SHAPES = 'li,option,[role="option"],[role="menuitem"]';
+function optionBox(el){
+  try{
+    if(!el || !el.closest) return null;
+    var t = el.tagName ? el.tagName.toLowerCase() : '';
+    if(t === 'select') return el;
+    if(el.matches && el.matches(OPTION_SHAPES)) return el.closest('[role="listbox"],[role="menu"],ul,select');
+    var ctl = attr(el,'aria-controls');
+    if(ctl){ var root = el.getRootNode ? el.getRootNode() : document;
+             var box = (root && root.getElementById) ? root.getElementById(ctl) : document.getElementById(ctl);
+             if(box) return box; }
+    return null;
+  }catch(e){ return null; }
+}
+function listboxOptions(el){
+  try{
+    var box = optionBox(el); if(!box || !box.querySelectorAll) return null;
+    var nodes = box.querySelectorAll(OPTION_SHAPES);
+    if(!nodes || !nodes.length) return null;
+    var out = [], i;
+    for(i = 0; i < nodes.length && out.length < OPTION_CAP; i++){
+      var s = (nodes[i].textContent || '').replace(/\s+/g,' ').trim();
+      if(s && s.length <= 120 && out.indexOf(s) < 0) out.push(s);
+    }
+    if(!out.length) return null;
+    return {options: out, total: nodes.length};
+  }catch(e){ return null; }
+}
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
   while (r && r !== document && r.host && g < 12){ out.push(r.host.tagName.toLowerCase()); r = r.host.getRootNode ? r.host.getRootNode() : document; g++; }
@@ -587,6 +627,9 @@ window.__gzDescribe = function(el){
     var root = el.getRootNode ? el.getRootNode() : document;
     d.in_shadow = !!(root && root !== document && root.host);
     d.host_chain = hostChain(el);
+    var lb = listboxOptions(el);       /* the OPEN listbox's options, for an Alt-clicked pick */
+    d.options = lb ? lb.options : null;
+    d.options_capped = (lb && lb.total > lb.options.length) ? lb.total : null;
     var li = labelIndex(el, d.label || d.text, d.family);
     d.label_index = li ? li.index : null;
     d.label_group_size = li ? li.group_size : null;

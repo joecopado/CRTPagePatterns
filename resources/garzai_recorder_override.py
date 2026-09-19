@@ -34,6 +34,7 @@ ROWS = json.loads('[{"n": 0, "label": "Toggle Panel", "type": "button", "identit
 PAGE_PATTERN = "/lightning/n/Zoo_Nightmare_Inputs"   # the ONLY page the embedded rows and recipe steps describe
 PAGE_PARTITION = "slockard"  # ... in the ONLY partition they were measured in (pom/keys.py)
 PAGE_HOST_STEMS = json.loads('["slockard-dev-ed"]')  # host stems `pom.keys` resolved to that partition at build time
+FIELDS = json.loads('{"Lead ID": {"object": "Lead", "name": "Id", "type": "id", "label": "Lead ID", "length": 18, "picklist_values": null}, "lead id": {"object": "Lead", "name": "Id", "type": "id", "label": "Lead ID", "length": 18, "picklist_values": null}, "Id": {"object": "Lead", "name": "Id", "type": "id", "label": "Lead ID", "length": 18, "picklist_values": null}, "id": {"object": "Lead", "name": "Id", "type": "id", "label": "Lead ID", "length": 18, "picklist_values": null}, "Deleted": {"object": "Lead", "name": "IsDeleted", "type": "boolean", "label": "Deleted", "length": null, "picklist_values": null}, "deleted": {"object": "Lead", "name": "IsDeleted", "type": "boolean", "label": "Deleted", "length": null, "picklist_values": null}, "IsDeleted": {"object": "Lead", "name": "IsDeleted", "type": "boolean", "label": "Deleted", "length": null, "picklist_values": null}, "isdeleted": {"object": "Lead", "name": "IsDeleted", "type": "boolean", "label": "Deleted", "length": null, "picklist_values": null}, "MasterRecordId": {"object": "Lead", "name": "MasterRecordId", "type": "reference", "label": "Master Record ID", "length": 18, "picklist_values": null}, "masterrecordid": {"object": "Lead", "name": "MasterRecordId", "type": "reference", "label": "Master Record ID", "length": 18, "picklist_values": null}, "Master Record ID": {"object": "Lead", "name": "MasterRecordId", "type": "reference", "label": "Master Record ID", "length": 18, "picklist_values": null}, "master record id": {"object": "Lead", "name": "MasterRecordId", "type": "reference", "label": "Master Record ID", "length": 18, "picklist_values": null}, "LastName": {"object": "Lead", "name": "LastName", "type": "string", "label": "Last Name", "length": 80, "picklist_values": null}, "lastname": {"object": "Lead", "name": "LastName", "type": "string", "label": "Last Name", "length": 80, "picklist_values": null}, "Last Name": {"object": "Lead", "name": "LastName", "type": "string", "label": "Last Name", "length": 80, "picklist_values": null}, "last name": {"object": "Lead", "name": "LastName", "type": "string", "label": "Last Name", "length": 80, "picklist_values": null}, "FirstName": {"object": "Lead", "name": "FirstName", "type": "string", "label": "First Name", "length": 40, "picklist_values": null}, "firstname": {"object": "Lead", "name": "FirstName", "type": "string", "label": "First Name", "length": 40, "picklist_values": null}, "First Name": {"object": "Lead", "name": "FirstName", "type": "string", "label": "First Name", "length": 40, "picklist_values": null}, "first name": {"object": "Lead", "name": "FirstName", "type": "string", "label": "First Name", "length": 40, "picklist_values": null}, "Salutation": {"object": "Lead", "name": "Salutation", "type": "picklist", "label": "Salutation", "length": 40, "picklist_values": ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof.", "Mx."]}, "salutation": {"object": "Lead", "name": "Salutation", "type": "picklist", "label": "Salutation", "length": 40, "picklist_values": ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof.", "Mx."]}, "Name": {"object": "Lead", "name": "Name", "type": "string", "label": "Full Name", "length": 121, "picklist_values": null}, "name": {"object": "Lead", "name": "Name", "type": "string", "label": "Full Name", "length": 121, "picklist_values": null}, "Full Name": {"object": "Lead", "name": "Name", "type": "string", "label": "Full Name", "length": 121, "picklist_values": null}, "full name": {"object": "Lead", "name": "Name", "type": "string", "label": "Full Name", "length": 121, "picklist_values": null}, "Title": {"object": "Lead", "name": "Title", "type": "string", "label": "Title", "length": 128, "picklist_values": null}, "title": {"object": "Lead", "name": "Title", "type": "string", "label": "Title", "length": 128, "picklist_values": null}, "Company": {"object": "Lead", "name": "Company", "type": "string", "label": "Company", "length": 255, "picklist_values": null}, "company": {"object": "Lead", "name": "Company", "type": "string", "label": "Company", "length": 255, "picklist_values": null}, "Street": {"object": "Lead", "name": "Street", "type": "textarea", "label": "Street", "length": 255, "picklist_values": null}, "street": {"object": "Lead", "name": "Street", "type": "textarea", "label": "Street", "length": 255, "picklist_values": null}, "City": {"object": "Lead", "name": "City", "type": "string", "label": "City", "length": 40, "picklist_values": null}, "city": {"object": "Lead", "name": "City", "type": "string", "label": "City", "length": 40, "picklist_values": null}, "State/Province": {"object": "Lead", "name": "State", "type": "string", "label": "State/Province", "length": 80, "picklist_values": null}, "state/province": {"object": "Lead", "name": "State", "type": "string", "label": "State/Province", "length": 80, "picklist_values": null}, "State": {"object": "Lead", "name": "State", "type": "string", "label": "State/Province", "length": 80, "picklist_values": null}, "state": {"object": "Lead", "name": "State", "type": "string", "label": "State/Province", "length": 80, "picklist_values": null}, "PostalCode": {"object": "Lead", "name": "PostalCode", "type": "string", "label": "Zip/Postal Code", "length": 20, "picklist_values": null}, "postalcode": {"object": "Lead", "name": "PostalCode", "type": "string", "label": "Zip/Postal Code", "length": 20, "picklist_values": null}, "Zip/Postal Code": {"object": "Lead", "name": "PostalCode", "type": "string", "label": "Zip/Postal Code", "length": 20, "picklist_values": null}, "zip/postal code": {"object": "Lead", "name": "PostalCode", "type": "string", "label": "Zip/Postal Code", "length": 20, "picklist_values": null}, "Country": {"object": "Lead", "name": "Country", "type": "string", "label": "Country", "length": 80, "picklist_values": null}, "country": {"object": "Lead", "name": "Country", "type": "string", "label": "Country", "length": 80, "picklist_values": null}, "Latitude": {"object": "Lead", "name": "Latitude", "type": "double", "label": "Latitude", "length": 18, "picklist_values": null}, "latitude": {"object": "Lead", "name": "Latitude", "type": "double", "label": "Latitude", "length": 18, "picklist_values": null}, "Longitude": {"object": "Lead", "name": "Longitude", "type": "double", "label": "Longitude", "length": 18, "picklist_values": null}, "longitude": {"object": "Lead", "name": "Longitude", "type": "double", "label": "Longitude", "length": 18, "picklist_values": null}, "Geocode Accuracy": {"object": "Lead", "name": "GeocodeAccuracy", "type": "picklist", "label": "Geocode Accuracy", "length": 40, "picklist_values": ["Address", "NearAddress", "Block", "Street", "ExtendedZip", "Zip", "Neighborhood", "City", "County", "State", "Unknown"]}, "geocode accuracy": {"object": "Lead", "name": "GeocodeAccuracy", "type": "picklist", "label": "Geocode Accuracy", "length": 40, "picklist_values": ["Address", "NearAddress", "Block", "Street", "ExtendedZip", "Zip", "Neighborhood", "City", "County", "State", "Unknown"]}, "GeocodeAccuracy": {"object": "Lead", "name": "GeocodeAccuracy", "type": "picklist", "label": "Geocode Accuracy", "length": 40, "picklist_values": ["Address", "NearAddress", "Block", "Street", "ExtendedZip", "Zip", "Neighborhood", "City", "County", "State", "Unknown"]}, "geocodeaccuracy": {"object": "Lead", "name": "GeocodeAccuracy", "type": "picklist", "label": "Geocode Accuracy", "length": 40, "picklist_values": ["Address", "NearAddress", "Block", "Street", "ExtendedZip", "Zip", "Neighborhood", "City", "County", "State", "Unknown"]}, "Address": {"object": "Lead", "name": "Address", "type": "address", "label": "Address", "length": null, "picklist_values": null}, "address": {"object": "Lead", "name": "Address", "type": "address", "label": "Address", "length": null, "picklist_values": null}, "Phone": {"object": "Lead", "name": "Phone", "type": "phone", "label": "Phone", "length": 40, "picklist_values": null}, "phone": {"object": "Lead", "name": "Phone", "type": "phone", "label": "Phone", "length": 40, "picklist_values": null}, "Email": {"object": "Lead", "name": "Email", "type": "email", "label": "Email", "length": 80, "picklist_values": null}, "email": {"object": "Lead", "name": "Email", "type": "email", "label": "Email", "length": 80, "picklist_values": null}, "Website": {"object": "Lead", "name": "Website", "type": "url", "label": "Website", "length": 255, "picklist_values": null}, "website": {"object": "Lead", "name": "Website", "type": "url", "label": "Website", "length": 255, "picklist_values": null}, "Photo URL": {"object": "Lead", "name": "PhotoUrl", "type": "url", "label": "Photo URL", "length": 255, "picklist_values": null}, "photo url": {"object": "Lead", "name": "PhotoUrl", "type": "url", "label": "Photo URL", "length": 255, "picklist_values": null}, "PhotoUrl": {"object": "Lead", "name": "PhotoUrl", "type": "url", "label": "Photo URL", "length": 255, "picklist_values": null}, "photourl": {"object": "Lead", "name": "PhotoUrl", "type": "url", "label": "Photo URL", "length": 255, "picklist_values": null}, "Description": {"object": "Lead", "name": "Description", "type": "textarea", "label": "Description", "length": 32000, "picklist_values": null}, "description": {"object": "Lead", "name": "Description", "type": "textarea", "label": "Description", "length": 32000, "picklist_values": null}, "LeadSource": {"object": "Lead", "name": "LeadSource", "type": "picklist", "label": "Lead Source", "length": 255, "picklist_values": ["Advertisement", "Employee Referral", "External Referral", "Partner", "Public Relations", "Seminar - Internal", "Seminar - Partner", "Trade Show", "Web", "Word of mouth", "Other"]}, "leadsource": {"object": "Lead", "name": "LeadSource", "type": "picklist", "label": "Lead Source", "length": 255, "picklist_values": ["Advertisement", "Employee Referral", "External Referral", "Partner", "Public Relations", "Seminar - Internal", "Seminar - Partner", "Trade Show", "Web", "Word of mouth", "Other"]}, "Lead Source": {"object": "Lead", "name": "LeadSource", "type": "picklist", "label": "Lead Source", "length": 255, "picklist_values": ["Advertisement", "Employee Referral", "External Referral", "Partner", "Public Relations", "Seminar - Internal", "Seminar - Partner", "Trade Show", "Web", "Word of mouth", "Other"]}, "lead source": {"object": "Lead", "name": "LeadSource", "type": "picklist", "label": "Lead Source", "length": 255, "picklist_values": ["Advertisement", "Employee Referral", "External Referral", "Partner", "Public Relations", "Seminar - Internal", "Seminar - Partner", "Trade Show", "Web", "Word of mouth", "Other"]}, "Status": {"object": "Lead", "name": "Status", "type": "picklist", "label": "Status", "length": 255, "picklist_values": ["New", "Contacted", "Nurturing", "Qualified", "Unqualified"]}, "status": {"object": "Lead", "name": "Status", "type": "picklist", "label": "Status", "length": 255, "picklist_values": ["New", "Contacted", "Nurturing", "Qualified", "Unqualified"]}, "Industry": {"object": "Lead", "name": "Industry", "type": "picklist", "label": "Industry", "length": 255, "picklist_values": ["Agriculture", "Apparel", "Banking", "Biotechnology", "Chemicals", "Communications", "Construction", "Consulting", "Education", "Electronics", "Energy", "Engineering", "Entertainment", "Environmental", "Finance", "Food & Beverage", "Government", "Healthcare", "Hospitality", "Insurance", "Machinery", "Manufacturing", "Media", "Not For Profit", "Other", "Recreation", "Retail", "Shipping", "Technology", "Telecommunications", "Transportation", "Utilities"]}, "industry": {"object": "Lead", "name": "Industry", "type": "picklist", "label": "Industry", "length": 255, "picklist_values": ["Agriculture", "Apparel", "Banking", "Biotechnology", "Chemicals", "Communications", "Construction", "Consulting", "Education", "Electronics", "Energy", "Engineering", "Entertainment", "Environmental", "Finance", "Food & Beverage", "Government", "Healthcare", "Hospitality", "Insurance", "Machinery", "Manufacturing", "Media", "Not For Profit", "Other", "Recreation", "Retail", "Shipping", "Technology", "Telecommunications", "Transportation", "Utilities"]}, "Rating": {"object": "Lead", "name": "Rating", "type": "picklist", "label": "Rating", "length": 255, "picklist_values": ["Hot", "Warm", "Cold"]}, "rating": {"object": "Lead", "name": "Rating", "type": "picklist", "label": "Rating", "length": 255, "picklist_values": ["Hot", "Warm", "Cold"]}, "Annual Revenue": {"object": "Lead", "name": "AnnualRevenue", "type": "currency", "label": "Annual Revenue", "length": 18, "picklist_values": null}, "annual revenue": {"object": "Lead", "name": "AnnualRevenue", "type": "currency", "label": "Annual Revenue", "length": 18, "picklist_values": null}, "AnnualRevenue": {"object": "Lead", "name": "AnnualRevenue", "type": "currency", "label": "Annual Revenue", "length": 18, "picklist_values": null}, "annualrevenue": {"object": "Lead", "name": "AnnualRevenue", "type": "currency", "label": "Annual Revenue", "length": 18, "picklist_values": null}, "Employees": {"object": "Lead", "name": "NumberOfEmployees", "type": "int", "label": "Employees", "length": null, "picklist_values": null}, "employees": {"object": "Lead", "name": "NumberOfEmployees", "type": "int", "label": "Employees", "length": null, "picklist_values": null}, "NumberOfEmployees": {"object": "Lead", "name": "NumberOfEmployees", "type": "int", "label": "Employees", "length": null, "picklist_values": null}, "numberofemployees": {"object": "Lead", "name": "NumberOfEmployees", "type": "int", "label": "Employees", "length": null, "picklist_values": null}, "Owner ID": {"object": "Lead", "name": "OwnerId", "type": "reference", "label": "Owner ID", "length": 18, "picklist_values": null}, "owner id": {"object": "Lead", "name": "OwnerId", "type": "reference", "label": "Owner ID", "length": 18, "picklist_values": null}, "OwnerId": {"object": "Lead", "name": "OwnerId", "type": "reference", "label": "Owner ID", "length": 18, "picklist_values": null}, "ownerid": {"object": "Lead", "name": "OwnerId", "type": "reference", "label": "Owner ID", "length": 18, "picklist_values": null}, "IsConverted": {"object": "Lead", "name": "IsConverted", "type": "boolean", "label": "Converted", "length": null, "picklist_values": null}, "isconverted": {"object": "Lead", "name": "IsConverted", "type": "boolean", "label": "Converted", "length": null, "picklist_values": null}, "Converted": {"object": "Lead", "name": "IsConverted", "type": "boolean", "label": "Converted", "length": null, "picklist_values": null}, "converted": {"object": "Lead", "name": "IsConverted", "type": "boolean", "label": "Converted", "length": null, "picklist_values": null}, "ConvertedDate": {"object": "Lead", "name": "ConvertedDate", "type": "date", "label": "Converted Date", "length": null, "picklist_values": null}, "converteddate": {"object": "Lead", "name": "ConvertedDate", "type": "date", "label": "Converted Date", "length": null, "picklist_values": null}, "Converted Date": {"object": "Lead", "name": "ConvertedDate", "type": "date", "label": "Converted Date", "length": null, "picklist_values": null}, "converted date": {"object": "Lead", "name": "ConvertedDate", "type": "date", "label": "Converted Date", "length": null, "picklist_values": null}, "ConvertedAccountId": {"object": "Lead", "name": "ConvertedAccountId", "type": "reference", "label": "Converted Account ID", "length": 18, "picklist_values": null}, "convertedaccountid": {"object": "Lead", "name": "ConvertedAccountId", "type": "reference", "label": "Converted Account ID", "length": 18, "picklist_values": null}, "Converted Account ID": {"object": "Lead", "name": "ConvertedAccountId", "type": "reference", "label": "Converted Account ID", "length": 18, "picklist_values": null}, "converted account id": {"object": "Lead", "name": "ConvertedAccountId", "type": "reference", "label": "Converted Account ID", "length": 18, "picklist_values": null}, "Converted Contact ID": {"object": "Lead", "name": "ConvertedContactId", "type": "reference", "label": "Converted Contact ID", "length": 18, "picklist_values": null}, "converted contact id": {"object": "Lead", "name": "ConvertedContactId", "type": "reference", "label": "Converted Contact ID", "length": 18, "picklist_values": null}, "ConvertedContactId": {"object": "Lead", "name": "ConvertedContactId", "type": "reference", "label": "Converted Contact ID", "length": 18, "picklist_values": null}, "convertedcontactid": {"object": "Lead", "name": "ConvertedContactId", "type": "reference", "label": "Converted Contact ID", "length": 18, "picklist_values": null}, "ConvertedOpportunityId": {"object": "Lead", "name": "ConvertedOpportunityId", "type": "reference", "label": "Converted Opportunity ID", "length": 18, "picklist_values": null}, "convertedopportunityid": {"object": "Lead", "name": "ConvertedOpportunityId", "type": "reference", "label": "Converted Opportunity ID", "length": 18, "picklist_values": null}, "Converted Opportunity ID": {"object": "Lead", "name": "ConvertedOpportunityId", "type": "reference", "label": "Converted Opportunity ID", "length": 18, "picklist_values": null}, "converted opportunity id": {"object": "Lead", "name": "ConvertedOpportunityId", "type": "reference", "label": "Converted Opportunity ID", "length": 18, "picklist_values": null}, "Unread By Owner": {"object": "Lead", "name": "IsUnreadByOwner", "type": "boolean", "label": "Unread By Owner", "length": null, "picklist_values": null}, "unread by owner": {"object": "Lead", "name": "IsUnreadByOwner", "type": "boolean", "label": "Unread By Owner", "length": null, "picklist_values": null}, "IsUnreadByOwner": {"object": "Lead", "name": "IsUnreadByOwner", "type": "boolean", "label": "Unread By Owner", "length": null, "picklist_values": null}, "isunreadbyowner": {"object": "Lead", "name": "IsUnreadByOwner", "type": "boolean", "label": "Unread By Owner", "length": null, "picklist_values": null}, "CreatedDate": {"object": "Lead", "name": "CreatedDate", "type": "datetime", "label": "Created Date", "length": null, "picklist_values": null}, "createddate": {"object": "Lead", "name": "CreatedDate", "type": "datetime", "label": "Created Date", "length": null, "picklist_values": null}, "Created Date": {"object": "Lead", "name": "CreatedDate", "type": "datetime", "label": "Created Date", "length": null, "picklist_values": null}, "created date": {"object": "Lead", "name": "CreatedDate", "type": "datetime", "label": "Created Date", "length": null, "picklist_values": null}, "Created By ID": {"object": "Lead", "name": "CreatedById", "type": "reference", "label": "Created By ID", "length": 18, "picklist_values": null}, "created by id": {"object": "Lead", "name": "CreatedById", "type": "reference", "label": "Created By ID", "length": 18, "picklist_values": null}, "CreatedById": {"object": "Lead", "name": "CreatedById", "type": "reference", "label": "Created By ID", "length": 18, "picklist_values": null}, "createdbyid": {"object": "Lead", "name": "CreatedById", "type": "reference", "label": "Created By ID", "length": 18, "picklist_values": null}, "Last Modified Date": {"object": "Lead", "name": "LastModifiedDate", "type": "datetime", "label": "Last Modified Date", "length": null, "picklist_values": null}, "last modified date": {"object": "Lead", "name": "LastModifiedDate", "type": "datetime", "label": "Last Modified Date", "length": null, "picklist_values": null}, "LastModifiedDate": {"object": "Lead", "name": "LastModifiedDate", "type": "datetime", "label": "Last Modified Date", "length": null, "picklist_values": null}, "lastmodifieddate": {"object": "Lead", "name": "LastModifiedDate", "type": "datetime", "label": "Last Modified Date", "length": null, "picklist_values": null}, "LastModifiedById": {"object": "Lead", "name": "LastModifiedById", "type": "reference", "label": "Last Modified By ID", "length": 18, "picklist_values": null}, "lastmodifiedbyid": {"object": "Lead", "name": "LastModifiedById", "type": "reference", "label": "Last Modified By ID", "length": 18, "picklist_values": null}, "Last Modified By ID": {"object": "Lead", "name": "LastModifiedById", "type": "reference", "label": "Last Modified By ID", "length": 18, "picklist_values": null}, "last modified by id": {"object": "Lead", "name": "LastModifiedById", "type": "reference", "label": "Last Modified By ID", "length": 18, "picklist_values": null}, "System Modstamp": {"object": "Lead", "name": "SystemModstamp", "type": "datetime", "label": "System Modstamp", "length": null, "picklist_values": null}, "system modstamp": {"object": "Lead", "name": "SystemModstamp", "type": "datetime", "label": "System Modstamp", "length": null, "picklist_values": null}, "SystemModstamp": {"object": "Lead", "name": "SystemModstamp", "type": "datetime", "label": "System Modstamp", "length": null, "picklist_values": null}, "systemmodstamp": {"object": "Lead", "name": "SystemModstamp", "type": "datetime", "label": "System Modstamp", "length": null, "picklist_values": null}, "Last Activity": {"object": "Lead", "name": "LastActivityDate", "type": "date", "label": "Last Activity", "length": null, "picklist_values": null}, "last activity": {"object": "Lead", "name": "LastActivityDate", "type": "date", "label": "Last Activity", "length": null, "picklist_values": null}, "LastActivityDate": {"object": "Lead", "name": "LastActivityDate", "type": "date", "label": "Last Activity", "length": null, "picklist_values": null}, "lastactivitydate": {"object": "Lead", "name": "LastActivityDate", "type": "date", "label": "Last Activity", "length": null, "picklist_values": null}, "Last Viewed Date": {"object": "Lead", "name": "LastViewedDate", "type": "datetime", "label": "Last Viewed Date", "length": null, "picklist_values": null}, "last viewed date": {"object": "Lead", "name": "LastViewedDate", "type": "datetime", "label": "Last Viewed Date", "length": null, "picklist_values": null}, "LastViewedDate": {"object": "Lead", "name": "LastViewedDate", "type": "datetime", "label": "Last Viewed Date", "length": null, "picklist_values": null}, "lastvieweddate": {"object": "Lead", "name": "LastViewedDate", "type": "datetime", "label": "Last Viewed Date", "length": null, "picklist_values": null}, "Last Referenced Date": {"object": "Lead", "name": "LastReferencedDate", "type": "datetime", "label": "Last Referenced Date", "length": null, "picklist_values": null}, "last referenced date": {"object": "Lead", "name": "LastReferencedDate", "type": "datetime", "label": "Last Referenced Date", "length": null, "picklist_values": null}, "LastReferencedDate": {"object": "Lead", "name": "LastReferencedDate", "type": "datetime", "label": "Last Referenced Date", "length": null, "picklist_values": null}, "lastreferenceddate": {"object": "Lead", "name": "LastReferencedDate", "type": "datetime", "label": "Last Referenced Date", "length": null, "picklist_values": null}, "Jigsaw": {"object": "Lead", "name": "Jigsaw", "type": "string", "label": "Data.com Key", "length": 20, "picklist_values": null}, "jigsaw": {"object": "Lead", "name": "Jigsaw", "type": "string", "label": "Data.com Key", "length": 20, "picklist_values": null}, "Data.com Key": {"object": "Lead", "name": "Jigsaw", "type": "string", "label": "Data.com Key", "length": 20, "picklist_values": null}, "data.com key": {"object": "Lead", "name": "Jigsaw", "type": "string", "label": "Data.com Key", "length": 20, "picklist_values": null}, "JigsawContactId": {"object": "Lead", "name": "JigsawContactId", "type": "string", "label": "Jigsaw Contact ID", "length": 20, "picklist_values": null}, "jigsawcontactid": {"object": "Lead", "name": "JigsawContactId", "type": "string", "label": "Jigsaw Contact ID", "length": 20, "picklist_values": null}, "Jigsaw Contact ID": {"object": "Lead", "name": "JigsawContactId", "type": "string", "label": "Jigsaw Contact ID", "length": 20, "picklist_values": null}, "jigsaw contact id": {"object": "Lead", "name": "JigsawContactId", "type": "string", "label": "Jigsaw Contact ID", "length": 20, "picklist_values": null}, "CompanyDunsNumber": {"object": "Lead", "name": "CompanyDunsNumber", "type": "string", "label": "Company D-U-N-S Number", "length": 9, "picklist_values": null}, "companydunsnumber": {"object": "Lead", "name": "CompanyDunsNumber", "type": "string", "label": "Company D-U-N-S Number", "length": 9, "picklist_values": null}, "Company D-U-N-S Number": {"object": "Lead", "name": "CompanyDunsNumber", "type": "string", "label": "Company D-U-N-S Number", "length": 9, "picklist_values": null}, "company d-u-n-s number": {"object": "Lead", "name": "CompanyDunsNumber", "type": "string", "label": "Company D-U-N-S Number", "length": 9, "picklist_values": null}, "Email Bounced Reason": {"object": "Lead", "name": "EmailBouncedReason", "type": "string", "label": "Email Bounced Reason", "length": 255, "picklist_values": null}, "email bounced reason": {"object": "Lead", "name": "EmailBouncedReason", "type": "string", "label": "Email Bounced Reason", "length": 255, "picklist_values": null}, "EmailBouncedReason": {"object": "Lead", "name": "EmailBouncedReason", "type": "string", "label": "Email Bounced Reason", "length": 255, "picklist_values": null}, "emailbouncedreason": {"object": "Lead", "name": "EmailBouncedReason", "type": "string", "label": "Email Bounced Reason", "length": 255, "picklist_values": null}, "Email Bounced Date": {"object": "Lead", "name": "EmailBouncedDate", "type": "datetime", "label": "Email Bounced Date", "length": null, "picklist_values": null}, "email bounced date": {"object": "Lead", "name": "EmailBouncedDate", "type": "datetime", "label": "Email Bounced Date", "length": null, "picklist_values": null}, "EmailBouncedDate": {"object": "Lead", "name": "EmailBouncedDate", "type": "datetime", "label": "Email Bounced Date", "length": null, "picklist_values": null}, "emailbounceddate": {"object": "Lead", "name": "EmailBouncedDate", "type": "datetime", "label": "Email Bounced Date", "length": null, "picklist_values": null}, "IndividualId": {"object": "Lead", "name": "IndividualId", "type": "reference", "label": "Individual ID", "length": 18, "picklist_values": null}, "individualid": {"object": "Lead", "name": "IndividualId", "type": "reference", "label": "Individual ID", "length": 18, "picklist_values": null}, "Individual ID": {"object": "Lead", "name": "IndividualId", "type": "reference", "label": "Individual ID", "length": 18, "picklist_values": null}, "individual id": {"object": "Lead", "name": "IndividualId", "type": "reference", "label": "Individual ID", "length": 18, "picklist_values": null}, "Important": {"object": "Lead", "name": "IsPriorityRecord", "type": "boolean", "label": "Important", "length": null, "picklist_values": null}, "important": {"object": "Lead", "name": "IsPriorityRecord", "type": "boolean", "label": "Important", "length": null, "picklist_values": null}, "IsPriorityRecord": {"object": "Lead", "name": "IsPriorityRecord", "type": "boolean", "label": "Important", "length": null, "picklist_values": null}, "ispriorityrecord": {"object": "Lead", "name": "IsPriorityRecord", "type": "boolean", "label": "Important", "length": null, "picklist_values": null}}')   # org-map field types by rendered label + API name (build n7, --fields)
 FE_SPEC = json.loads('{"_why": "2026-09-10 (user, Zoo_Nightmare_Inputs): the standard SLDS form element -- <div class=slds-form-element><div class=slds-form-element__label-wrapper><label class=slds-form-element__label>X</label></div><div class=slds-form-element__control>...<input></div></div> -- carries NO for= and the label is neither an ancestor nor a descendant of the control, so standard_label/label_span never read it: every one of the page\'s 26 inputs, selects and checkboxes parsed with no label (review raw_had: cousin labels x19). The rung climbs to the nearest form-element ancestor and reads its label element; a form element with no label of its own (the Approved Budget from/to pair) climbs to the next one. An input INSIDE the label wrapper (the readonly helper beside Contract Term) is not the control and gets no label.", "containerClassFragment": "slds-form-element", "excludeContainerClassFragments": ["slds-form-element__control", "slds-form-element__label-wrapper", "slds-form-element__help", "slds-form-element__icon", "slds-form-element__static", "slds-form-element__row"], "labelClassFragments": ["slds-form-element__label", "slds-checkbox__label", "slds-radio__label"], "targetInsideExcludedClassFragments": ["slds-form-element__label-wrapper", "slds-form-element__help-preview"], "climbWhenUnlabelled": true, "maxClimb": 8, "containerRowsNeverClaimIt": true, "targetTags": ["input", "select", "textarea"], "_why_targetTags": "2026-09-10 late (twelve industry-page audits): the rung labelled the inline-edit PENCIL with the field\'s name -- <button title=\\"Edit Name\\"> inside the field\'s slds-form-element read \'Name\' (56 rows on 4 pages, measured CAUGHT-BUG live: click_text(\'Name\', index=2) lands elsewhere) and every output field gained a phantom group_size 2. The rung is for the CONTROL the label names: a native form control, or a custom wrapper around exactly one. Buttons and links inside a form element keep their own title/text.", "wrapperMayBeTarget": true}')  # the template's own formElementLabel block, for the page-side describer
 GEN_SPEC = json.loads('{"prefixes": ["help-message-", "error-message-", "label-", "listbox-", "dropdown-element-", "tooltip-", "slds-combobox-", "slds-listbox-"], "patterns": ["^\\\\d+:\\\\d+;[a-z]$", "(^|:)j_id\\\\d+(:|$)", "^[a-z][a-z0-9]*(-[a-z0-9]+)*-\\\\d+$", "^[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*-\\\\d+$", "^ctab\\\\d+$", "^tabOperation-", "^tooltip-bubble_", "^check-button-label-\\\\d+(-\\\\d+)*$", "^[0-9a-f]{32}$", "^[A-Za-z][A-Za-z0-9]*_\\\\d{10,}$"]}')  # the template's own dynamicValuePatterns (D5), for the descriptor
 
@@ -597,6 +598,46 @@ function omniKey(el){ var cur = el, h = 0;
     if (OMNI_KEY_ELEMENT_RX.test(t)) return null;     /* the element host itself, keyless */
     cur = up(cur); h++; }
   return cur ? OMNI_KEY_CAP : null; }   /* stopped ON THE CAP, not on a boundary: say which */
+/* THE OPEN LISTBOX'S OWN OPTIONS, AT EVENT TIME (build n7, 2026-09-19).
+   A click-recorded control cannot carry a typed sentinel, so an ALT-CLICK on an option means "any
+   valid value here" -- and the only moment the set of valid values is visible is while the listbox
+   is OPEN, which is exactly when the pick fires. Run 8's own decisions already proved the page
+   holds them: decision 21's `ul` carried the text `-- No Value --USAUKAustraliaNew ZealandK`, one
+   run-on string nothing could split. This reads them as a LIST instead.
+   Three doors, in order: the element IS an option (its own listbox is an ancestor); the element
+   OWNS a listbox by `aria-controls` (the combobox input, whose listbox is a sibling, not a
+   parent); or the element is a native `<select>`. Anything else gets null -- a plain `<input>`
+   that happens to sit inside a `<ul>` is not a picklist and must not acquire one's options.
+   THE CAP IS DISCLOSED, never silent: `options_capped` carries the true count. */
+var OPTION_CAP = 40;
+var OPTION_SHAPES = 'li,option,[role="option"],[role="menuitem"]';
+function optionBox(el){
+  try{
+    if(!el || !el.closest) return null;
+    var t = el.tagName ? el.tagName.toLowerCase() : '';
+    if(t === 'select') return el;
+    if(el.matches && el.matches(OPTION_SHAPES)) return el.closest('[role="listbox"],[role="menu"],ul,select');
+    var ctl = attr(el,'aria-controls');
+    if(ctl){ var root = el.getRootNode ? el.getRootNode() : document;
+             var box = (root && root.getElementById) ? root.getElementById(ctl) : document.getElementById(ctl);
+             if(box) return box; }
+    return null;
+  }catch(e){ return null; }
+}
+function listboxOptions(el){
+  try{
+    var box = optionBox(el); if(!box || !box.querySelectorAll) return null;
+    var nodes = box.querySelectorAll(OPTION_SHAPES);
+    if(!nodes || !nodes.length) return null;
+    var out = [], i;
+    for(i = 0; i < nodes.length && out.length < OPTION_CAP; i++){
+      var s = (nodes[i].textContent || '').replace(/\s+/g,' ').trim();
+      if(s && s.length <= 120 && out.indexOf(s) < 0) out.push(s);
+    }
+    if(!out.length) return null;
+    return {options: out, total: nodes.length};
+  }catch(e){ return null; }
+}
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
   while (r && r !== document && r.host && g < 12){ out.push(r.host.tagName.toLowerCase()); r = r.host.getRootNode ? r.host.getRootNode() : document; g++; }
@@ -626,6 +667,9 @@ window.__gzDescribe = function(el){
     var root = el.getRootNode ? el.getRootNode() : document;
     d.in_shadow = !!(root && root !== document && root.host);
     d.host_chain = hostChain(el);
+    var lb = listboxOptions(el);       /* the OPEN listbox's options, for an Alt-clicked pick */
+    d.options = lb ? lb.options : null;
+    d.options_capped = (lb && lb.total > lb.options.length) ? lb.total : null;
     var li = labelIndex(el, d.label || d.text, d.family);
     d.label_index = li ? li.index : null;
     d.label_group_size = li ? li.group_size : null;
@@ -672,21 +716,30 @@ function stampAndDescribe(el){var out={nonce:null,descriptor:null};try{if(el&&el
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
  var alt;try{if(ctx&&ctx.nodeType===1){alt=axp(ctx);if(alt){window.__gzSeen[alt]=Date.now();Object.keys(window.__gzPending).forEach(function(k){var pe=window.__gzPendingEl[k];if(k===alt||(pe&&(pe===ctx||pe.contains(ctx)||ctx.contains(pe)))){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k];delete window.__gzPendingEl[k];window.__gzSeen[k]=Date.now()}})}}}catch(e){}
  var mark=stampAndDescribe(ctx);
- enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){gzOutcome(j);var line=(j&&typeof j.line==='string')?j.line:r;((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,event,x)});if(line!==''){self.pushStep(line,event,x)}((j&&j.backups)||[]).forEach(function(b){self.pushStep(b,event,x)})}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
+ /* THE ALT-CLICK MARKER (build n7). A click-recorded control -- a picklist option, a calendar day
+    -- cannot carry a typed sentinel, so the modifier key IS the sentinel: Alt means "any valid
+    value here". The capture-phase listener and this call site both see the real DOM event, so the
+    flag is read where it is true and nowhere else. */
+ var altKey=false;try{altKey=!!(event&&event.altKey)}catch(e){}
+ enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,alt:altKey,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){gzOutcome(j);var line=(j&&typeof j.line==='string')?j.line:r;((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,event,x)});if(line!==''){self.pushStep(line,event,x)}((j&&j.backups)||[]).forEach(function(b){self.pushStep(b,event,x)})}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
 function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.target;if(!tg||tg.nodeType!==1)return;var el=tg;
  if(kind==='click'){el=tg.closest('button,a,[role="button"],[role="option"],[role="tab"],[role="menuitem"],[role="checkbox"],input,select,option,[class*="zn-arrow"],lightning-button-icon,lightning-button,lightning-icon')||tg}
  var self=window.__gzRec;if(!self){console.log('gz safety-net: no recorder instance yet');return}
  var k=axp(el);if(!k){console.log('gz safety-net: the element is detached; no positional key');return}var now=Date.now();if(window.__gzSeen[k]&&now-window.__gzSeen[k]<1500)return;if(window.__gzPending[k])clearTimeout(window.__gzPending[k]);window.__gzPendingEl[k]=el;
  var value=(kind==='change')?(el.type==='checkbox'?(el.checked?'on':'off'):(el.value!==undefined?String(el.value):'')):undefined;
  var mark=stampAndDescribe(el);
+ var altKey=false;try{altKey=!!(ev&&ev.altKey)}catch(e){}   /* the Alt-click marker, build n7 */
  window.__gzPending[k]=setTimeout(function(){delete window.__gzPending[k];delete window.__gzPendingEl[k];if(window.__gzSeen[k]&&Date.now()-window.__gzSeen[k]<1500+HOLD)return;window.__gzSeen[k]=Date.now();
-  enqueue(function(){return ask({rendered:'',xpath:k,synthetic:true,kind:kind,value:value,nonce:mark.nonce,descriptor:mark.descriptor,tag:el.tagName.toLowerCase(),etype:(el.type||''),text:(el.textContent||'').trim().slice(0,80)}).then(function(j){gzOutcome(j);((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,ev,k)});if(j&&j.line){self.pushStep(j.line,ev,k)}((j&&j.backups)||[]).forEach(function(b){self.pushStep(b,ev,k)})})})},HOLD)}catch(e){}}
+  enqueue(function(){return ask({rendered:'',xpath:k,synthetic:true,kind:kind,value:value,alt:altKey,nonce:mark.nonce,descriptor:mark.descriptor,tag:el.tagName.toLowerCase(),etype:(el.type||''),text:(el.textContent||'').trim().slice(0,80)}).then(function(j){gzOutcome(j);((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,ev,k)});if(j&&j.line){self.pushStep(j.line,ev,k)}((j&&j.backups)||[]).forEach(function(b){self.pushStep(b,ev,k)})})})},HOLD)}catch(e){}}
 document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-19n6 inband", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
-         "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
+STATE = {"version": "2026-09-19n7 data", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
+         "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None,
+         # every variable name this pane has already used, so `${last_name}` and a second
+         # `Last Name` on the same page do not collide (`compose_live.variable_name`)
+         "vars": []}
 
 # ------------------------------------------------------------------ the IN-BAND outcome channel
 # The composer's verdicts used to live in ONE place the container never hands back:
@@ -1405,6 +1458,93 @@ def _omni_date_flush(cl=None):
     return out
 
 
+def _taken():
+    """The variable names this pane has already used. A NEW set each call, so a caller that only
+    wants a dormant name can pass a copy and reserve nothing."""
+    return set(STATE.get("vars") or [])
+
+
+def _alt_date(req, decision, label, key, iso, cl, stock_open, stock_day):
+    """(pre, line, backups) for an ALT-CLICKED calendar day, or ([], '', []).
+
+    The offset is computed HERE, at compose time, because this is the only moment both `today` and
+    the picked day are known. The pane then keeps `Gz Date    +30    --iso` instead of
+    `2026-10-19`, so the same recording picks a date the same distance away on every later run
+    rather than one that has drifted into the past -- which is the duplication-rule failure the
+    user named, in its date costume."""
+    if not req.get("alt"):
+        return [], "", []
+    taken = _taken()
+    try:
+        gvar, gline, gbk, gwhy = cl.generated_date_lines(label, key, iso, taken=taken)
+    except Exception as exc:
+        decision["generated"] = "error: %s" % exc
+        return [], "", []
+    if not gline:
+        decision["generated"] = "Alt-click on the day, but %s: the literal date stands" % gwhy
+        return [], "", []
+    STATE["vars"] = sorted(taken)
+    backups = [gbk] + ["    #   backup: %s   (stock recorder line, unverified)" % s.strip()
+                       for s in (stock_open, stock_day) if (s or "").strip()]
+    decision["why"] = ("OmniStudio date pick, ALT-CLICKED: an OFFSET from today, not the literal "
+                       "date (%s); the literal date and both stock lines are dormant backups" % gwhy)
+    decision["omni"] = "date paired (Alt: generated offset)"
+    decision["generated"] = gwhy
+    return [gvar], gline, backups
+
+
+def _dormant_date_generate(cl, decision, label, key, iso):
+    """(c) the dormant generate pair under EVERY plain date pick -- no gesture, literal recording,
+    two cell deletions per line to switch it. Named against a COPY of the pane's variable set."""
+    try:
+        dvar, dline, _bk, _why = cl.generated_date_lines(label, key, iso, taken=set(_taken()))
+        return cl.dormant_generate_pair(dvar, dline)
+    except Exception as exc:
+        decision["generated"] = "dormant generate line not composed: %s" % exc
+        return []
+
+
+def _generated_data(req, decision, line, backups):
+    """(pre, line, backups) -- the TYPED-SENTINEL rule, run LAST so it sees the line that will
+    actually run (the OmniStudio routing has already chosen `Omni Type` over `TypeText`, and an
+    `asdf` in a masked input must become `Omni Type    <key>    ${phone_number}`).
+
+    A sentinel composes a VARIABLE line above the fill and the fill uses the variable, so a later
+    verify or cleanup step reuses the same value and the run stamp inside it is the cleanup tag."""
+    cl = _parser()
+    if cl is None or not hasattr(cl, "generated_data_lines"):
+        return [], line, backups
+    if not isinstance(line, str) or not line.strip():
+        return [], line, backups
+    desc = req.get("descriptor") or {}
+    taken = _taken()
+    try:
+        var_line, new_line, why = cl.generated_data_lines(
+            line, label=desc.get("label") or desc.get("aria_label") or desc.get("placeholder"),
+            fields=FIELDS, desc=desc, options=desc.get("options"), taken=taken,
+            indent=(line[: len(line) - len(line.lstrip())] or "    "))
+    except Exception as exc:
+        decision["generated"] = "error: %s" % exc
+        return [], line, backups
+    if not var_line:
+        # A MALFORMED SENTINEL, OR A TYPE WITH NO GENERATOR, IS SAID OUT LOUD. `@@dat+30` typed
+        # into a field is a person asking for generated data and not getting it; passing it
+        # through with no mark would type `@@dat+30` into the record and call it a pass.
+        if why and "not a sentinel" not in why and "no value cell" not in why:
+            decision["generated"] = why
+            decision["why"] = "%s; %s" % (decision.get("why") or "", why)
+        return [], line, backups
+    STATE["vars"] = sorted(taken)
+    var = new_line.split("${", 1)[1].split("}", 1)[0] if "${" in new_line else ""
+    # THE DORMANT READ-BACK STILL QUOTES THE SENTINEL unless it is retargeted: `_omni_fill` built
+    # `#   verify: Verify Input Value    Phone Number    asdf` from the line as it was. Left alone
+    # it asserts that `asdf` landed -- the exact thing the sentinel-landed verdict exists to catch.
+    backups = [cl.retarget_verify_backup(b, "${%s}" % var) for b in backups]
+    decision["generated"] = why
+    decision["why"] = "%s; generated data: %s" % (decision.get("why") or "", why)
+    return [var_line], new_line, backups
+
+
 def _omni_date_pair(req, decision, line, backups):
     """(pre, line, backups) or None when this event is not the date picker's business."""
     cl = _parser()
@@ -1423,6 +1563,11 @@ def _omni_date_pair(req, decision, line, backups):
         _OMNI_DATE.update({"picked": True, "day_line": line if isinstance(line, str) and line.strip()
                            else rendered, "iso": iso, "t": now})
         if iso:
+            gpre, gline, gbks = _alt_date(req, decision, _OMNI_DATE["label"], _OMNI_DATE["key"],
+                                          iso, cl, _OMNI_DATE["open_line"], _OMNI_DATE["day_line"])
+            if gline:
+                _omni_date_clear()
+                return pre + gpre, gline, gbks
             out, bks = cl.omni_date_pair_lines(_OMNI_DATE["label"], _OMNI_DATE["key"], iso,
                                                _OMNI_DATE["open_line"], _OMNI_DATE["day_line"])
             if out:
@@ -1430,6 +1575,8 @@ def _omni_date_pair(req, decision, line, backups):
                                    "day cell composed as one Omni Date (%s); both stock lines "
                                    "are dormant backups -- %s" % (iso, why))
                 decision["omni"] = "date paired"
+                bks = list(bks) + _dormant_date_generate(cl, decision, _OMNI_DATE["label"],
+                                                         _OMNI_DATE["key"], iso)
                 _omni_date_clear()
                 return pre, out, bks
         decision["why"] = ("OmniStudio date pick: HELD with its opening click; %s" % why)
@@ -1444,8 +1591,13 @@ def _omni_date_pair(req, decision, line, backups):
         key = str(desc.get("omni_key") or "").strip()
         if iso and key:
             stock_day = line if isinstance(line, str) and line.strip() else rendered
+            gpre, gline, gbks = _alt_date(req, decision, desc.get("label"), key, iso, cl,
+                                          "", stock_day)
+            if gline:
+                return pre + gpre, gline, gbks
             out, bks = cl.omni_date_pair_lines(None, key, iso, "", stock_day)
             if out:
+                bks = list(bks) + _dormant_date_generate(cl, decision, desc.get("label"), key, iso)
                 decision["why"] = ("OmniStudio day cell with NO opening click of its own (the "
                                    "calendar was already open): the cell's own aria-label names "
                                    "the whole date (%s) and the element carries its key, and "
@@ -1542,12 +1694,43 @@ def _omni_pair(req, decision, line, backups):
                                               "side, so the instances were not compared")
         option = _cells(rendered)[1]
         label = _OMNI_HOLD["label"]
+        # THE ALT-CLICK MARKER on an option (build n7). A click-recorded control cannot carry a
+        # typed sentinel, so Alt IS the sentinel: "any valid value here". The descriptor carries
+        # the OPEN listbox's own options at event time, so this needs no metadata -- the values a
+        # person could have picked are the values the page was offering.
+        if req.get("alt"):
+            taken = _taken()
+            gvar, gsel, gbk, gwhy = cl.generated_pick_lines(label, option, desc.get("options"),
+                                                            taken=taken)
+            if gsel:
+                STATE["vars"] = sorted(taken)
+                _pair, pair_backups = cl.omni_pair_lines(label, option, _OMNI_HOLD["line"], rendered)
+                decision["why"] = ("OmniStudio combobox pick, ALT-CLICKED: a generated value from "
+                                   "the options the listbox was showing (%s); the literal pick and "
+                                   "both stock lines are dormant backups" % gwhy)
+                decision["omni"] = "paired (Alt: generated value)"
+                decision["generated"] = gwhy
+                _omni_clear()
+                return pre + [gvar], gsel, [gbk] + pair_backups
+            decision["generated"] = ("Alt-click on the option, but %s: the literal pick stands"
+                                     % gwhy)
         pair, pair_backups = cl.omni_pair_lines(label, option, _OMNI_HOLD["line"], rendered)
         if pair:
             decision["why"] = ("OmniStudio combobox pick: the open click and the option click "
                                "composed as one Omni Select (%r -> %r); the two stock lines are "
                                "dormant backups" % (cl.omni_label(label), option))
             decision["omni"] = "paired"
+            # (c) THE DORMANT GENERATE PAIR, under EVERY plain pick. No gesture was made, so the
+            # recording stays literal and runs as recorded -- and switching it to generated data
+            # is two cell deletions per line, with nothing to retype. Named against a COPY of the
+            # pane's variable set, so a dormant line never reserves a live name.
+            try:
+                dvar, dsel, _dbk, _dwhy = cl.generated_pick_lines(label, option,
+                                                                  desc.get("options"),
+                                                                  taken=set(_taken()))
+                pair_backups = list(pair_backups) + cl.dormant_generate_pair(dvar, dsel)
+            except Exception as exc:
+                decision["generated"] = "dormant generate line not composed: %s" % exc
             _omni_clear()
             return pre, pair, pair_backups
         if pair_backups:
@@ -1840,6 +2023,9 @@ class _H(BaseHTTPRequestHandler):
         try:
             pre, out_line, backups = _omni_pair(req, decision, decision["out"], backups)
             out_line, backups = _omni_fill(req, decision, out_line, backups)
+            # the TYPED-SENTINEL rule runs LAST, on the line that will actually run
+            gpre, out_line, backups = _generated_data(req, decision, out_line, backups)
+            pre = list(pre) + gpre
             decision["out"] = out_line
         except Exception as exc:
             # the pair is an improvement on top of a decision that is already made: a failure here

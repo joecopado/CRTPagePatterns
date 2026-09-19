@@ -41,6 +41,7 @@ Documentation     GarzAI TypeText override (2026-09-18): shadows the library's o
 ...               each retyped attempt landed on top of the last.
 Library           QForce
 Library           Collections    # Set To Dictionary below; measured missing in Live Testing 2026-09-19 (every TypeText failed "No keyword with name 'Set To Dictionary' found")
+Resource          ${CURDIR}/garzai_data.robot    # Gz Sentinel Verdict: a read-back that IS a sentinel is CAUGHT-BUG, never a quiet pass
 
 *** Variables ***
 # THE STEP IS THE ACTION; THE VERDICT IS AN OBSERVATION (user, 2026-09-19: "validations should be
@@ -94,6 +95,15 @@ TypeText
         Gz Report Mismatch    COULD-NOT-CHECK    GarzAI TypeText('${locator}'): could not read back a value after typing '${input_text}' through two repair passes -- not a pass.
         RETURN
     END
+    # THE SENTINEL-LANDED VERDICT (build n7, 2026-09-19). Checked BEFORE Values Match, because a
+    # sentinel that was typed AND read back matches itself perfectly: `Values Match` would return
+    # true and this would print VERIFIED-PASS over a record now holding the literal `asdf`. That
+    # is the green-signal-is-not-a-correct-result failure in its newest costume, so the read-back
+    # gets its own question first -- is this value a SENTINEL? -- and answers CAUGHT-BUG.
+    ${landed}=    Gz Sentinel Verdict    GarzAI TypeText('${locator}')    ${actual}
+    IF    ${landed}
+        RETURN
+    END
     ${matches}=    Values Match    ${input_text}    ${actual}
     IF    not ${matches}
         Gz Report Mismatch    CAUGHT-BUG    GarzAI TypeText('${locator}'): value did not land. asked for '${input_text}', field holds '${actual}' -- never re-typed over a non-blank mismatch (D13, CLAUDE.md).
@@ -119,6 +129,12 @@ Verify Input Value
     ...    repair -- for a suite that wants to assert on a value it (or an earlier step) already set.
     [Arguments]    ${locator}    ${expected}    ${anchor}=1
     ${actual}=    GetInputValue    ${locator}    anchor=${anchor}
+    # the same sentinel-landed question the TypeText override asks, for the same reason: a
+    # sentinel compared against itself matches, and a match here would read as a pass
+    ${landed}=    Gz Sentinel Verdict    GarzAI Verify Input Value('${locator}')    ${actual}
+    IF    ${landed}
+        Fail    CAUGHT-BUG: sentinel landed -- GarzAI Verify Input Value('${locator}'): the field holds the sentinel '${actual}'.
+    END
     ${matches}=    Values Match    ${expected}    ${actual}
     IF    not ${matches}
         Fail    GarzAI Verify Input Value('${locator}'): expected '${expected}', field holds '${actual}'.
