@@ -35,7 +35,7 @@ Agentforce Employee Agent Walkthrough - US-0001088
     ClickElement                 (//div[@role\="rowgroup"]/preceding::input[@type\="checkbox"])[last()]    timeout=15    # UNVERIFIED: header "select all" checkbox locator, not confirmed live
 
     # SAY: Dependency Analysis on the full set -- this is how we catch a missing permission set or a missing prompt template before it ships.
-    ClickText                    Dependency Analysis             partial_match=False
+    ClickText                    Dependency Analysis    # count-suffixed label ("Dependency Analysis (n)"): exact match fails, partial is right -- aligned with 01_standard_user_story 2026-09-18
     VerifyText                   Dependencies                    timeout=20
     # SAY: Whatever shows up here, we review it, we don't add it -- that decision belongs to the story's owner, not to this demo.
     Close Side Panel              heading=Dependency Analysis

@@ -600,15 +600,15 @@ Review /lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_
     # row 135  button  "Standard Rules"  [accepted]  -- member of bucket b0
     GoTo    https://copado-se-demo.lightning.force.com/lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_Deployment_Configuration?objectApiName&context=RECORD_DETAIL&recordId=a1vJ7000000lhWGIAY&backgroundContext=%2Flightning%2Fr%2Fcopado__User_Story__c%2Fa1vJ7000000lhWGIAY%2Fview
     VerifyText    Search by Label    timeout=30
-    ClickText    Standard Rules    partial_match=False
+    ClickText    Standard Rules    partial_match=True    # tab label carries a count; fixed in 00_transitions, aligned here 2026-09-18
     # row 136  button  "Advanced Rules"  [accepted]  -- member of bucket b0
     GoTo    https://copado-se-demo.lightning.force.com/lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_Deployment_Configuration?objectApiName&context=RECORD_DETAIL&recordId=a1vJ7000000lhWGIAY&backgroundContext=%2Flightning%2Fr%2Fcopado__User_Story__c%2Fa1vJ7000000lhWGIAY%2Fview
     VerifyText    Search by Label    timeout=30
-    ClickText    Advanced Rules    partial_match=False
+    ClickText    Advanced Rules    partial_match=True
     # row 137  button  "Automations"  [accepted]  -- member of bucket b0
     GoTo    https://copado-se-demo.lightning.force.com/lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_Deployment_Configuration?objectApiName&context=RECORD_DETAIL&recordId=a1vJ7000000lhWGIAY&backgroundContext=%2Flightning%2Fr%2Fcopado__User_Story__c%2Fa1vJ7000000lhWGIAY%2Fview
     VerifyText    Search by Label    timeout=30
-    ClickText    Automations    partial_match=False
+    ClickText    Automations    partial_match=True
     # row 142  button  "Add Changes"  [accepted]  -- member of bucket b0
     GoTo    https://copado-se-demo.lightning.force.com/lightning/action/quick/copado__User_Story__c.copado_labs__Revenue_Cloud_Deployment_Configuration?objectApiName&context=RECORD_DETAIL&recordId=a1vJ7000000lhWGIAY&backgroundContext=%2Flightning%2Fr%2Fcopado__User_Story__c%2Fa1vJ7000000lhWGIAY%2Fview
     VerifyText    Search by Label    timeout=30
