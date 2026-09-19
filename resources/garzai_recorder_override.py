@@ -234,6 +234,26 @@ def control_class(tag, role, family=None) -> str:
     return 'other'
 
 
+def has_class_evidence(tag, role, family) -> bool:
+    """True when this side said ANYTHING about what kind of control it is. `control_class` folds
+    "nothing was supplied" and "something unrecognised" into the same `other`, and `other` agrees
+    with everything -- so a side that carries no tag, no role and no family used to claim any row
+    with the same label text (challenge 2026-09-19b case 11c). `other` is what the describer
+    yields for a closed shadow root or a describe that threw."""
+    return any(str(x or '').strip() for x in (tag, role, family))
+
+
+def row_has_class_evidence(row: dict) -> bool:
+    attrs = (row.get('attrs') or {}) if isinstance(row, dict) else {}
+    return has_class_evidence(row.get('tag_corrected') or row.get('tag'), attrs.get('role'),
+                              row.get('family_corrected') or row.get('element_type')
+                              or row.get('type'))
+
+
+def desc_has_class_evidence(desc: dict) -> bool:
+    return has_class_evidence(desc.get('tag'), desc.get('role'), desc.get('family'))
+
+
 def classes_agree(a: str, b: str) -> bool:
     """Two control classes name the same kind of control. `other` agrees with everything;
     `option` agrees only with `option`."""
@@ -270,11 +290,30 @@ def _in_chrome_path(path: str) -> bool:
 def row_may_claim(row: dict, desc: dict):
     """(True, None) when this row may answer for this descriptor's element, or (False, why not).
 
-    Two refusals, both measured (fsc7f 2026-09-19, ledger F42's class):
+    Three refusals, all measured (fsc7f 2026-09-19, ledger F42's class):
+      * A SIDE THAT SAID NOTHING AT ALL about what kind of control it is -- no tag, no role, no
+        family -- leaves a label-text match as the only evidence, and that is COULD-NOT-CHECK, not
+        agreement (challenge 2026-09-19b case 11c: `control_class` folds "nothing supplied" and
+        "something unrecognised" into the same `other`, `other` agreed with everything, and an
+        unstamped chrome row claimed an element the page could not class);
       * the control classes disagree -- a listbox option is not a tab and not a nav link;
       * the row lives in the app chrome while the element's own path does not.
+
+    NARROWED FROM THE REPORT'S WORDING, BY MEASUREMENT. The challenge report's rule line reads
+    "two `other` classes are COULD-NOT-CHECK". Implemented literally that refuses EVERY ordinary
+    form field: `control_class` returns `other` for family `input_field` on both sides, so
+    `tools/recorder/tests/challenge/test_challenge_composer_guards.py` went 7 red -- the composer
+    stopped matching the reviewed rows at all. The defect the report actually measured is a side
+    with NO class evidence, which is what this refuses; a stamped-but-unrecognised pair still
+    agrees, because both sides did say something and they said the same thing.
     """
     rc, dc = row_class(row), desc_class(desc)
+    if not desc_has_class_evidence(desc):
+        return False, ('COULD-NOT-CHECK: the page could not class this element (no tag, no role, '
+                       'no family), so a label-text match is the only evidence there is')
+    if not row_has_class_evidence(row):
+        return False, ('COULD-NOT-CHECK: the row carries no tag, no role and no family, so a '
+                       'label-text match is the only evidence there is')
     if not classes_agree(rc, dc):
         return False, 'the row is a %s and the element is a %s' % (rc, dc)
     path = desc.get('xpath') or desc.get('alt_xpath') or ''
@@ -542,6 +581,12 @@ function labelIndex(el, label, fam){
    host stops it after reading. Reaching either with nothing is null, which the composer already
    says out loud and answers with the stock TypeText line. */
 var OMNI_KEY_MAX_HOPS = 20;
+/* THE CAP GETS ITS OWN ANSWER (challenge 2026-09-19b case 12). `null` used to mean BOTH "this
+   element genuinely carries no key" and "the walk gave up before it got there", and the composer
+   reported the first for the second -- a false statement of fact, on a page where the key existed.
+   Stopping on the cap now returns this sentinel; `__gzDescribe` turns it into `omni_key: null`
+   PLUS `omni_key_capped: <hops>`, so the composer can say "not reached within N hops". */
+var OMNI_KEY_CAP = '__gz_omni_key_cap__';
 var OMNI_KEY_CONTAINER_RX = /^(runtime_omnistudio-(flexcard|omniscript|generated-omniscript)|runtime_omnistudio_flexcards-|runtime_omnistudio_omniscript-omniscript-(container|step)$)/;
 var OMNI_KEY_ELEMENT_RX = /^runtime_omnistudio_omniscript-omniscript-/;
 function omniKey(el){ var cur = el, h = 0;
@@ -551,7 +596,7 @@ function omniKey(el){ var cur = el, h = 0;
     var k = attr(cur,'data-omni-key'); if (k) return k;
     if (OMNI_KEY_ELEMENT_RX.test(t)) return null;     /* the element host itself, keyless */
     cur = up(cur); h++; }
-  return null; }
+  return cur ? OMNI_KEY_CAP : null; }   /* stopped ON THE CAP, not on a boundary: say which */
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
   while (r && r !== document && r.host && g < 12){ out.push(r.host.tagName.toLowerCase()); r = r.host.getRootNode ? r.host.getRootNode() : document; g++; }
@@ -570,7 +615,9 @@ window.__gzDescribe = function(el){
     d.title = attr(el,'title');
     d.role = attr(el,'role');
     d.data_testid = attr(el,'data-testid') || attr(el,'data-test-id');
-    d.omni_key = omniKey(el);          /* OmniProcessElement.Name, off the element HOST */
+    var _ok = omniKey(el);             /* OmniProcessElement.Name, off the element HOST */
+    d.omni_key = (_ok === OMNI_KEY_CAP) ? null : _ok;
+    d.omni_key_capped = (_ok === OMNI_KEY_CAP) ? OMNI_KEY_MAX_HOPS : null;
     d.text = txt(el).slice(0,80);
     var nl = nearestLabel(el);
     d.label = nl[0] || null;
@@ -616,11 +663,16 @@ JS = r"""
 function axp(el){if(!el||el.isConnected===false)return null;var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return el?('/html[1]/'+p.join('/')):null}
 var ASK_MS=6000;function ask(body){body.frame=(window!==window.top);try{body.frame_path=location.pathname}catch(e){body.frame_path=''}var ctl=(typeof AbortController!=='undefined')?new AbortController():null;var timer=setTimeout(function(){try{ctl&&ctl.abort()}catch(e){}},ASK_MS);return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body),signal:ctl?ctl.signal:undefined}).then(function(res){clearTimeout(timer);return res.json()}).catch(function(e){clearTimeout(timer);throw e})}
 function enqueue(fn){window.__gzQ=window.__gzQ.then(fn).catch(function(e){console.log('gz queue',e)})}
+/* THE IN-BAND OUTCOME. The composer's verdicts are written into the page under test, on TWO
+   surfaces, so whichever one a DOM snapshot keeps carries them back out with the next keyword
+   reply: a <script type="application/json" id="gz-outcome"> element and the same JSON on
+   <html data-gz-outcome>. Read by tools/crt_live/session.py keyword --outcome. */
+function gzOutcome(j){try{if(!j||!j.outcome)return;var s=JSON.stringify(j.outcome);var id=j.outcome_id||'gz-outcome';var at=j.outcome_attr||'data-gz-outcome';var r=document.documentElement;if(r&&r.setAttribute)r.setAttribute(at,s);var e=document.getElementById(id);if(!e){e=document.createElement('script');e.type='application/json';e.id=id;(document.head||r).appendChild(e)}e.textContent=s}catch(e){console.log('gz outcome',e)}}
 function stampAndDescribe(el){var out={nonce:null,descriptor:null};try{if(el&&el.nodeType===1&&window.__gzStamp){out.nonce=window.__gzStamp(el);out.descriptor=window.__gzDescribe(el)}}catch(e){out.describe_error=String(e)}return out}
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
  var alt;try{if(ctx&&ctx.nodeType===1){alt=axp(ctx);if(alt){window.__gzSeen[alt]=Date.now();Object.keys(window.__gzPending).forEach(function(k){var pe=window.__gzPendingEl[k];if(k===alt||(pe&&(pe===ctx||pe.contains(ctx)||ctx.contains(pe)))){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k];delete window.__gzPendingEl[k];window.__gzSeen[k]=Date.now()}})}}}catch(e){}
  var mark=stampAndDescribe(ctx);
- enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,event,x)});if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
+ enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){gzOutcome(j);var line=(j&&typeof j.line==='string')?j.line:r;((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,event,x)});if(line!==''){self.pushStep(line,event,x)}((j&&j.backups)||[]).forEach(function(b){self.pushStep(b,event,x)})}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
 function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.target;if(!tg||tg.nodeType!==1)return;var el=tg;
  if(kind==='click'){el=tg.closest('button,a,[role="button"],[role="option"],[role="tab"],[role="menuitem"],[role="checkbox"],input,select,option,[class*="zn-arrow"],lightning-button-icon,lightning-button,lightning-icon')||tg}
  var self=window.__gzRec;if(!self){console.log('gz safety-net: no recorder instance yet');return}
@@ -628,13 +680,30 @@ function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.t
  var value=(kind==='change')?(el.type==='checkbox'?(el.checked?'on':'off'):(el.value!==undefined?String(el.value):'')):undefined;
  var mark=stampAndDescribe(el);
  window.__gzPending[k]=setTimeout(function(){delete window.__gzPending[k];delete window.__gzPendingEl[k];if(window.__gzSeen[k]&&Date.now()-window.__gzSeen[k]<1500+HOLD)return;window.__gzSeen[k]=Date.now();
-  enqueue(function(){return ask({rendered:'',xpath:k,synthetic:true,kind:kind,value:value,nonce:mark.nonce,descriptor:mark.descriptor,tag:el.tagName.toLowerCase(),etype:(el.type||''),text:(el.textContent||'').trim().slice(0,80)}).then(function(j){if(j&&j.line){self.pushStep(j.line,ev,k);(j.backups||[]).forEach(function(b){self.pushStep(b,ev,k)})}})})},HOLD)}catch(e){}}
+  enqueue(function(){return ask({rendered:'',xpath:k,synthetic:true,kind:kind,value:value,nonce:mark.nonce,descriptor:mark.descriptor,tag:el.tagName.toLowerCase(),etype:(el.type||''),text:(el.textContent||'').trim().slice(0,80)}).then(function(j){gzOutcome(j);((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,ev,k)});if(j&&j.line){self.pushStep(j.line,ev,k)}((j&&j.backups)||[]).forEach(function(b){self.pushStep(b,ev,k)})})})},HOLD)}catch(e){}}
 document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-19n5 opens", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-19n6 inband", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
+
+# ------------------------------------------------------------------ the IN-BAND outcome channel
+# The composer's verdicts used to live in ONE place the container never hands back:
+# /home/services/log/gz_override.log. A person reading the pane sees lines and no reasons, and the
+# only way to ask the library anything was `Gz Override Status`, which needs a Robot step of its
+# own. So after every decision the library writes its last GZ_OUTCOME_N (10) decisions INTO THE PAGE
+# UNDER TEST -- `<script type="application/json" id="gz-outcome">` plus the same JSON on
+# `<html data-gz-outcome>` (two surfaces, because which one a DOM snapshot keeps is the
+# serializer's choice, not ours, and this repo has not measured the CRT healing-context
+# serializer). The keyword reply's own snapshot then carries it back out:
+# `tools/crt_live/session.py keyword --outcome` parses it, and `Gz Override Outcome` returns the
+# same JSON to a Robot caller. NO DOM TEXT travels -- the composed line, the reason, the served
+# count and the build version, nothing read off the page.
+GZ_OUTCOME_ID = "gz-outcome"
+GZ_OUTCOME_ATTR = "data-gz-outcome"
+GZ_OUTCOME_N = 10
+GZ_OUTCOME_WHY_CHARS = 400
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
 BUNDLE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garzai_parser")
@@ -948,7 +1017,7 @@ def _backups(row_n, line, rendered):
     return out[:2]
 
 
-_LAST = {"el": None, "t": 0.0, "action": None, "label": None, "family": None}
+_LAST = {"el": None, "t": 0.0, "action": None, "label": None, "family": None, "value": None}
 _LOCK = threading.Lock()   # the selenium driver is not thread-safe and _CACHE/_LAST are shared
 
 
@@ -979,7 +1048,7 @@ def _action_class(rendered, req=None):
     return None
 
 
-def _arm_dedupe(target, out_line, action, desc):
+def _arm_dedupe(target, out_line, action, desc, value=None):
     """Remember this event ONLY if it put a line in the pane.
 
     An event composed as '' is noise we deliberately record nothing for -- the recorder's focus
@@ -992,7 +1061,8 @@ def _arm_dedupe(target, out_line, action, desc):
     desc = desc or {}
     _LAST.update({"el": target, "t": time.time(), "action": action,
                   "label": desc.get("label") or desc.get("text") or None,
-                  "family": desc.get("family")})
+                  "family": desc.get("family"),
+                  "value": value if value is not None else _event_value(out_line)})
     return True
 
 
@@ -1181,7 +1251,48 @@ def _on_reviewed_page(drv):
     return _page_verdict(drv)[0]
 
 
-def _is_duplicate(drv, target, action=None, desc=None, window_s=2.5):
+def _event_value(rendered, req=None):
+    """What this event says is IN the field, or None when it is not a fill at all. A recorded
+    `TypeText` carries it in cell 3; a synthetic `change` carries it as `value`."""
+    cells = _cells(rendered or "")
+    if len(cells) >= 3 and cells[0].lower().startswith("type"):
+        return cells[2]
+    v = (req or {}).get("value")
+    return None if v is None else str(v)
+
+
+def _dup_verdict(drv, target, action=None, desc=None, window_s=2.5, value=None):
+    """(is a duplicate, why) -- see `_is_duplicate`."""
+    if _LAST["el"] is None or time.time() - _LAST["t"] > window_s:
+        return False, None
+    if not _same(drv, _LAST["el"], target):
+        return False, None
+    desc = desc or {}
+    if _LAST.get("action") and action and _LAST["action"] != action:
+        return False, None
+    a, b = _LAST.get("label"), (desc.get("label") or desc.get("text") or None)
+    if a and b and str(a).strip().casefold() != str(b).strip().casefold():
+        return False, None
+    fa, fb = _LAST.get("family"), desc.get("family")
+    if fa and fb and str(fa).casefold() != str(fb).casefold():
+        return False, None
+    # THE VALUE IS PART OF THE EVENT (challenge 2026-09-19b case 14). The user types `ab`, the
+    # widget commits `abc`, and the safety net posts a synthetic `change` carrying it. Element,
+    # action, label and family all agree, so the second event used to be dropped and the pane kept
+    # the STALE `ab` -- with a `why` that never mentioned the two disagreed. The later value is the
+    # committed one and therefore the better evidence: this is not a duplicate, it SUPERSEDES.
+    if action == "type":
+        av, bv = _LAST.get("value"), value
+        if av is not None and bv is not None and str(av) != str(bv):
+            return False, ("not a duplicate: the same element was armed with %r %d ms ago and this "
+                           "event commits %r -- the committed value is the later evidence, so this "
+                           "line SUPERSEDES the armed one" %
+                           (av, int((time.time() - _LAST["t"]) * 1000), bv))
+    return True, ("duplicate: the same element, same action and same label was served %d ms ago"
+                  % int((time.time() - _LAST["t"]) * 1000))
+
+
+def _is_duplicate(drv, target, action=None, desc=None, window_s=2.5, value=None):
     """The safety net and the recorder can resolve ONE click to two different elements (the anchor and
     its span), so a path-keyed dedupe in the page misses it (measured 2026-09-18: two lines for one
     Fields & Relationships click). Identity in the DOM within a short window is the rule.
@@ -1191,21 +1302,11 @@ def _is_duplicate(drv, target, action=None, desc=None, window_s=2.5):
     truthy for any pair -- a stub, a proxy element, a driver returning a truthy value -- suppressed a
     genuinely different control's step, and the only trace was a log line inside the container. So
     the recorded ACTION and the descriptor's label and family must agree too. Either side UNKNOWN is
-    agreement (an old bundle sends no descriptor); two KNOWN values that differ are two events."""
-    if _LAST["el"] is None or time.time() - _LAST["t"] > window_s:
-        return False
-    if not _same(drv, _LAST["el"], target):
-        return False
-    desc = desc or {}
-    if _LAST.get("action") and action and _LAST["action"] != action:
-        return False
-    a, b = _LAST.get("label"), (desc.get("label") or desc.get("text") or None)
-    if a and b and str(a).strip().casefold() != str(b).strip().casefold():
-        return False
-    fa, fb = _LAST.get("family"), desc.get("family")
-    if fa and fb and str(fa).casefold() != str(fb).casefold():
-        return False
-    return True
+    agreement (an old bundle sends no descriptor); two KNOWN values that differ are two events.
+
+    `value` is the fourth known-value comparison and the one that was missing: a `type` duplicate
+    whose value differs is not a duplicate at all (challenge 2026-09-19b case 14)."""
+    return _dup_verdict(drv, target, action, desc, window_s, value)[0]
 
 
 # --------------------------------------------------------------------------- the OmniStudio pair
@@ -1219,11 +1320,11 @@ def _is_duplicate(drv, target, action=None, desc=None, window_s=2.5):
 # click as its own pass-through line, ahead of its own (the `pre` list the page pushes first).
 # Measured on the user's fsc7f recording, 2026-09-19: 5 pairs, 10 pane lines, 5 of them 1,200
 # characters of absolute path.
-_OMNI_HOLD = {"held": False, "line": "", "label": None, "t": 0.0}
+_OMNI_HOLD = {"held": False, "line": "", "label": None, "t": 0.0, "prefix": None}
 
 
 def _omni_clear():
-    _OMNI_HOLD.update({"held": False, "line": "", "label": None, "t": 0.0})
+    _OMNI_HOLD.update({"held": False, "line": "", "label": None, "t": 0.0, "prefix": None})
 
 
 def _omni_flush(cl=None):
@@ -1268,23 +1369,40 @@ def _omni_flush(cl=None):
 # A held opening click with NO day pick composes NOTHING: opening a calendar and closing it again
 # is not a step.
 _OMNI_DATE = {"held": False, "open_line": "", "day_line": "", "label": None, "key": None,
-              "iso": None, "picked": False, "t": 0.0}
+              "iso": None, "picked": False, "t": 0.0, "prefix": None}
 
 
 def _omni_date_clear():
     _OMNI_DATE.update({"held": False, "open_line": "", "day_line": "", "label": None, "key": None,
-                       "iso": None, "picked": False, "t": 0.0})
+                       "iso": None, "picked": False, "t": 0.0, "prefix": None})
 
 
 def _omni_date_flush(cl=None):
-    """What a lapsed date hold leaves behind. With no day pick that is NOTHING. With a day pick
-    but no fill to name the year, the day-cell stock line is the only handle there is and it
-    stands, rather than losing a click the user really made."""
+    """What a lapsed date hold leaves behind. With no day pick that is NOTHING.
+
+    With a day pick but no fill to name the year, BOTH stock lines stand -- the opening click in
+    its label form and the day cell -- never the day cell alone (challenge 2026-09-19b case 5c).
+    The day cell alone is `ClickText    10` against a calendar nobody opened: the exact line this
+    build exists to stop shipping, and it was what a lapsed hold emitted."""
     picked, day_line = _OMNI_DATE["picked"], _OMNI_DATE["day_line"]
+    open_line, label = _OMNI_DATE["open_line"], _OMNI_DATE["label"]
     _omni_date_clear()
-    if picked and (day_line or "").strip():
-        return [day_line]
-    return []
+    if not (picked and (day_line or "").strip()):
+        return []
+    out = []
+    if cl is not None:
+        try:
+            body, _why = cl.omni_open_click_line(label, open_line)
+            if body and body.strip():
+                indent = (open_line[: len(open_line) - len(open_line.lstrip())]
+                          if (open_line or "").strip() else "") or "    "
+                out.append("%s%s" % (indent, body.strip()))
+        except Exception:
+            pass
+    if not out and (open_line or "").strip():
+        out.append(open_line)          # no label form available: the positional line is the handle
+    out.append(day_line)
+    return out
 
 
 def _omni_date_pair(req, decision, line, backups):
@@ -1317,6 +1435,25 @@ def _omni_date_pair(req, decision, line, backups):
         decision["why"] = ("OmniStudio date pick: HELD with its opening click; %s" % why)
         decision["omni"] = "date held for the input's own value"
         return pre, "", []
+    # 1b. a DAY PICK WITH NO HELD OPENER -- the calendar was already open (challenge 2026-09-19b
+    #     case 6). This used to pass through as `ClickText    9`, unreplayable on a fresh page,
+    #     while the very same event carried the cell's full aria-label AND the control's
+    #     `data-omni-key`: everything `Omni Date` needs, and the keyword opens the calendar itself.
+    if not _OMNI_DATE["held"] and cl.omni_day_cell(rendered, *paths):
+        iso, why = cl.omni_day_cell_date(rendered, desc)
+        key = str(desc.get("omni_key") or "").strip()
+        if iso and key:
+            stock_day = line if isinstance(line, str) and line.strip() else rendered
+            out, bks = cl.omni_date_pair_lines(None, key, iso, "", stock_day)
+            if out:
+                decision["why"] = ("OmniStudio day cell with NO opening click of its own (the "
+                                   "calendar was already open): the cell's own aria-label names "
+                                   "the whole date (%s) and the element carries its key, and "
+                                   "Omni Date opens the calendar itself -- %s" % (iso, why))
+                decision["omni"] = "date composed from an unheld day cell"
+                return pre, out, bks
+        decision["omni"] = ("a day cell with no held opening click, and %s: the stock line stands"
+                            % ("no data-omni-key on the element" if not key else why))
     # 2. the FILL on the same input completes the pair: `_omni_fill` composes the `Omni Date`
     #    line from the value the widget committed, and the two held stock lines go under it.
     if _OMNI_DATE["held"] and _OMNI_DATE["picked"] and cl.omni_fill_line(
@@ -1328,13 +1465,33 @@ def _omni_date_pair(req, decision, line, backups):
         _omni_date_clear()
         return pre, line, list(backups) + ["    #   backup: %s   (stock recorder line, unverified)"
                                            % b.strip() for b in extra]
+    # 2b. A CLICK INSIDE THE HELD PICKER THAT IS NOT A DAY CELL IS PART OF THE GESTURE (challenge
+    #     2026-09-19b case 5a). `Next Month` lives inside the widget but outside the day grid, so
+    #     neither predicate claimed it and it passed through as its own step -- leaving
+    #     `ClickElement <Next Month>` sitting ABOVE an `Omni Date` line that navigates the calendar
+    #     itself, and firing at replay against a calendar nobody has opened. The same exemption the
+    #     combobox already gives its own synthetic events, keyed on the widget INSTANCE.
+    if _OMNI_DATE["held"]:
+        first = (_cells(rendered) or [""])[0]
+        is_click = (not first) or first.startswith("Click")
+        same = None
+        try:
+            same = cl.omni_same_host(_OMNI_DATE.get("prefix"), *paths, host=cl._OMNI_DATE_PICKER)
+        except Exception:
+            same = None
+        if is_click and same is True:
+            decision["omni"] = ("a click inside the HELD date picker that is not a day cell "
+                                "(calendar navigation): absorbed into the gesture, not a step of "
+                                "its own")
+            return pre, "", []
     # 3. the OPENING click itself
     if cl.omni_date_opener(rendered, *paths, family=desc.get("family")):
         pre = pre + _omni_date_flush(cl)
         _OMNI_DATE.update({"held": True, "open_line": line if isinstance(line, str) and line.strip()
                            else rendered, "day_line": "", "picked": False, "iso": None,
                            "label": desc.get("label") or desc.get("aria_label") or desc.get("placeholder"),
-                           "key": desc.get("omni_key"), "t": now})
+                           "key": desc.get("omni_key"), "t": now,
+                           "prefix": cl.omni_date_picker_prefix(*paths) if hasattr(cl, "omni_date_picker_prefix") else None})
         decision["why"] = ("OmniStudio date picker OPENED: a click on a date input opens the "
                            "calendar (measured live on fsc7f 2026-09-19), so it is HELD for its "
                            "day-cell pick (up to %.0f s), not dropped as a focus click"
@@ -1362,6 +1519,27 @@ def _omni_pair(req, decision, line, backups):
     if _OMNI_HOLD["held"] and now - _OMNI_HOLD["t"] > cl.OMNI_PAIR_WINDOW_S:
         pre = _omni_flush(cl)             # the option click never came: the held line stands alone
     if _OMNI_HOLD["held"] and cl.omni_combobox_option(rendered, *paths):
+        # THE OPTION HAS TO BELONG TO THE HELD COMBOBOX (challenge 2026-09-19b case 9b). This
+        # branch used to ask only "is this a ClickText on an `li` under SOME
+        # runtime_omnistudio_common-combobox" -- so combobox B's option composed
+        # `Omni Select    Phone Type    Australia`: the right option, the WRONG control, stated
+        # confidently. F42's class through the pairing door. TRI-STATE: a prefix neither side
+        # carries is COULD-NOT-CHECK and the old behaviour stands, said out loud.
+        same = None
+        try:
+            same = cl.omni_same_host(_OMNI_HOLD.get("prefix"), *paths)
+        except Exception:
+            same = None
+        if same is False:
+            decision["omni"] = ("the option is inside a DIFFERENT combobox than the held one "
+                                "(held ...%s, this option ...%s): the hold is flushed and the "
+                                "pick stands alone rather than naming the wrong control"
+                                % (str(_OMNI_HOLD.get("prefix"))[-48:],
+                                    str(cl.omni_combobox_prefix(*paths))[-48:]))
+            return pre + _omni_flush(cl), line, backups
+        if same is None:
+            decision["omni_pair_identity"] = ("COULD-NOT-CHECK: no combobox host prefix on one "
+                                              "side, so the instances were not compared")
         option = _cells(rendered)[1]
         label = _OMNI_HOLD["label"]
         pair, pair_backups = cl.omni_pair_lines(label, option, _OMNI_HOLD["line"], rendered)
@@ -1373,16 +1551,24 @@ def _omni_pair(req, decision, line, backups):
             _omni_clear()
             return pre, pair, pair_backups
         if pair_backups:
-            # THE PLACEHOLDER PICK. `-- No Value --` leaves the control where it began, so neither
-            # the open click nor the pick is a step: both compose NOTHING and the held line is
-            # dropped with this one. Measured live on fsc7f 2026-09-19 13:13 -- `Omni Select
-            # Salutation    -- No Value --` failed there. Both stock lines stay as dormant backups.
+            # THE PLACEHOLDER PICK. `-- No Value --` leaves the control where it began, so the
+            # pick is not a step and composes nothing. Measured live on fsc7f 2026-09-19 13:13 --
+            # `Omni Select    Salutation    -- No Value --` failed there.
+            # THE HOLD SURVIVES IT (challenge 2026-09-19b case 3). Dropping the hold here meant a
+            # REAL pick one second later on the same still-open listbox composed a bare
+            # `ClickText    Mr.` with no opening click and no backups -- unreplayable against a
+            # closed listbox, which is the very shape the user named on run 8. So only the PICK is
+            # banked as a dormant backup; the open click stays held for the next pick.
+            indent = (line[: len(line) - len(line.lstrip())]
+                      if isinstance(line, str) and line.strip() else "") or "    "
+            kept = [cl.omni_dormant(rendered, indent)] if (rendered or "").strip() else []
             decision["why"] = ("OmniStudio combobox placeholder pick (%r): picking nothing is not "
-                               "a step, so neither the open click nor the pick composes a line; "
-                               "both stock lines are dormant backups" % option)
-            decision["omni"] = "placeholder pick: nothing composed, the held click dropped too"
-            _omni_clear()
-            return pre, "", pair_backups
+                               "a step, so the pick composes no line -- but the OPEN click stays "
+                               "HELD, so the next pick on this combobox still pairs with it"
+                               % option)
+            decision["omni"] = "placeholder pick: nothing composed, the open click still held"
+            _OMNI_HOLD["t"] = now
+            return pre, "", kept
         # no label to name the control with: a keyword whose first argument is blank is a guess.
         decision["omni"] = "no label on the combobox: the two stock lines stand"
         return pre + _omni_flush(cl), line, backups
@@ -1391,6 +1577,7 @@ def _omni_pair(req, decision, line, backups):
         pre = pre + _omni_flush(cl)       # two openers in a row: the first one stands alone
         _OMNI_HOLD.update({"held": True, "line": line if isinstance(line, str) else rendered,
                            "label": desc.get("label") or desc.get("aria_label") or desc.get("placeholder"),
+                           "prefix": cl.omni_combobox_prefix(*paths) if hasattr(cl, "omni_combobox_prefix") else None,
                            "t": now})
         decision["why"] = "OmniStudio combobox opened: HELD for its option click (up to %.0f s)" % cl.OMNI_PAIR_WINDOW_S
         decision["omni"] = "held"
@@ -1442,7 +1629,7 @@ def _omni_fill(req, decision, line, backups):
     try:
         omni, backup, why = cl.omni_fill_line(
             line, req.get("xpath") or "", req.get("alt_xpath") or "",
-            omni_key=desc.get("omni_key"),
+            omni_key=desc.get("omni_key"), omni_key_capped=desc.get("omni_key_capped"),
             indent=(line[: len(line) - len(line.lstrip())] or "    "))
     except Exception as exc:
         decision["omni_fill"] = "error: %s" % exc
@@ -1451,8 +1638,22 @@ def _omni_fill(req, decision, line, backups):
         decision["omni_fill"] = why
         decision["why"] = "%s; %s" % (decision.get("why") or "", why)
         line, backups = omni, [backup] + list(backups)
+    elif backup:
+        # AN EMPTY LINE WITH A BACKUP MEANS "RECORD NOTHING, KEEP THE HANDLE" (challenge
+        # 2026-09-19b case 7): the all-placeholder mask. The stock line would replay literal
+        # underscores into a masked input, so it must not stand -- and nothing was typed, so no
+        # verify line belongs under it either.
+        decision["omni_fill"] = why
+        decision["why"] = "%s; %s" % (decision.get("why") or "", why)
+        decision["omni_dropped"] = True
+        return "", [backup] + list(backups)
     elif why:
+        # SAY IT WHERE THE READER LOOKS (challenge 2026-09-19b case 13). A DECLINED OmniStudio
+        # routing used to land only in `omni_fill`, so the `why` column showed a plain TypeText
+        # with no sign the routing had been considered -- on a control where TypeText's clear is
+        # measured not to clear (the value APPENDS, `adsads`).
         decision["omni_fill"] = why          # named, never a silent miss
+        decision["why"] = "%s; %s" % (decision.get("why") or "", why)
     try:
         verify = cl.verify_backup(stock, indent=(stock[: len(stock) - len(stock.lstrip())] or "    "))
     except Exception:
@@ -1461,6 +1662,30 @@ def _omni_fill(req, decision, line, backups):
         backups = list(backups) + [verify]
         decision["verify_line"] = True
     return line, backups
+
+
+def _outcome_payload():
+    """The last GZ_OUTCOME_N decisions, in the shape that travels IN BAND on the page under test.
+
+    WHAT TRAVELS: the composed line (`out`), the reason (`why`), the OmniStudio note when there is
+    one, the served count and the build version. NO DOM TEXT -- nothing read off the page, no
+    label, no element path, no value the recorder captured beyond the step it composed.
+
+    An elide is DISCLOSED, never silent: a `why` longer than GZ_OUTCOME_WHY_CHARS is cut and the
+    row carries `why_chars` (the full length) and `why_full_at` (the log that holds all of it)."""
+    rows = []
+    for d in STATE["decisions"][-GZ_OUTCOME_N:]:
+        why = str(d.get("why") or "")
+        row = {"out": d.get("out"), "why": why[:GZ_OUTCOME_WHY_CHARS]}
+        if len(why) > GZ_OUTCOME_WHY_CHARS:
+            row["why_chars"] = len(why)
+            row["why_full_at"] = LOG
+        for k in ("omni", "omni_fill", "supersedes", "page"):
+            if d.get(k):
+                row[k] = str(d[k])[:GZ_OUTCOME_WHY_CHARS]
+        rows.append(row)
+    return {"version": STATE["version"], "served": STATE["served"], "n": len(rows),
+            "of_decisions": len(STATE["decisions"]), "log": LOG, "decisions": rows}
 
 
 class _H(BaseHTTPRequestHandler):
@@ -1544,11 +1769,22 @@ class _H(BaseHTTPRequestHandler):
                         # NAME THE DOOR. The note used to say "fell back to the recorder's xpath"
                         # even when OUR alt path is what resolved (challenge D10 finding 6).
                         decision["resolve"] += "; the nonce found nothing; resolved by %s" % door
-                if t is not None and _is_duplicate(drv, t, _action_class(rendered, req), desc):
+                _act = _action_class(rendered, req)
+                _val = _event_value(rendered, req)
+                _dup, _dup_why = (_dup_verdict(drv, t, _act, desc, value=_val) if t is not None
+                                  else (False, None))
+                if t is not None and _dup:
                     line = ""
-                    decision["why"] = "duplicate: the same element, same action and same label was served %d ms ago" % int((time.time() - _LAST["t"]) * 1000)
+                    decision["why"] = _dup_why
                     t = None
-                elif t is not None and not _on_reviewed_page(drv):
+                elif _dup_why:
+                    # not a duplicate BECAUSE the values disagree: this line supersedes the armed
+                    # one, and the `why` quotes both (challenge 2026-09-19b case 14)
+                    decision["supersedes"] = _dup_why
+                if t is None:
+                    if not decision["why"]:
+                        decision["why"] = "the element could not be resolved: %s" % decision["resolve"]
+                elif not _on_reviewed_page(drv):
                     # build k2 (2026-09-18): identity xpaths are POSITIONAL ((//input)[3]) and resolve to one
                     # element on ANY page; without this gate a Lead form's Company field matched the Zoo
                     # page's Amount row with confident backups. Off the reviewed page: parser proposal only.
@@ -1591,13 +1827,12 @@ class _H(BaseHTTPRequestHandler):
                                     decision["why"] = "synthetic %s on <%s> %r: %s; no recipe, no parser proposal (parser %s); not recorded" % (req.get("kind"), req.get("tag"), (req.get("text") or "")[:40], why, PARSER["state"])
                                 else:
                                     decision["why"] = "%s; no recipe step; no parser proposal (parser %s)" % (why, PARSER["state"])
-                elif not decision["why"]:
-                    decision["why"] = "the element could not be resolved: %s" % decision["resolve"]
             elif not decision["why"]:
                 decision["why"] = "no nonce and no xpath in event"
             decision["out"] = rendered if line is None else line
             # ARM THE DEDUPE LAST, and only on an event that actually put a line in the pane.
-            decision["armed_dedupe"] = _arm_dedupe(t, decision["out"], _action_class(rendered, req), desc)
+            decision["armed_dedupe"] = _arm_dedupe(t, decision["out"], _action_class(rendered, req),
+                                                   desc, _event_value(rendered, req))
         except Exception as exc:
             decision["why"] = "error: %s" % exc; decision["out"] = rendered
         backups = proposal_backups or _backups(decision.get("row"), decision["out"], rendered)
@@ -1614,7 +1849,9 @@ class _H(BaseHTTPRequestHandler):
         STATE["decisions"].append(decision); STATE["decisions"] = STATE["decisions"][-50:]
         _log(json.dumps(decision))
         backups = [_dormant_form(b) for b in backups]
-        self._send({"line": decision["out"], "backups": backups, "pre": pre})
+        self._send({"line": decision["out"], "backups": backups, "pre": pre,
+                    "outcome": _outcome_payload(), "outcome_id": GZ_OUTCOME_ID,
+                    "outcome_attr": GZ_OUTCOME_ATTR})
 
 
 def _serve():
@@ -1657,6 +1894,14 @@ class garzai_recorder_override:
         st["parser_reason"] = PARSER["reason"]
         st["proposals"] = PARSER["proposals"]
         return json.dumps(st, default=str)
+
+    def gz_override_outcome(self):
+        """The same JSON the library writes into the page under test (`<script
+        type="application/json" id="gz-outcome">` and `<html data-gz-outcome>`), for a Robot
+        caller who would rather read it from here than out of a DOM snapshot: the last
+        GZ_OUTCOME_N decisions as {out, why, ...}, plus the served count and the build version.
+        No DOM text. The client-side twin is `tools/crt_live/session.py keyword --outcome`."""
+        return json.dumps(_outcome_payload(), default=str)
 
     def gz_override_org(self, alias=None):
         """The org alias the parser bundle stamps on the capture it takes of an unreviewed page.

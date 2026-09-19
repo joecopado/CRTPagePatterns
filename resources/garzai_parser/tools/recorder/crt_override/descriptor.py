@@ -195,6 +195,26 @@ def control_class(tag, role, family=None) -> str:
     return 'other'
 
 
+def has_class_evidence(tag, role, family) -> bool:
+    """True when this side said ANYTHING about what kind of control it is. `control_class` folds
+    "nothing was supplied" and "something unrecognised" into the same `other`, and `other` agrees
+    with everything -- so a side that carries no tag, no role and no family used to claim any row
+    with the same label text (challenge 2026-09-19b case 11c). `other` is what the describer
+    yields for a closed shadow root or a describe that threw."""
+    return any(str(x or '').strip() for x in (tag, role, family))
+
+
+def row_has_class_evidence(row: dict) -> bool:
+    attrs = (row.get('attrs') or {}) if isinstance(row, dict) else {}
+    return has_class_evidence(row.get('tag_corrected') or row.get('tag'), attrs.get('role'),
+                              row.get('family_corrected') or row.get('element_type')
+                              or row.get('type'))
+
+
+def desc_has_class_evidence(desc: dict) -> bool:
+    return has_class_evidence(desc.get('tag'), desc.get('role'), desc.get('family'))
+
+
 def classes_agree(a: str, b: str) -> bool:
     """Two control classes name the same kind of control. `other` agrees with everything;
     `option` agrees only with `option`."""
@@ -231,11 +251,30 @@ def _in_chrome_path(path: str) -> bool:
 def row_may_claim(row: dict, desc: dict):
     """(True, None) when this row may answer for this descriptor's element, or (False, why not).
 
-    Two refusals, both measured (fsc7f 2026-09-19, ledger F42's class):
+    Three refusals, all measured (fsc7f 2026-09-19, ledger F42's class):
+      * A SIDE THAT SAID NOTHING AT ALL about what kind of control it is -- no tag, no role, no
+        family -- leaves a label-text match as the only evidence, and that is COULD-NOT-CHECK, not
+        agreement (challenge 2026-09-19b case 11c: `control_class` folds "nothing supplied" and
+        "something unrecognised" into the same `other`, `other` agreed with everything, and an
+        unstamped chrome row claimed an element the page could not class);
       * the control classes disagree -- a listbox option is not a tab and not a nav link;
       * the row lives in the app chrome while the element's own path does not.
+
+    NARROWED FROM THE REPORT'S WORDING, BY MEASUREMENT. The challenge report's rule line reads
+    "two `other` classes are COULD-NOT-CHECK". Implemented literally that refuses EVERY ordinary
+    form field: `control_class` returns `other` for family `input_field` on both sides, so
+    `tools/recorder/tests/challenge/test_challenge_composer_guards.py` went 7 red -- the composer
+    stopped matching the reviewed rows at all. The defect the report actually measured is a side
+    with NO class evidence, which is what this refuses; a stamped-but-unrecognised pair still
+    agrees, because both sides did say something and they said the same thing.
     """
     rc, dc = row_class(row), desc_class(desc)
+    if not desc_has_class_evidence(desc):
+        return False, ('COULD-NOT-CHECK: the page could not class this element (no tag, no role, '
+                       'no family), so a label-text match is the only evidence there is')
+    if not row_has_class_evidence(row):
+        return False, ('COULD-NOT-CHECK: the row carries no tag, no role and no family, so a '
+                       'label-text match is the only evidence there is')
     if not classes_agree(rc, dc):
         return False, 'the row is a %s and the element is a %s' % (rc, dc)
     path = desc.get('xpath') or desc.get('alt_xpath') or ''
@@ -503,6 +542,12 @@ function labelIndex(el, label, fam){
    host stops it after reading. Reaching either with nothing is null, which the composer already
    says out loud and answers with the stock TypeText line. */
 var OMNI_KEY_MAX_HOPS = 20;
+/* THE CAP GETS ITS OWN ANSWER (challenge 2026-09-19b case 12). `null` used to mean BOTH "this
+   element genuinely carries no key" and "the walk gave up before it got there", and the composer
+   reported the first for the second -- a false statement of fact, on a page where the key existed.
+   Stopping on the cap now returns this sentinel; `__gzDescribe` turns it into `omni_key: null`
+   PLUS `omni_key_capped: <hops>`, so the composer can say "not reached within N hops". */
+var OMNI_KEY_CAP = '__gz_omni_key_cap__';
 var OMNI_KEY_CONTAINER_RX = /^(runtime_omnistudio-(flexcard|omniscript|generated-omniscript)|runtime_omnistudio_flexcards-|runtime_omnistudio_omniscript-omniscript-(container|step)$)/;
 var OMNI_KEY_ELEMENT_RX = /^runtime_omnistudio_omniscript-omniscript-/;
 function omniKey(el){ var cur = el, h = 0;
@@ -512,7 +557,7 @@ function omniKey(el){ var cur = el, h = 0;
     var k = attr(cur,'data-omni-key'); if (k) return k;
     if (OMNI_KEY_ELEMENT_RX.test(t)) return null;     /* the element host itself, keyless */
     cur = up(cur); h++; }
-  return null; }
+  return cur ? OMNI_KEY_CAP : null; }   /* stopped ON THE CAP, not on a boundary: say which */
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
   while (r && r !== document && r.host && g < 12){ out.push(r.host.tagName.toLowerCase()); r = r.host.getRootNode ? r.host.getRootNode() : document; g++; }
@@ -531,7 +576,9 @@ window.__gzDescribe = function(el){
     d.title = attr(el,'title');
     d.role = attr(el,'role');
     d.data_testid = attr(el,'data-testid') || attr(el,'data-test-id');
-    d.omni_key = omniKey(el);          /* OmniProcessElement.Name, off the element HOST */
+    var _ok = omniKey(el);             /* OmniProcessElement.Name, off the element HOST */
+    d.omni_key = (_ok === OMNI_KEY_CAP) ? null : _ok;
+    d.omni_key_capped = (_ok === OMNI_KEY_CAP) ? OMNI_KEY_MAX_HOPS : null;
     d.text = txt(el).slice(0,80);
     var nl = nearestLabel(el);
     d.label = nl[0] || null;

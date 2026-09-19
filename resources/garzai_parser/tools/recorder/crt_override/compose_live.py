@@ -361,6 +361,46 @@ def omni_combobox_option(rendered: str, *xpaths) -> bool:
     return _OMNI_COMBOBOX in blob and '/li[' in blob
 
 
+def _host_prefix(host: str, *xpaths) -> str | None:
+    """The element path up to and INCLUDING its `<host>[n]` segment, or None when no such host is
+    on the path. Two controls of the same kind on one page differ EARLIER than that segment
+    (`omniscript-select[2]` vs `omniscript-select[5]`), so the prefix names the instance."""
+    for xp in xpaths:
+        s = str(xp or '')
+        i = s.rfind('/' + host)
+        if i < 0:
+            continue
+        j = s.find('/', i + 1)
+        return s[:j] if j > 0 else s
+    return None
+
+
+def omni_combobox_prefix(*xpaths) -> str | None:
+    """The held combobox INSTANCE's own path prefix (challenge 2026-09-19b case 9b)."""
+    return _host_prefix(_OMNI_COMBOBOX, *xpaths)
+
+
+def omni_date_picker_prefix(*xpaths) -> str | None:
+    """The held date picker INSTANCE's own path prefix (challenge 2026-09-19b case 5a)."""
+    return _host_prefix(_OMNI_DATE_PICKER, *xpaths)
+
+
+def omni_same_host(prefix: str | None, *xpaths, host: str = _OMNI_COMBOBOX):
+    """TRI-STATE: True (this event is inside the same widget instance the hold named), False (it
+    is plainly a DIFFERENT instance), None (COULD-NOT-CHECK -- one side carries no prefix, so the
+    caller keeps its previous behaviour and says so). Never collapses the third into the first."""
+    mine = _host_prefix(host, *xpaths)
+    if not prefix or not mine:
+        return None
+    return prefix == mine
+
+
+def omni_dormant(text: str, indent: str = '    ') -> str:
+    """One dormant `#   backup:` line, for a caller outside this module (the generated library's
+    placeholder-pick branch, which keeps the OPEN click held and banks only the pick)."""
+    return _dormant(indent, text)
+
+
 def omni_typeahead_shape(rendered: str, *xpaths) -> bool:
     """The typeahead's opener, for the record. A Type Ahead Block opens its listbox on TYPING, not
     on a click (`Omni Typeahead`'s own [Documentation]), so its two events are NOT this pair's
@@ -540,6 +580,7 @@ def omni_mask_value(value: str) -> tuple[str, str]:
 
 
 def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
+                   omni_key_capped: int | None = None,
                    indent: str = '    ') -> tuple:
     """(the Omni line, the dormant backup, why) for one composed fill on an OmniStudio control, or
     ('', '', why) when nothing should change.
@@ -560,11 +601,26 @@ def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
         return '', '', 'no OmniStudio fill component in the element path'
     key = str(omni_key or '').strip()
     if not key:
+        if omni_key_capped:
+            # THE THIRD STATE (challenge 2026-09-19b case 12). `omniKey` gave up at the hop cap;
+            # the key may well exist above it. Saying "carries no data-omni-key" here is a false
+            # statement of fact, and it is the elide-without-disclosure shape the previous cap
+            # (`h < 8`) already cost a whole run to.
+            return '', '', ('an OmniStudio %s: the data-omni-key was NOT REACHED within %s hops '
+                            '(the walk stopped on its own cap -- this is NOT the same fact as an '
+                            'element that carries no key); the stock TypeText line stands'
+                            % (tag.rsplit('-', 1)[-1], omni_key_capped))
         return '', '', ('an OmniStudio %s, but the element carries no data-omni-key: the stock '
                         'TypeText line stands' % tag.rsplit('-', 1)[-1])
     value, mask_why = omni_mask_value(value)
     if not value:
-        return '', '', mask_why
+        # AN ALL-PLACEHOLDER MASK IS NOT "LEAVE THE LINE ALONE" (challenge 2026-09-19b case 7).
+        # The line left alone is the stock `TypeText Phone Number (___) ___-____`, which replays
+        # eleven literal underscores into a masked input -- the exact hazard the mask rule exists
+        # to stop, handed through on the input where the evidence is strongest. So it composes
+        # NOTHING and the stock line survives as a DORMANT backup: the shape the placeholder PICK
+        # already uses (an empty line with a non-empty backup is the caller's signal).
+        return '', _dormant(indent, composed), mask_why
     if tag == _OMNI_DATE_PICKER:
         iso = omni_iso_date(value)
         if not iso:
