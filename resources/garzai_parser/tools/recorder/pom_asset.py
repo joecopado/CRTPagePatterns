@@ -56,6 +56,7 @@ from capture_orchestration import parse_elements_from_html  # noqa: E402
 import metadata_dom_parity as PARITY                        # noqa: E402
 from pom import keys as K                                   # noqa: E402
 from pom.store import Store, element_id, stable_attrs       # noqa: E402
+from pom import store as STORE_MOD                          # noqa: E402  -- apply_capture_stamp
 
 ASSET_VERSION = 1
 SOURCE_CAPTURE = 'capture'
@@ -92,7 +93,28 @@ def capture_meta(path: str) -> dict:
         host = (m.group(1) if m else '').strip()
         if host and out.get('path'):
             out['url'] = 'https://%s%s' % (host, out['path'])
+    out.update(state_stamp(head))
     return out
+
+
+# THE STATE STAMP (user, 2026-09-18). cdp_capture.py writes exactly one line:
+#   <!-- state: <name> | entered_via: <label> | host_url: <url> -->
+# An older capture has no such line; it reads back as the default state with an unknown opener,
+# which is the truth about it, not a silent zero.
+_STAMP = re.compile(r'<!--\s*state:\s*(?P<state>.*?)\s*\|\s*entered_via:\s*(?P<via>.*?)\s*'
+                    r'(?:\|\s*host_url:\s*(?P<host>.*?)\s*)?-->')
+
+
+def state_stamp(head: str) -> dict:
+    """{state, entered_via, host_url} off a capture header. Never raises, never invents."""
+    m = _STAMP.search(head or '')
+    if not m:
+        return {'state': 'default', 'entered_via': 'unknown', 'host_url': '',
+                'state_stamp_present': False}
+    return {'state': (m.group('state') or 'default').strip() or 'default',
+            'entered_via': (m.group('via') or 'unknown').strip() or 'unknown',
+            'host_url': (m.group('host') or '').strip(),
+            'state_stamp_present': True}
 
 
 def template_provenance(path: str) -> dict:
@@ -293,6 +315,14 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
     }
     rec['page']['title'] = meta.get('title')
     rec['last_seen'] = a['built_at']
+    # THE STATE STAMP travels from the capture header into the record (user, 2026-09-18). Until
+    # now this writer recorded `states`/`links`/`opens`/`leads_to` NEVER -- a capture is one
+    # instant of one state of a page and the record had no field saying which state that instant
+    # was, so two captures of the same page in two states merged into one flat control set
+    # (docs/audit/pom-states-and-modals-2026-09-18.md section 3, W2).
+    a['state_stamp'] = {k: meta.get(k) for k in ('state', 'entered_via', 'host_url')}
+    a['state_stamp']['present'] = bool(meta.get('state_stamp_present'))
+    stamped_eids = []
 
     for c in cs:
         # On a single-surface app the "container" is whatever prose surrounded the control on this
@@ -302,6 +332,10 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
                          drop_container=(K.single_surface_prefix(pk.get("host"), pk.get("pattern") or "")
                                          and not pk.get('salesforce')))
         el = rec['elements'].setdefault(eid, {})
+        # a `capture-stamp` placeholder another page's stamp left behind for this control is
+        # folded in here, so one control is never two records (store.absorb_stamp_placeholder)
+        STORE_MOD.absorb_stamp_placeholder(rec, eid, c['label'])
+        stamped_eids.append(eid)
         pred = predicted_by_norm.get(c['norm'])
         el.update({
             'family': c['family'], 'label': c['label'], 'container': c['container'],
@@ -352,6 +386,10 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
                                   'last_verdict': 'COULD-NOT-CHECK', 'last_seen': None,
                                   'failure_signal': None, 'origin': 'metadata', 'rank': -1})
         el['ladder'] = ladder
+    rec['_stamp'] = STORE_MOD.apply_capture_stamp(
+        store, rec, stamped_eids, state=meta.get('state'), entered_via=meta.get('entered_via'),
+        host_url=meta.get('host_url'), org=pk.get('alias'), stamp=a['built_at'],
+        evidence=capture_rel)
     return rec
 
 
@@ -474,7 +512,11 @@ def cmd_build(a) -> int:
         rec = build_record(store, pk, cs, capture_meta(path), template_provenance(path),
                            predictions_for(pk, path), rel)
         p = store.put(rec)
-        written[pk['key']] = {'path': p, 'elements': len(rec['elements']), 'from_capture': len(cs)}
+        written[pk['key']] = {'path': p, 'elements': len(rec['elements']), 'from_capture': len(cs),
+                              # the state stamp: what this capture said, and what the store did
+                              # with it. Printed, never only written -- a capture that could not
+                              # name its opener says so on the caller's screen.
+                              'state_stamp': rec.get('_stamp')}
     # never slice a JSON string to a length -- that is how a tool prints something no consumer
     # can parse and still looks like it worked. Trim the DATA, then dump.
     recs = dict(list(written.items())[:40])

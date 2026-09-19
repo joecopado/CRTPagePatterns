@@ -1,4 +1,6 @@
-"""pattern_library -- the reusable interaction recipes and the bucket rule for the review loop.
+"""
+Usage: python3 tools/recorder/pattern_library.py [-h] --review REVIEW [--library LIBRARY]
+pattern_library -- the reusable interaction recipes and the bucket rule for the review loop.
 
 Two things the user set on 2026-09-10 after four pages:
 

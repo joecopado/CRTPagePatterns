@@ -289,6 +289,166 @@ def page_state(rec: dict, name: str) -> dict:
         name, {"entered_via": [], "elements": [], "n_seen": 0, "last_seen": None})
 
 
+# --------------------------------------------------------------------- the CAPTURE STATE STAMP
+UNKNOWN_ENTERED_VIA = "unknown"
+
+
+def _norm_label(s: str | None) -> str:
+    return " ".join(str(s or "").split()).casefold()
+
+
+def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: str | None,
+                        entered_via: str | None, host_url: str | None, org: str | None = None,
+                        stamp: str | None = None, evidence: str | None = None) -> dict:
+    """Land one capture's state stamp -- the ONE writer both pom_asset.build_record and
+    review_table.writeback go through, so the two cannot drift.
+
+    The user's decision (2026-09-18): "What a capture lacks is a stamp saying which page state it
+    was taken in and which control got it there. Add that one field and every capture becomes a
+    state." Before this, `build_record` and `writeback` wrote `states`/`links`/`opens`/`leads_to`
+    NEVER -- not once across 3,394 controls -- so 76 pages were recorded as one flat control set
+    and 20 of 25 routed modals had no route to them (docs/audit/pom-states-and-modals-2026-09-18.md
+    G1/G2, section 3 W2 and W3).
+
+    Two shapes, and the difference is the whole point:
+
+    * **routed** modal (`host_url` resolves to a DIFFERENT page key -- a quick action,
+      `/lightning/o/<Obj>/new`): the modal's own page key holds its controls FLAT, and the HOST
+      page gets the `links` edge plus `opens`/`leads_to` on the opening control. No state is
+      written on the modal's own key -- that is exactly the defect the audit named at 20:08
+      (`fsc7f|/lightning/o/Account/new` carrying a state literally called `New Account` with
+      `entered_via` empty: a state nobody can enter, and still no link from the list view).
+    * **in-page** modal / panel / tab state (`host_url` is this same page, or absent): the state
+      is written HERE, with the opening control in `entered_via` and the capture's controls as its
+      members.
+
+    An `entered_via` of `unknown` (nothing could be derived) still files the controls and still
+    names the state, and marks the state `entered_via_unknown` so `audit_states.py` reports it
+    under `states_with_no_opening_control` rather than letting it pass as complete. Third state,
+    stated -- never a guessed opener.
+
+    Returns what it did, so the caller can print it.
+    """
+    out = {"state": state or DEFAULT_STATE, "entered_via": entered_via or UNKNOWN_ENTERED_VIA,
+           "host_url": host_url or "", "wrote": [], "gap": None}
+    stamp = stamp or _iso(now())
+    known_via = bool(entered_via) and entered_via != UNKNOWN_ENTERED_VIA
+    named_state = bool(state) and state != DEFAULT_STATE
+    this_key = (rec.get("page") or {}).get("key")
+
+    host_key, host_rec = None, None
+    if known_via and host_url:
+        hk = store.key_for(host_url, org)
+        if hk.get("host"):
+            host_key = hk["key"]
+            host_rec = rec if host_key == this_key else store._open(hk)
+
+    routed = bool(host_key) and host_key != this_key
+    if routed:
+        # the opening control lives on the HOST page. Look it up by visible label; a capture of the
+        # host may never have been built, in which case the control is recorded with what is
+        # actually known (its label) and NOTHING is invented about its shape -- a fabricated
+        # family/tag would put a guessed rung in front of a real one.
+        els = host_rec.setdefault("elements", {})
+        eid = next((i for i, e in els.items() if _norm_label(e.get("label")) == _norm_label(entered_via)), None)
+        if eid is None:
+            eid = element_id(None, entered_via, "", {})
+            els[eid] = {"family": None, "label": entered_via, "container": "", "attrs": {},
+                        "tag": None, "ladder": [], "effects": {}, "n_seen": 0,
+                        "source": "capture-stamp", "verdict": "COULD-NOT-CHECK",
+                        "evidence": [evidence] if evidence else [],
+                        "note": "named by a capture's state stamp as the control that opens "
+                                "%s; its shape has never been captured" % (state or this_key)}
+        el = els[eid]
+        el["n_seen"] = (el.get("n_seen") or 0) + 1
+        el["last_seen"] = stamp
+        opens_title = state if named_state else ((rec.get("page") or {}).get("title") or this_key)
+        _bump(el.setdefault("opens", {}), opens_title)
+        _bump(el.setdefault("leads_to", {}), this_key)
+        link = host_rec.setdefault("links", {}).setdefault(
+            this_key, {"via": [], "n": 0, "opens": opens_title})
+        link["opens"] = link.get("opens") or opens_title
+        _append_unique(link["via"], eid)
+        link["n"] = (link.get("n") or 0) + 1
+        host_rec["last_seen"] = stamp
+        if host_rec is not rec:
+            store.put(host_rec)
+        out["wrote"] += ["links[%s] on %s" % (this_key, host_key), "opens on %r" % entered_via]
+        out["host_key"] = host_key
+        return out
+
+    if not named_state:
+        out["gap"] = "no state to write (default state, no routed modal)"
+        return out
+
+    ps = page_state(rec, state)
+    ps["n_seen"] = (ps.get("n_seen") or 0) + 1
+    ps["last_seen"] = stamp
+    for eid in eids:
+        _append_unique(ps["elements"], eid)
+        el = (rec.get("elements") or {}).get(eid)
+        if el is not None:
+            el.setdefault("states", {})[state] = {"label": el.get("label")}
+    if known_via:
+        via_eid = next((i for i, e in (rec.get("elements") or {}).items()
+                        if _norm_label(e.get("label")) == _norm_label(entered_via)), None)
+        _append_unique(ps["entered_via"], via_eid or entered_via)
+        if via_eid:
+            _bump((rec["elements"][via_eid]).setdefault("opens", {}), state)
+        ps.pop("entered_via_unknown", None)
+    else:
+        ps["entered_via_unknown"] = True
+        out["gap"] = ("state %r has no opening control -- audit_states.py names it under "
+                      "states_with_no_opening_control" % state)
+    out["wrote"].append("states[%s] += %d control(s)" % (state, len(eids)))
+    return out
+
+
+def absorb_stamp_placeholder(rec: dict, eid: str, label: str | None) -> str:
+    """Fold a `capture-stamp` placeholder into the REAL element once a capture parses that control.
+
+    `apply_capture_stamp` has to name the opening control on a HOST page that may never have been
+    captured, so it records what it actually knows -- the visible label -- as an element with no
+    family, tag or ladder. When the host page IS captured later, the parser mints a different id
+    from the real shape and the store ends up holding the control TWICE: one entry with the
+    verified ladder and no `opens`, one with the `opens` and no way to click it. A reader looking
+    up "New" gets whichever it hits first, and both answers are half right -- this codebase's
+    signature failure in miniature.
+
+    CAUGHT LIVE 2026-09-18 on slockard's Account list view, by building the routed New Account
+    modal and then the list view itself into a scratch store: `button|New|Accounts|title=New`
+    (2 rungs, no opens) beside `generic|New||` (opens `New Account`, 0 rungs). Everything the
+    placeholder carries -- `opens`, `leads_to`, its `n_seen`, and every `links[].via` and state
+    membership pointing at it -- moves onto the real element, and the placeholder is deleted.
+    Returns `eid`, so the caller can use it inline.
+    """
+    els = rec.get("elements") or {}
+    tgt = els.get(eid)
+    if tgt is None:
+        return eid
+    for pid, p in list(els.items()):
+        if pid == eid or p.get("source") != "capture-stamp":
+            continue
+        if _norm_label(p.get("label")) != _norm_label(label):
+            continue
+        for field in ("opens", "leads_to"):
+            for k, v in (p.get(field) or {}).items():
+                _bump(tgt.setdefault(field, {}), k, v)
+        tgt["n_seen"] = (tgt.get("n_seen") or 0) + (p.get("n_seen") or 0)
+        tgt["evidence"] = sorted(set((tgt.get("evidence") or []) + (p.get("evidence") or [])))
+        for link in (rec.get("links") or {}).values():
+            via = link.get("via") or []
+            if pid in via:
+                link["via"] = list(dict.fromkeys([eid if v == pid else v for v in via]))
+        for st in (rec.get("states") or {}).values():
+            for name in ("entered_via", "elements"):
+                lst = st.get(name) or []
+                if pid in lst:
+                    st[name] = list(dict.fromkeys([eid if v == pid else v for v in lst]))
+        del els[pid]
+    return eid
+
+
 def rung_key(c: dict) -> str:
     return json.dumps({"kw": c.get("kw") or c.get("name"), "args": c.get("args"), "kwargs": c.get("kwargs")},
                       sort_keys=True, default=str)

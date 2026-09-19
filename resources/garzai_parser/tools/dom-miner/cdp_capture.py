@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Usage: python3 tools/dom-miner/cdp_capture.py [-h] [--org ORG] [--path PATH] [--url URL] --out OUT [--port PORT] [--settle SETTLE] [--wait-text WAIT_TEXT] [--click-text CLICK_TEXT] [--frames {on,off}] [--cross-origin-frames] [--target-id TARGET_ID] [--in-place] [--depth-cap DEPTH_CAP] [--lazy-timeout LAZY_TIMEOUT] [--no-redact]
+Usage: python3 tools/dom-miner/cdp_capture.py [-h] [--org ORG] [--path PATH] [--url URL] --out OUT [--port PORT] [--settle SETTLE] [--wait-text WAIT_TEXT] [--click-text CLICK_TEXT] [--frames {on,off}] [--cross-origin-frames] [--target-id TARGET_ID] [--in-place] [--depth-cap DEPTH_CAP] [--lazy-timeout LAZY_TIMEOUT] [--state STATE] [--entered-via ENTERED_VIA] [--host-url HOST_URL] [--no-redact]
 Capture a Salesforce Lightning page's *full* DOM (light + open shadow roots)
 straight to disk over the Chrome DevTools Protocol.
 
@@ -443,6 +443,50 @@ def scrub(text: str) -> str:
     return text
 
 
+# ------------------------------------------------------- the STATE STAMP (user, 2026-09-18)
+# "What a capture lacks is a stamp saying which page state it was taken in and which control got
+# it there. Add that one field and every capture becomes a state." Until now a capture was one
+# instant of one state of a page with NO field saying which state that instant was, so two
+# captures of the same page in two states merged into one flat control set with nothing to tell
+# them apart (docs/audit/pom-states-and-modals-2026-09-18.md, W2 in section 3 -- the mechanism
+# behind gap G1, 76 pages).
+_DIALOG_OPEN = re.compile(r'<(\w[\w-]*)\b([^>]*\brole="dialog"[^>]*)>', re.I)
+_HEADING = re.compile(r'<h[1-4]\b[^>]*>(.*?)</h[1-4]>', re.I | re.S)
+_ANY_TAG = re.compile(r'<[^>]+>')
+UNKNOWN_ENTERED_VIA = "unknown"
+DEFAULT_STATE = "default"
+
+
+def dialog_state_name(html: str) -> str | None:
+    """The visible title of an OPEN modal dialog in a serialized capture, else None.
+
+    NEVER guesses: a dialog with no `aria-label` and no heading inside it returns None, and the
+    caller stamps `default` rather than inventing a state name a reader cannot check. The
+    serializer already drops `display:none` subtrees, which removes most closed Lightning
+    modals; `aria-hidden="true"` covers the rest.
+    """
+    for m in _DIALOG_OPEN.finditer(html or ""):
+        attrs = m.group(2)
+        if re.search(r'aria-hidden="true"', attrs, re.I):
+            continue
+        lab = re.search(r'aria-label="([^"]*)"', attrs, re.I)
+        if lab and lab.group(1).strip():
+            return " ".join(lab.group(1).split())
+        h = _HEADING.search(html[m.end(): m.end() + 30000])
+        if h:
+            import html as _html
+            txt = " ".join(_html.unescape(_ANY_TAG.sub(" ", h.group(1))).split())
+            if txt:
+                return txt
+    return None
+
+
+def _stamp_value(v: str | None, fallback: str) -> str:
+    """One header field's value: no comment terminator, no newline, never silently empty."""
+    s = " ".join(str(v or "").split()).replace("-->", "--&gt;")
+    return scrub(s) if s else fallback
+
+
 def frontdoor_url(org: str, path: str) -> str:
     """Mint a fresh frontdoor URL locally. Never returned to a caller's stdout."""
     out = subprocess.run(
@@ -685,7 +729,9 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                   cross_origin_frames: bool = True, in_place: bool = False,
                   max_depth: int = DEFAULT_MAX_DEPTH, target_id: str | None = None,
                   org: str | None = None, no_redact: bool = False,
-                  lazy_timeout: float = 20.0, expand_collapsed: bool = True):
+                  lazy_timeout: float = 20.0, expand_collapsed: bool = True,
+                  page_state: str | None = None, entered_via: str | None = None,
+                  host_url: str | None = None):
     import websockets
 
     serializer = build_serializer(max_depth)
@@ -882,6 +928,21 @@ async def capture(url: str, out_path: str, port: int, settle: float,
               f"the `path:` header records the LANDED page; `nav_path:` records the request.",
               file=sys.stderr)
 
+    # THE STATE STAMP. `--state` given by the driver wins; otherwise the state name is the visible
+    # title of an open modal dialog, and `default` when no dialog is open. `entered_via` is the
+    # control that got the page here (up.py derives it from the kept `--op kw` session) and
+    # `host_url` is the page that control was clicked ON -- the same page for an in-page modal,
+    # the host page for a routed one. Nothing is guessed: with nothing to derive this stamps
+    # `state: default | entered_via: unknown`, which a reader can act on.
+    # NB the parameter is `page_state`, not `state`: `state` is already a local in this
+    # function (the lazy-related-list poll result). It shadowed the argument and the header
+    # stamped the poll dict as the state name -- caught live 2026-09-18 on the first real
+    # capture, which is exactly what a live proof is for.
+    state_name = _stamp_value(page_state, "") or dialog_state_name(html) or DEFAULT_STATE
+    state_name = _stamp_value(state_name, DEFAULT_STATE)
+    entered_via_name = _stamp_value(entered_via, UNKNOWN_ENTERED_VIA)
+    state_host_url = _stamp_value(host_url, "")
+
     header = (
         f"<!-- capture: {os.path.basename(out_path)} -->\n"
         f"<!-- title: {scrub(payload['title'])} -->\n"
@@ -907,6 +968,10 @@ async def capture(url: str, out_path: str, port: int, settle: float,
         # is readable by eye (`lazy_wait: TIMEOUT`), the counts as JSON after it for a reader.
         f"<!-- lazy_wait: {lazy['status']} "
         f"{json.dumps({k: v for k, v in lazy.items() if k != 'status'}, sort_keys=True)} -->\n"
+        # 2026-09-18 (user): which page STATE this capture was taken in, and which control got it
+        # there. One line, three fields, `|`-separated so it reads by eye and parses by regex.
+        f"<!-- state: {state_name} | entered_via: {entered_via_name} "
+        f"| host_url: {state_host_url} -->\n"
         f"<!-- cross-origin-frames: {json.dumps(frame_stats)} -->\n"
         f"<!-- redaction: {json.dumps(redaction, sort_keys=True)} -->\n"
         "<!-- serialization: open shadow roots emitted as "
@@ -921,6 +986,8 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                       "title": payload["title"], "cross_origin_frames": frame_stats,
                       "landed": payload["path"], "nav_path": requested_path,
                       "path_matches": path_matches, "lazy_wait": lazy,
+                      "state": state_name, "entered_via": entered_via_name,
+                      "host_url": state_host_url,
                       "redaction": redaction, **payload["stats"]}))
 
 
@@ -968,6 +1035,20 @@ def main():
                           "the capture still happens and the header records `lazy_wait: TIMEOUT` "
                           "with the cards that never filled in -- tools/recorder/"
                           "capture_completeness.py reports those as COULD-NOT-CHECK")
+    ap.add_argument("--state", default=None,
+                     help="the page STATE this capture is being taken in (a modal/panel title, a "
+                          "tab name). Omitted: the visible title of an open modal dialog, else "
+                          "`default`. Stamped into the header as "
+                          "`<!-- state: X | entered_via: Y | host_url: Z -->` and into the JSON "
+                          "summary, so pom_asset/review_table file the controls under that state "
+                          "instead of flat on the page (user, 2026-09-18)")
+    ap.add_argument("--entered-via", dest="entered_via", default=None,
+                     help="the visible label of the control that got the page into this state "
+                          "(or `nav`). Omitted: `unknown` -- never guessed")
+    ap.add_argument("--host-url", dest="host_url", default=None,
+                     help="the URL the --entered-via control was clicked ON. Same page for an "
+                          "in-page modal; the host page for a routed one (a quick action, "
+                          "/lightning/o/<Obj>/new), which is what lets the store write the LINK")
     ap.add_argument("--no-redact", action="store_true",
                      help="keep emails/phones/person names/record ids in the written capture. "
                           "OWNED test orgs only (dev1/slockard/fsc7f/health90/copado-trial) -- "
@@ -983,7 +1064,9 @@ def main():
     asyncio.run(capture(url, a.out, a.port, a.settle, a.wait_text, a.click_text, frames_on,
                         in_place=a.in_place, max_depth=a.depth_cap,
                         target_id=(a.target_id or None),
-                        org=a.org, no_redact=a.no_redact, lazy_timeout=a.lazy_timeout))
+                        org=a.org, no_redact=a.no_redact, lazy_timeout=a.lazy_timeout,
+                        page_state=a.state, entered_via=a.entered_via,
+                        host_url=a.host_url))
 
 
 if __name__ == "__main__":

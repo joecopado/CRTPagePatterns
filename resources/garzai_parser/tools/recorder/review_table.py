@@ -60,6 +60,7 @@ import disambiguation_args as DA                         # noqa: E402
 import pattern_library as PL                             # noqa: E402  (buckets + the recipe library, 2026-09-10)
 import shutil                                            # noqa: E402
 from pom.store import Store, element_id, stable_attrs, STABLE_ATTRS, UNSTABLE_VALUE  # noqa: E402
+from pom import store as STORE_MOD                      # noqa: E402  -- apply_capture_stamp
 
 TEMPLATE = os.path.join(_ROOT, 'docs', 'recorder', 'templates', 'salesforce-lightning.json')
 SCORES_DEFAULT = os.path.join(_ROOT, 'docs', 'recorder', 'evidence', 'review-scores.jsonl')
@@ -741,10 +742,21 @@ def cmd_build(a) -> int:
     if os.path.exists(os.path.join(out_dir, 'review.json')):
         prev = json.load(open(os.path.join(out_dir, 'review.json')))
     carried = _carry_over(rows, prev)
+    # THE STATE STAMP travels capture -> review -> store (user, 2026-09-18). Every row carries the
+    # state its control was seen in, so `writeback` can attach it to that state instead of flat on
+    # the page. Before this the review TABLE had no column for "which state was the page in when
+    # this row was probed", so a reviewer had nowhere to put the answer even when they knew it --
+    # which is why cicd-demo's Revenue Cloud Settings modal has 133 VERIFIED-PASS controls and
+    # zero states (docs/audit/pom-states-and-modals-2026-09-18.md section 3, W3).
+    stamp = capture_header(a.capture)
+    for r in rows:
+        r['state'] = stamp.get('state') or 'default'
     rel = lambda p: os.path.relpath(os.path.abspath(p), _ROOT) if p else None
     review = {
         'org': org,
         'capture': rel(a.capture),
+        'state_stamp': {k: stamp.get(k) for k in
+                        ('state', 'entered_via', 'host_url', 'state_stamp_present')},
         'screenshot': rel(a.screenshot) if a.screenshot else None,
         'page_key': pk['key'] if pk else None,
         'page': {k: pk.get(k) for k in ('pattern', 'object', 'action', 'host')} if pk else None,
@@ -765,6 +777,12 @@ def cmd_build(a) -> int:
     path = os.path.join(out_dir, 'review.json')
     json.dump(review, open(path, 'w'), indent=1)
     print(f"review: {rel(path)}  rows {len(rows)}  page_key {review['page_key']}")
+    _st = review['state_stamp']
+    print("state stamp: state=%s  entered_via=%s  host_url=%s%s" % (
+        _st['state'], _st['entered_via'], _st['host_url'] or '(none)',
+        '' if _st['state_stamp_present'] else
+        '  -- NO stamp in this capture header (taken before 2026-09-18, or by a writer that does '
+        'not stamp): every row is filed under the default state with no opening control'))
     print_table(review)
     _render(review, os.path.join(out_dir, 'review.html'))
     return 0
@@ -1639,12 +1657,17 @@ result = out
 
 def capture_header(path: str) -> dict:
     """title / path / host the capture serializer stamped in its header comments."""
-    head = open(path, errors='replace').read(3000)
+    head = open(path, errors='replace').read(4000)
     out = {}
     for key in ('title', 'path', 'host'):
         m = re.search(r'<!--\s*%s:\s*(.*?)\s*-->' % key, head)
         if m:
             out[key] = m.group(1).strip()
+    # THE STATE STAMP (user, 2026-09-18) -- one reader, in pom_asset, for the one line
+    # cdp_capture writes. A review row that does not know which state its control was seen in
+    # cannot write that state back, which is why `cicd-demo`'s Revenue Cloud Settings modal had
+    # 133 VERIFIED-PASS controls and zero states.
+    out.update(PA.state_stamp(head))
     return out
 
 
@@ -1985,7 +2008,13 @@ def cmd_writeback(a) -> int:
     stamp = time.strftime('%Y-%m-%dT%H:%M:%S')
     rec.setdefault('reviews', []).append({'review': review.get('capture'), 'at': stamp,
                                           'rows': len(review['rows'])})
+    # THE STATE STAMP, read off the review (which read it off the capture header). A review built
+    # before 2026-09-18 carries no `state_stamp`; it is then re-read from the capture on disk, and
+    # failing that it is the default state with an unknown opener -- the truth about it.
+    hdr_stamp = review.get('state_stamp') or PA.state_stamp(
+        open(cap_path, errors='replace').read(4000) if os.path.exists(cap_path) else '')
     written = 0
+    by_state: dict = {}
     for r in review['rows']:
         st = r['review']['status']
         if st == 'unreviewed':
@@ -1994,6 +2023,9 @@ def cmd_writeback(a) -> int:
         label = r.get('label_corrected') or r.get('label') or ''
         eid = element_id(family, label, r.get('container'), r.get('attrs'))
         el = rec['elements'].setdefault(eid, {})
+        # same fold as pom_asset: a reviewed control absorbs any `capture-stamp` placeholder
+        # another page's state stamp left for it, so one control is never two records
+        STORE_MOD.absorb_stamp_placeholder(rec, eid, label)
         el.update({
             'family': family, 'label': label, 'container': r.get('container'),
             'attrs': stable_attrs(r.get('attrs')), 'tag': r.get('tag'),
@@ -2049,14 +2081,28 @@ def cmd_writeback(a) -> int:
                 ladder.remove(rung)
                 ladder.insert(0, rung)
         el['ladder'] = ladder
+        by_state.setdefault(r.get('state') or hdr_stamp.get('state') or 'default', []).append(eid)
         written += 1
     rec['last_seen'] = stamp
+    # One call per state seen in this review, through the SAME writer pom_asset.build_record uses,
+    # so a review and a capture can never disagree about how a state is recorded. A routed modal's
+    # controls stay flat on the modal's own key and the LINK is written on the host -- never a
+    # state named after the modal's title on the modal's own page key with `entered_via` empty,
+    # which is the defect the 20:08 audit caught the live streams producing.
+    stamp_results = []
+    for state_name, eids in sorted(by_state.items()):
+        stamp_results.append(STORE_MOD.apply_capture_stamp(
+            store, rec, eids, state=state_name, entered_via=hdr_stamp.get('entered_via'),
+            host_url=hdr_stamp.get('host_url'), org=pk.get('alias'), stamp=stamp,
+            evidence=review.get('capture')))
     path = store.put(rec)
     try:
         store.render(pk['partition'])
     except Exception:
         pass
     print('wrote %d reviewed control(s) -> %s' % (written, path))
+    for sr in stamp_results:
+        print('  state stamp: %s' % json.dumps(sr, default=str))
     return 0
 
 
