@@ -24,3 +24,10 @@ Record On Zoo With GarzAI Composition
     # now turn the recorder on in Live Testing and interact with the page; the lines that land in
     # the editor are composed by GarzAI where a row matched, and are the recorder's own otherwise.
     # Afterwards, run `Gz Override Status` again to see every decision the composer made.
+
+Restore Stock Recorder
+    # RUN THIS SELECTION before stopping the Live Testing session: Live Testing runs the highlighted
+    # steps only and never the Suite Teardown, so the patched extension would outlive the session on a
+    # reused container (measured 2026-09-18: a stock recording got the Allow prompt).
+    ${restored}=    Gz Override Restore
+    Log To Console    recorder bundle: ${restored}

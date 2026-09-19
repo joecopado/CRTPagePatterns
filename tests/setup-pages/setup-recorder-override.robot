@@ -26,3 +26,10 @@ Setup Pages With The GarzAI Composer
 Status After Recording
     ${status}=    Gz Override Status
     Log To Console    ${status}
+
+Restore Stock Recorder
+    # RUN THIS SELECTION before stopping the Live Testing session: Live Testing runs the highlighted
+    # steps only and never the Suite Teardown, so the patched extension would outlive the session on a
+    # reused container (measured 2026-09-18: a stock recording got the Allow prompt).
+    ${restored}=    Gz Override Restore
+    Log To Console    recorder bundle: ${restored}
