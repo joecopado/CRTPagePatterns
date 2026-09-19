@@ -601,7 +601,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-19m focus", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-19n dormant", "dormant_form": "keyword", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -864,6 +864,25 @@ def _our_line_body(row, rendered):
     if t == "dropdown" and action == "DropDown":
         return None  # theirs already passes
     return None
+
+
+def _dormant_form(text):
+    """A dormant line (`#   backup:`, `#   verify:`, `#   why xpath:`, `#   label repeats`) in the
+    form the editor will KEEP. Measured 2026-09-19 (four fsc7f sessions, builds l and m): the
+    composer built 2-3 backups per fill and the JSON carried them, yet not one `#` line reached
+    the pane -- the same push path had shown them on the wire on 2026-09-18 (k2), so the drop is
+    in the editor's step model, not ours. `keyword` (default): the line becomes
+    `<indent>Comment    backup: ...`, a real BuiltIn.Comment step that does nothing when run and
+    survives the editor; a person makes it live by deleting `Comment    backup: `. `comment`: the
+    bare `#` form, for an editor that keeps comments. `Gz Override Dormant Form` switches."""
+    if STATE.get("dormant_form", "keyword") != "keyword":
+        return text
+    stripped = text.lstrip()
+    if not stripped.startswith("#"):
+        return text
+    indent = text[: len(text) - len(stripped)]
+    body = stripped.lstrip("#").strip()
+    return "%sComment    %s" % (indent, body)
 
 
 def _backups(row_n, line, rendered):
@@ -1419,6 +1438,7 @@ class _H(BaseHTTPRequestHandler):
         decision["backups"] = len(backups); decision["pre"] = len(pre)
         STATE["decisions"].append(decision); STATE["decisions"] = STATE["decisions"][-50:]
         _log(json.dumps(decision))
+        backups = [_dormant_form(b) for b in backups]
         self._send({"line": decision["out"], "backups": backups, "pre": pre})
 
 
@@ -1479,6 +1499,12 @@ class garzai_recorder_override:
             raise ValueError("form must be keyword, xpath or both")
         STATE["form"] = form
         return form
+
+    def gz_override_dormant_form(self, form="keyword"):
+        """keyword (default): dormant backup/verify lines are pushed as `Comment    ...` steps the
+        editor keeps; comment: bare `#` lines. Returns the form in force."""
+        STATE["dormant_form"] = "comment" if str(form).strip().lower().startswith("c") else "keyword"
+        return STATE["dormant_form"]
 
     def gz_override_backups(self, on=True):
         """on: push dormant '#   backup:' comment lines under each composed step (default); off: only the line."""
