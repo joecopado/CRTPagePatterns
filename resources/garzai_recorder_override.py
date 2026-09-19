@@ -172,10 +172,10 @@ def _our_line_body(row, rendered):
             return "DropDown    %s    %s%s" % (loc, sval, ("    anchor=%d" % idx) if grp > 1 else "")
         if kind == "click" and t == "input_field":
             return ""  # a focus click; the change event carries the intent
+        if kw_ok and loc and t in ("button", "link", "tab"):
+            return "ClickText    %s%s    partial_match=False" % (loc, ("    anchor=%d" % idx) if grp > 1 else "")
         if xp_ok:
             return "ClickElement    %s" % _xp(row)
-        if kw_ok and loc and t in ("button", "link", "tab", "checkbox"):
-            return "ClickText    %s%s    partial_match=False" % (loc, ("    anchor=%d" % idx) if grp > 1 else "")
         return None
     if not row.get("locator") and not row.get("label"):
         if xp_ok and action in ("ClickText", "ClickElement", "ClickItem"):
