@@ -9,6 +9,7 @@ Documentation                   RECORD ON fsc7f WITH THE GARZAI COMPOSER (build 
 ...                              Fresh Live Testing session required; run Gz Container Marker first.
 Resource                        ../../resources/common.robot
 Resource                        ../../resources/garzai_typetext_override.robot    # comment out to record with stock QWeb TypeText
+Resource                        ../../resources/garzai_omni.robot    # Omni Type / Omni Select / Omni Date: the lines build m composes for OmniScript controls (missing until 2026-09-19 12:52: 'No keyword with name Omni Type found')
 Library                         ../../resources/garzai_recorder_override.py
 Suite Setup                     Setup Browser
 Suite Teardown                  Run Keywords    Gz Override Restore    AND    End suite
