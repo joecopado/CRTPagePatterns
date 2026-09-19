@@ -25,17 +25,25 @@ PORT = 18077
 CALL = "this.pushStep(r,event,ctx?this.handler.getXPathForElement(ctx):undefined)"
 REPL = "window.__gzCompose(this,r,event,ctx)"
 JS = r"""
-;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};
+;(function(){var U='http://127.0.0.1:%(port)d';window.__gzQ=Promise.resolve();window.__gzSeen={};window.__gzPending={};var HOLD=900;
 function axp(el){var p=[];while(el&&el.nodeType===1&&el.tagName.toLowerCase()!=='html'){var i=1,s=el.previousElementSibling;while(s){if(s.tagName===el.tagName)i++;s=s.previousElementSibling}p.unshift(el.tagName.toLowerCase()+'['+i+']');el=el.parentElement}return '/html[1]/'+p.join('/')}
 function ask(body){return fetch(U+'/compose',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(function(res){return res.json()})}
+function enqueue(fn){window.__gzQ=window.__gzQ.then(fn).catch(function(e){console.log('gz queue',e)})}
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
- window.__gzQ=window.__gzQ.then(function(){return ask({rendered:r,xpath:x}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
-document.addEventListener('click',function(ev){try{var tg=ev.target;if(!tg||tg.nodeType!==1)return;var el=tg.closest('[class*="zn-arrow"],button,[role="button"]');if(!el||(el.textContent||'').trim()!=='')return;
- var self=window.__gzRec;if(!self){console.log('gz synthetic: no recorder instance yet');return}var x=axp(el);var now=Date.now();if(window.__gzSeen[x]&&now-window.__gzSeen[x]<1500)return;window.__gzSeen[x]=now;
- window.__gzQ=window.__gzQ.then(function(){return ask({rendered:'',xpath:x,synthetic:true}).then(function(j){if(j&&j.line)self.pushStep(j.line,ev,x)}).catch(function(e){console.log('gz synthetic failed',e)})})}catch(e){}},true);
+ try{if(ctx&&ctx.nodeType===1){var k=axp(ctx);window.__gzSeen[k]=Date.now();if(window.__gzPending[k]){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k]}}}catch(e){}
+ enqueue(function(){return ask({rendered:r,xpath:x}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
+function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.target;if(!tg||tg.nodeType!==1)return;var el=tg;
+ if(kind==='click'){el=tg.closest('button,a,[role="button"],[role="option"],[role="tab"],[role="menuitem"],[role="checkbox"],input,select,option,[class*="zn-arrow"],lightning-button-icon,lightning-button,lightning-icon')||tg}
+ var self=window.__gzRec;if(!self){console.log('gz safety-net: no recorder instance yet');return}
+ var k=axp(el);var now=Date.now();if(window.__gzSeen[k]&&now-window.__gzSeen[k]<1500)return;if(window.__gzPending[k])clearTimeout(window.__gzPending[k]);
+ var value=(kind==='change')?(el.type==='checkbox'?(el.checked?'on':'off'):(el.value!==undefined?String(el.value):'')):undefined;
+ window.__gzPending[k]=setTimeout(function(){delete window.__gzPending[k];if(window.__gzSeen[k]&&Date.now()-window.__gzSeen[k]<1500+HOLD)return;window.__gzSeen[k]=Date.now();
+  enqueue(function(){return ask({rendered:'',xpath:k,synthetic:true,kind:kind,value:value,tag:el.tagName.toLowerCase(),text:(el.textContent||'').trim().slice(0,80)}).then(function(j){if(j&&j.line){self.pushStep(j.line,ev,k);(j.backups||[]).forEach(function(b){self.pushStep(b,ev,k)})}})})},HOLD)}catch(e){}}
+document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
+document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18f backups-in-pane", "form": "keyword", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
+STATE = {"version": "2026-09-18g safety-net", "form": "keyword", "patched": None, "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 
 def _log(msg):
@@ -145,14 +153,30 @@ def _our_line_body(row, rendered):
         # control and the read-back under Selected are the recipe's next lines
         return "ClickText    %s    partial_match=False" % cells[1]
     xp_ok = row.get("xp_verdict") == "VERIFIED-PASS" and row.get("xpath")
+    kw_ok = row.get("kw_verdict") == "VERIFIED-PASS"
     if t == "input_field" and action in ("ClickText", "VerifyText"):
         # the focus click renders the field's current value as ClickText and the tab-out renders
         # the next field's value as VerifyText (measured 2026-09-18, 8 of 17 recorded lines); the
         # TypeText that follows carries the intent
         return ""
-    if action == "" and xp_ok:
-        # a synthetic event: our own listener saw a click the recorder emits nothing for
-        return "ClickElement    %s" % _xp(row)
+    if action == "":
+        # a synthetic event: our own listener saw a click or a value change the recorder emitted nothing for
+        kind = (row.get("_syn") or {}).get("kind"); sval = (row.get("_syn") or {}).get("value")
+        if kind == "change" and t == "input_field" and sval is not None:
+            if kw_ok:
+                return "TypeText    %s    %s%s" % (loc, sval, ("    anchor=%d" % idx) if grp > 1 else "")
+            return ("TypeText    %s    %s" % (_xp(row), sval)) if xp_ok else None
+        if kind == "change" and t == "checkbox" and sval is not None:
+            return "ClickCheckbox    %s    %s%s" % (loc, sval, ("    anchor=%d" % idx) if grp > 1 else "")
+        if kind == "change" and t == "dropdown" and sval is not None:
+            return "DropDown    %s    %s%s" % (loc, sval, ("    anchor=%d" % idx) if grp > 1 else "")
+        if kind == "click" and t == "input_field":
+            return ""  # a focus click; the change event carries the intent
+        if xp_ok:
+            return "ClickElement    %s" % _xp(row)
+        if kw_ok and loc and t in ("button", "link", "tab", "checkbox"):
+            return "ClickText    %s%s    partial_match=False" % (loc, ("    anchor=%d" % idx) if grp > 1 else "")
+        return None
     if not row.get("locator") and not row.get("label"):
         if xp_ok and action in ("ClickText", "ClickElement", "ClickItem"):
             return "ClickElement    %s" % _xp(row)
@@ -163,7 +187,6 @@ def _our_line_body(row, rendered):
         if action in ("ClickElement", "TypeText"):
             return row["corrected"].split(" ;; ")[0]
         return None  # their text click on an option already passes; keep it
-    kw_ok = row.get("kw_verdict") == "VERIFIED-PASS"
     if t == "input_field" and action in ("TypeText", "TypeSecret") and value is not None:
         if kw_ok:
             return "TypeText    %s    %s%s" % (loc, value, ("    anchor=%d" % idx) if grp > 1 else "")
@@ -255,6 +278,8 @@ class _H(BaseHTTPRequestHandler):
                         except Exception:
                             continue
                         if len(els) == 1 and drv.execute_script("return arguments[0] === arguments[1]", els[0], t):
+                            if req.get("synthetic"):
+                                row = dict(row, _syn={"kind": req.get("kind"), "value": req.get("value")})
                             line = _our_line(row, rendered)
                             decision["row"] = row["n"]; decision["why"] = "identity match" if line else "matched, no better line"
                             break
@@ -263,7 +288,7 @@ class _H(BaseHTTPRequestHandler):
                         if step:
                             line = step; decision["row"] = n; decision["why"] = "recipe step identity match"
                         elif req.get("synthetic"):
-                            line = ""; decision["why"] = "synthetic click, nothing known; not recorded"
+                            line = ""; decision["why"] = "synthetic %s on <%s> %r: no row, no recipe; not recorded (compose_live will propose here)" % (req.get("kind"), req.get("tag"), (req.get("text") or "")[:40])
                         else:
                             decision["why"] = "no row resolves to this element"
                 else:
