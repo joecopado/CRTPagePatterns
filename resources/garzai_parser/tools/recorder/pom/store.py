@@ -17,7 +17,12 @@ Record schema -- docs/recorder/POM.md. The short version:
   l0        the last observed index (source: v3 | v1 | session), captured_at, bytes
   elements  {element_id: {family, label, container, attrs, ladder:[rung...], effects:{class: n},
              leads_to:{page key: n}, opens:{modal/panel title: n}, states:{name: {label, enabled?}},
-             last_seen}}
+             last_seen, source?, folded_from?}}
+             -- WHAT a control is called here is decided in ONE place, `identify_control`, which
+             every writer calls before it writes (F70, 2026-09-19): a driven `--op kw` step knows
+             no tag or attrs, so without it the same control got a second id and the truth split
+             between the two halves. `source: driven` marks an element minted with no shape yet;
+             `folded_from` names an id the migration merged away.
   links     {target page key: {via: [element_id...], n}}  -- where this page's controls GO, and
              which control goes there. The target may be in ANOTHER PARTITION: Copado CI/CD's
              `Commit Changes` on a Salesforce User Story page leads to
@@ -263,6 +268,242 @@ def same_control_id(rec: dict, eid: str, family: str | None, label: str | None,
     return eid
 
 
+# ------------------------------------------------- TWO WRITERS, ONE CONTROL (F70, 2026-09-19)
+# A control DRIVEN through `merge_session` (`--op kw`) carries no DOM shape: the keyword name is
+# all there is, so `normalise_step` mints `button|Object Fields||` -- family read off the keyword,
+# tag null, container empty. The capture writer parses the SAME live control and mints
+# `link|Object Fields|Tabs|id=customTab__item` -- family link, tag `a`, the real attrs. Nothing
+# folded the two, so the store held one control twice and each half carried half the truth:
+#
+#   button|Object Fields||                      tag null, family button, opens {object-fields: 1},
+#                                               ladder: click_text PASS-GUARDED  <- the BEHAVIOUR
+#   link|Object Fields|Tabs|id=customTab__item  tag "a", family link, source capture, no opens
+#
+# Measured 2026-09-19 on copado-trial's Data Template page: 11 of 13 pre-existing controls got a
+# twin (docs/recorder/evidence/datatemplate-states-filled-2026-09-19.md 6b, ledger F70). It is not
+# tidiness: CLAUDE.md is explicit that `ClickItem` silently finds nothing without the REAL tag, and
+# a reader that follows `opens` gets the untagged, mis-familied half.
+#
+# THE FIX IS `identify_control` BELOW, NOT A FOLD: all three writers ask it what a control is
+# CALLED on this page before they write, so the second name is never minted. `fold_driven_twins` /
+# `migrate_twins.py` exist ONLY to clean up the twins the old writers already put on disk.
+#
+# The fold classes are deliberately NARROWER than `match.families_compatible` (which exists for a
+# tolerant lookup, where a wrong hit costs a re-derive). A fold DESTROYS an identity, so two
+# controls merge only inside one class, and an unknown family matches only itself.
+DRIVEN = "driven"
+TWIN_FAMILY_CLASS = {
+    "button": "click", "link": "click", "tab": "click", "menuitem": "click", "a": "click",
+    "click": "click",
+    "input": "type", "input_field": "type", "textarea": "type", "lookup": "type", "search": "type",
+    "picklist": "choice", "combobox": "choice", "dropdown": "choice", "select": "choice",
+}
+# Fields the surviving element may take from the folded one -- only where its own is EMPTY, and
+# never a narrative field (`note`, `verdict`, `source`): a capture-stamp placeholder's note says
+# "its shape has never been captured", which becomes a lie the moment the real shape lands.
+FOLD_FILL_FIELDS = ("label", "family", "container", "tag", "attrs", "shape", "shadow_depth")
+
+
+def twin_families_compatible(a: str | None, b: str | None) -> bool:
+    """True only when two families are the same, or map to the same fold class. A missing family on
+    EITHER side is False -- the third state is "do not fold", never a guessed merge."""
+    fa, fb = (a or "").casefold(), (b or "").casefold()
+    if not fa or not fb:
+        return False
+    if fa == fb:
+        return True
+    ca = TWIN_FAMILY_CLASS.get(fa)
+    return bool(ca) and ca == TWIN_FAMILY_CLASS.get(fb)
+
+
+def is_shapeless(el: dict | None) -> bool:
+    """A control the store knows only by name: no real HTML tag and no stable attribute. That is
+    exactly what a `--op kw` driven step and a capture-stamp placeholder produce."""
+    if el is None:
+        return False
+    return not el.get("tag") and not stable_attrs(el.get("attrs"))
+
+
+def identify_control(rec: dict, label: str | None, family: str | None, attrs: dict | None = None,
+                     tag: str | None = None, container: str | None = "",
+                     drop_container: bool = False, exclude: str | None = None) -> str:
+    """**THE id for this control on this page.** Every writer calls this BEFORE it writes.
+
+    The fix for F70 is not another fold: it is that the three writers stop disagreeing about what
+    a control is CALLED. `merge_session` (a driven `--op kw` step), `apply_capture_stamp` (the
+    capture path) and `review_table.writeback` all resolve through here, so a control written by
+    any of them in any order lands on ONE element that ends up holding the tag, the attrs, the
+    `opens`/`leads_to` and the verdicts together.
+
+    The rule is the store's one match rule (`pom.match`): the label normalised (whitespace, case,
+    a trailing live count -- `Dependency Analysis (2)` is the same button as `Dependency Analysis`)
+    and the family in one compatibility class (`TWIN_FAMILY_CLASS`). Two narrowings, each paid for:
+
+    * **Exactly one candidate, or it mints.** `match.find_control` breaks a tie by verified rungs
+      because a wrong hit on a READ costs a re-derive; a wrong hit on a WRITE merges two real
+      controls forever. A page with three `Edit` buttons cannot say which one was driven, so the
+      driven step keeps its own id and `migrate_twins.py` REPORTS the ambiguity.
+    * **Two SHAPED controls are never merged.** When the caller brings a tag or a stable attribute
+      and the candidate has one too, they are two structural identities (`button|Edit|Deployment
+      Options|` and `button|Edit|Main Object Filter|`) and stay two. The match only ever joins a
+      shapeless half to a shaped one -- which is exactly the driven/captured split.
+
+    An UNKNOWN family on either side matches on the label alone, as the capture stamp always has:
+    the stamp names a control it has never seen the shape of, so `None` there means "not known",
+    not "not a button". (`twin_families_compatible` keeps saying False for a missing family --
+    that is the MIGRATION's rule, where a fold is destructive and an unknown must not be guessed
+    at.) `exclude` lets `fold_driven_twins` ask the same question of an element already in the
+    record ("what else is this control called here?") without matching itself.
+    """
+    els = rec.get("elements") or {}
+    base = element_id(family, label, container, attrs, drop_container)
+    if base in els and base != exclude:
+        return base
+    relabelled = same_control_id(rec, base, family, label, container)
+    if relabelled in els and relabelled != exclude:
+        return relabelled
+    want = M.norm_label(label)
+    if not want:
+        return base
+    caller_shaped = bool(tag) or bool(stable_attrs(attrs))
+    hits = [i for i, e in els.items()
+            if i != exclude and M.norm_label(e.get("label")) == want
+            and (twin_families_compatible(family, e.get("family"))
+                 if (family and e.get("family")) else True)
+            and not (caller_shaped and not is_shapeless(e))]
+    if len(hits) != 1:
+        return base
+    if caller_shaped and hits[0] != base and exclude is None:
+        # The store knew this control only by NAME and the caller brings its shape. Keep ONE
+        # element and give it the id the shape earns: `button|Object Fields||` becomes
+        # `link|Object Fields|Tabs|id=customTab__item`, with every `links[].via` and state
+        # membership re-pointed. This is a RENAME of one element, not a merge of two -- and it is
+        # what makes identification idempotent: without it the next capture of the same page would
+        # find a now-SHAPED element under a shapeless id, decline to claim it, and mint the twin
+        # all over again. The id also stops lying about the tag, which `ClickItem` needs.
+        rename_element(rec, hits[0], base)
+        return base
+    return hits[0]
+
+
+def rename_element(rec: dict, old_id: str, new_id: str) -> str:
+    """Move one element to a new id and re-point every reference to it. No merge: if `new_id` is
+    already taken the record is left alone and `old_id` comes back (the caller is then looking at
+    two real controls, which `identify_control` never merges)."""
+    els = rec.get("elements") or {}
+    if old_id not in els or new_id in els or old_id == new_id:
+        return old_id
+    el = els.pop(old_id)
+    el["renamed_from"] = sorted(set((el.get("renamed_from") or []) + [old_id]))
+    els[new_id] = el
+    for link in (rec.get("links") or {}).values():
+        via = link.get("via") or []
+        if old_id in via:
+            link["via"] = list(dict.fromkeys([new_id if v == old_id else v for v in via]))
+    for st in (rec.get("states") or {}).values():
+        for name in ("entered_via", "elements"):
+            lst = st.get(name) or []
+            if old_id in lst:
+                st[name] = list(dict.fromkeys([new_id if v == old_id else v for v in lst]))
+    return new_id
+
+
+def _merge_ladders(dst: dict, src: dict) -> None:
+    """Rung-by-rung, counters SUMMED -- the driven half is where the VERIFIED rungs live
+    (`click_text` PASS-GUARDED on the Data Template tabs), so a fold that dropped them would throw
+    away the only live evidence on the page. A capture rung has no `_key`; `rung_key` computes the
+    same identity for both writers."""
+    ladder = dst.setdefault("ladder", [])
+    index = {(r.get("_key") or rung_key(r)): r for r in ladder}
+    for r in src.get("ladder") or []:
+        k = r.get("_key") or rung_key(r)
+        cur = index.get(k)
+        if cur is None:
+            cur = dict(r)
+            cur["_key"] = k
+            ladder.append(cur)
+            index[k] = cur
+            continue
+        for c in ("n_verified", "n_failed", "n_unverified"):
+            cur[c] = int(cur.get(c) or 0) + int(r.get(c) or 0)
+        if (r.get("last_seen") or "") >= (cur.get("last_seen") or ""):
+            for f in ("last_verdict", "last_seen", "failure_signal"):
+                if r.get(f) is not None:
+                    cur[f] = r[f]
+    dst["ladder"] = order_ladder(ladder)
+
+
+def fold_element(rec: dict, src_id: str, dst_id: str) -> bool:
+    """Move everything the twin `src_id` knows onto `dst_id`, re-point every reference, delete it.
+
+    Carried: `opens`, `leads_to`, `effects` (counts bumped), `n_seen` (summed), `evidence` (unioned),
+    the ladder (rung counters summed), per-element `states` membership and `overrides`, and any
+    FOLD_FILL_FIELDS the survivor is missing. Re-pointed: every `links[].via` and every
+    `states[].entered_via` / `states[].elements` entry -- a state whose opener was the driven twin
+    would otherwise name a control that no longer exists. `folded_from` records the id that went,
+    so the fold is never silent."""
+    els = rec.get("elements") or {}
+    src, dst = els.get(src_id), els.get(dst_id)
+    if src is None or dst is None or src_id == dst_id:
+        return False
+    for field in ("opens", "leads_to", "effects"):
+        for k, v in (src.get(field) or {}).items():
+            _bump(dst.setdefault(field, {}), k, int(v or 0))
+    dst["n_seen"] = int(dst.get("n_seen") or 0) + int(src.get("n_seen") or 0)
+    ev = sorted(set((dst.get("evidence") or []) + (src.get("evidence") or [])))
+    if ev:
+        dst["evidence"] = ev
+    _merge_ladders(dst, src)
+    for name, seen_as in (src.get("states") or {}).items():
+        dst.setdefault("states", {}).setdefault(name, seen_as)
+    for o in src.get("overrides") or []:
+        _append_unique(dst.setdefault("overrides", []), o)
+    for f in FOLD_FILL_FIELDS:
+        if not dst.get(f) and src.get(f):
+            dst[f] = src[f]
+    if (src.get("last_seen") or "") > (dst.get("last_seen") or ""):
+        dst["last_seen"] = src["last_seen"]
+    dst["folded_from"] = sorted(set((dst.get("folded_from") or []) + [src_id]))
+    for link in (rec.get("links") or {}).values():
+        via = link.get("via") or []
+        if src_id in via:
+            link["via"] = list(dict.fromkeys([dst_id if v == src_id else v for v in via]))
+    for st in (rec.get("states") or {}).values():
+        for name in ("entered_via", "elements"):
+            lst = st.get(name) or []
+            if src_id in lst:
+                st[name] = list(dict.fromkeys([dst_id if v == src_id else v for v in lst]))
+    del els[src_id]
+    return True
+
+
+def fold_driven_twins(rec: dict) -> list[dict]:
+    """MIGRATION ONLY: the twins already on disk, from before every writer went through
+    `identify_control`. Nothing in the write path calls this -- new writes cannot produce a twin,
+    so this exists to clean up what the old writers left (`migrate_twins.py`).
+
+    The survivor is decided by `identify_control` itself, asked of the shapeless element with
+    `exclude=<itself>`: "what else is this control called here?". An answer that is the element's
+    own id means nothing else matches, and nothing is folded. Returns one row per fold
+    (`{"from", "into", "label", "family", "into_family"}`)."""
+    folded = []
+    for src_id in list((rec.get("elements") or {}).keys()):
+        src = (rec.get("elements") or {}).get(src_id)
+        if src is None or not is_shapeless(src):
+            continue
+        dst_id = identify_control(rec, src.get("label"), src.get("family"),
+                                  attrs=src.get("attrs"), tag=src.get("tag"),
+                                  container=src.get("container") or "", exclude=src_id)
+        dst = (rec.get("elements") or {}).get(dst_id)
+        if dst is None or dst_id == src_id or not dst.get("tag"):
+            continue
+        dst_family = dst.get("family")
+        if fold_element(rec, src_id, dst_id):
+            folded.append({"from": src_id, "into": dst_id, "label": src.get("label"),
+                           "family": src.get("family"), "into_family": dst_family})
+    return folded
+
+
 def _md(s) -> str:
     """A page key contains `|`, which ends a markdown table cell. Escape it, or the render eats
     the rest of the row silently -- exactly the class of failure no_silent_truncation.py names."""
@@ -349,10 +590,11 @@ def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: st
         # host may never have been built, in which case the control is recorded with what is
         # actually known (its label) and NOTHING is invented about its shape -- a fabricated
         # family/tag would put a guessed rung in front of a real one.
+        # WRITER 2 of 3 (F70): the capture path asks `identify_control` what this control is called
+        # on the host page, so a stamp never mints a second name for a control already there.
         els = host_rec.setdefault("elements", {})
-        eid = next((i for i, e in els.items() if _norm_label(e.get("label")) == _norm_label(entered_via)), None)
-        if eid is None:
-            eid = element_id(None, entered_via, "", {})
+        eid = identify_control(host_rec, entered_via, None)
+        if eid not in els:
             els[eid] = {"family": None, "label": entered_via, "container": "", "attrs": {},
                         "tag": None, "ladder": [], "effects": {}, "n_seen": 0,
                         "source": "capture-stamp", "verdict": "COULD-NOT-CHECK",
@@ -390,8 +632,8 @@ def apply_capture_stamp(store: "Store", rec: dict, eids: list[str], *, state: st
         if el is not None:
             el.setdefault("states", {})[state] = {"label": el.get("label")}
     if known_via:
-        via_eid = next((i for i, e in (rec.get("elements") or {}).items()
-                        if _norm_label(e.get("label")) == _norm_label(entered_via)), None)
+        cand = identify_control(rec, entered_via, None)
+        via_eid = cand if cand in (rec.get("elements") or {}) else None
         _append_unique(ps["entered_via"], via_eid or entered_via)
         if via_eid:
             _bump((rec["elements"][via_eid]).setdefault("opens", {}), state)
@@ -421,6 +663,12 @@ def absorb_stamp_placeholder(rec: dict, eid: str, label: str | None) -> str:
     placeholder carries -- `opens`, `leads_to`, its `n_seen`, and every `links[].via` and state
     membership pointing at it -- moves onto the real element, and the placeholder is deleted.
     Returns `eid`, so the caller can use it inline.
+
+    F70 (2026-09-19) did NOT add a second fold here. A placeholder only exists because
+    `apply_capture_stamp` may have to name a control on a page nothing has captured yet; every
+    writer now asks `identify_control` what a control is called before it writes, so the
+    driven/captured split this used to be widened to cover cannot be minted in the first place.
+    The body moved onto the shared `fold_element`, which also carries the ladder.
     """
     els = rec.get("elements") or {}
     tgt = els.get(eid)
@@ -431,21 +679,7 @@ def absorb_stamp_placeholder(rec: dict, eid: str, label: str | None) -> str:
             continue
         if _norm_label(p.get("label")) != _norm_label(label):
             continue
-        for field in ("opens", "leads_to"):
-            for k, v in (p.get(field) or {}).items():
-                _bump(tgt.setdefault(field, {}), k, v)
-        tgt["n_seen"] = (tgt.get("n_seen") or 0) + (p.get("n_seen") or 0)
-        tgt["evidence"] = sorted(set((tgt.get("evidence") or []) + (p.get("evidence") or [])))
-        for link in (rec.get("links") or {}).values():
-            via = link.get("via") or []
-            if pid in via:
-                link["via"] = list(dict.fromkeys([eid if v == pid else v for v in via]))
-        for st in (rec.get("states") or {}).values():
-            for name in ("entered_via", "elements"):
-                lst = st.get(name) or []
-                if pid in lst:
-                    st[name] = list(dict.fromkeys([eid if v == pid else v for v in lst]))
-        del els[pid]
+        fold_element(rec, pid, eid)
     return eid
 
 
@@ -550,7 +784,7 @@ class Store:
         a rung with history. Returns {pages: n, elements: n, rungs: n, skipped: [...]}."""
         org = session.get("org")
         stats = {"pages": set(), "elements": 0, "rungs": 0, "skipped": [], "dropped_hostless": 0,
-                 "links": 0, "opens": 0, "states": 0}
+                 "links": 0, "opens": 0, "states": 0, "twins_attached": 0}
         flow_name = flow_name or session.get("name")
         open_recs: dict[str, dict] = {}
         steps = [normalise_step(s) for s in session.get("steps", [])]
@@ -595,13 +829,27 @@ class Store:
             attrs = dict((ctx.get("interactive") or {}).get("attrs") or {})
             attrs.update(tgt.get("attrs") or {})
             family = ctx.get("family") or tgt.get("tag")
-            eid = same_control_id(rec, element_id(family, label, container, attrs),
-                                  family, label, container)
+            # WRITER 1 of 3 (F70). A DRIVEN step carries no DOM shape -- `--op kw` knows the
+            # keyword and nothing else -- so this path used to mint `button|Object Fields||` while
+            # the capture writer minted `link|Object Fields|Tabs|id=customTab__item` for the same
+            # control, and the truth split in half: the behaviour (`opens`, the verified rung) sat
+            # on the untagged copy, which `ClickItem` can never resolve. `identify_control` is the
+            # one place that decides what a control is CALLED here, so the driven step lands on the
+            # element the store already holds; when nothing matches it mints and says `source:
+            # driven`, so the next writer with a real shape fills the SAME element in.
+            shapeless = not tgt.get("tag") and not stable_attrs(attrs)
+            eid = identify_control(rec, label, family, attrs=attrs, tag=tgt.get("tag"),
+                                   container=container)
+            minted = eid not in rec["elements"]
+            if not minted and eid != element_id(family, label, container, attrs):
+                stats["twins_attached"] += 1
             el = rec["elements"].setdefault(eid, {"family": ctx.get("family") or tgt.get("tag"),
                                                   "label": label, "container": container,
                                                   "attrs": stable_attrs(attrs), "tag": tgt.get("tag"),
                                                   "shadow_depth": tgt.get("shadow_depth"),
                                                   "ladder": [], "effects": {}, "n_seen": 0, "last_seen": None})
+            if minted and shapeless:
+                el["source"] = DRIVEN
             el["n_seen"] += 1
             el["last_seen"] = rec["last_seen"]
             stats["elements"] += 1

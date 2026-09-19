@@ -224,6 +224,19 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
     if fam in FILL_FAMILIES and action in NOISE_ACTIONS and not (fam == 'dual_listbox'):
         return ''
 
+    # 1b. the SAME focus click arriving by the OTHER door. The safety net posts a SYNTHETIC click
+    #    for an element the stock recorder wrote no line for at all (`rendered` is '', so
+    #    `action` is ''), and on a fill-family control that click is the focus click of rule 1:
+    #    the user clicked the field because they are about to TYPE in it, and the TypeText that
+    #    follows carries the whole intent. Rule 3 used to answer it with an xpath ClickElement, so
+    #    every filled field cost a `ClickElement    xpath\=//input[@placeholder="..."]` line
+    #    immediately above its own TypeText -- 7 of the 33 lines the user recorded on fsc7f,
+    #    2026-09-19 (the frozen pane, decisions 1/3/7/12/17/24/29).
+    #    Rule 9 is untouched: a RENDERED click on a combobox or lookup opens a list and is a real
+    #    step, and it never reaches here because its action is `ClickElement`, not ''.
+    if action == '' and fam in FILL_FAMILIES:
+        return ''
+
     # 2. a dual listbox: the option the user clicked, exact text -- the library's recipe, rendered
     #    with the clicked text as the parameter (its move-right and read-back are the next lines).
     if fam == 'dual_listbox' and action in ('ClickText', 'VerifyText') and len(cells) >= 2:
@@ -299,6 +312,201 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
     if entry:
         return _recipe_first_action(entry, row, value)
     return None
+
+
+# ----------------------------------------------------------------------------- the OmniStudio pair
+# An OmniScript combobox is TWO stock recorder events for ONE intent: a click on the combobox's own
+# input (which the stock recorder writes as a ~1,200-character positional `ClickElement
+# /html[1]/body[1]/...`) and then a `ClickText <option>` on an `li` inside the listbox it opened.
+# The job library already owns that intent as one keyword -- CRTPagePatterns
+# `resources/garzai_omni.robot` -> `Omni Select    <key-or-label>    <option>` -- which scopes the
+# option to THIS combobox's own listbox (`aria-controls`) and drives the full pointer sequence a
+# bare .click() is measured not to commit. The two stock lines are kept as dormant `#   backup:`
+# lines so a reader who wants them can still have them: `Omni Select` resolves its first argument
+# through `keywords_omni.__host` (data-omni-key, then data-element-label, then aria-label, then
+# placeholder), and whether the RENDERED label reaches the host on a given script is a live
+# question this module cannot answer -- COULD-NOT-CHECK until a run says so, which is exactly what
+# the backups are for.
+OMNI_PAIR_WINDOW_S = 8.0
+_OMNI_COMBOBOX = 'runtime_omnistudio_common-combobox'
+_OMNI_TYPEAHEAD = 'runtime_omnistudio_common-typeahead'
+_OMNI_ANY = 'runtime_omnistudio'
+
+
+def _paths(*parts) -> str:
+    return '\n'.join(str(p or '') for p in parts)
+
+
+def omni_combobox_opener(rendered: str, *xpaths, family: str | None = None) -> bool:
+    """True when this event is the CLICK that opens an OmniScript combobox's listbox.
+
+    A rendered click (never a synthetic one -- the safety net's focus click on the same input is
+    rule 1b's business), on a fill-family control, whose own path runs through a
+    `runtime_omnistudio_common-combobox` host."""
+    cells = _cells(rendered)
+    if not cells or cells[0] not in ('ClickElement', 'ClickItem', 'Click'):
+        return False
+    if family is not None and family not in FILL_FAMILIES:
+        return False
+    return _OMNI_COMBOBOX in _paths(*xpaths)
+
+
+def omni_combobox_option(rendered: str, *xpaths) -> bool:
+    """True when this event is the `ClickText <option>` on an `li` of an OmniScript combobox's
+    own listbox. The `li` is what separates a real option from any other text in the container."""
+    cells = _cells(rendered)
+    if len(cells) < 2 or cells[0] != 'ClickText':
+        return False
+    blob = _paths(*xpaths)
+    return _OMNI_COMBOBOX in blob and '/li[' in blob
+
+
+def omni_typeahead_shape(rendered: str, *xpaths) -> bool:
+    """The typeahead's opener, for the record. A Type Ahead Block opens its listbox on TYPING, not
+    on a click (`Omni Typeahead`'s own [Documentation]), so its two events are NOT this pair's
+    shape and nothing here composes one."""
+    return _OMNI_TYPEAHEAD in _paths(*xpaths)
+
+
+def omni_label(label: str | None) -> str:
+    """The label a person reads, without the required-field marker the page renders in front of
+    it (`*Phone Type` -> `Phone Type`)."""
+    return re.sub(r'\s+', ' ', str(label or '')).strip().strip('*').strip()
+
+
+def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_option: str,
+                    indent: str = '    ') -> tuple[str, list]:
+    """(the one composed line, the two dormant backup lines) for one combobox pick.
+
+    Returns ('', []) when there is no label to name the control with -- a keyword whose first
+    argument would be blank is not a proposal, it is a guess, and the stock lines stand instead."""
+    lab = omni_label(label)
+    opt = (option or '').strip()
+    if not lab or not opt:
+        return '', []
+    line = '%s%s    %s' % (indent, RT._rf('Omni Select', lab, opt).strip(), UNVERIFIED)
+    backups = ['%s#   backup: %s   (stock recorder line, unverified)' % (indent, (s or '').strip())
+               for s in (stock_open, stock_option) if (s or '').strip()]
+    return line, backups
+
+
+# ------------------------------------------------------- the OmniStudio fill (the component tag)
+# Measured on the user's SECOND fsc7f run, 2026-09-19 12:17-12:19: the composed pane EXECUTED, every
+# click landed, 7 TypeText lines ran and 5 read back correctly. The 2 that did not are both
+# OmniStudio MASKED controls, and the failure is the keyword, not the locator:
+#   * `TypeText    Date of Birth    09-01-2025    anchor=1` -- the element sits under
+#     `runtime_omnistudio_common-date-picker`; the field ended BLANK on the page. That widget only
+#     commits a value chosen through its own calendar UI (`Omni Date`'s [Documentation]: a plain
+#     native-value write never commits on it).
+#   * `TypeText    Phone Number    (555) 111-2244` -- under `runtime_omnistudio_common-masked-input`,
+#     which REFORMATS on blur, so a raw string compare cannot confirm it.
+# The job library owns both: `Omni Date    <key-or-label>    <YYYY-MM-DD>` drives the calendar, and
+# `Omni Type    <key-or-label>    <value>    family=` normalises the read-back per family. So the
+# OmniScript COMPONENT TAG in the element's own path routes the keyword -- the same shape as the
+# combobox pair, one rung below it -- and the stock TypeText stays as a dormant backup.
+_OMNI_DATE_PICKER = 'runtime_omnistudio_common-date-picker'
+_OMNI_MASKED_INPUT = 'runtime_omnistudio_common-masked-input'
+_OMNI_PLAIN_INPUT = 'runtime_omnistudio_common-input'
+# EVERY OmniStudio fill component, widened on the THIRD run (2026-09-19 12:28): the composed
+# `TypeText    First Name    ads` ran into a field already holding `ads` and the field ended
+# `adsads` -- the recorder itself then captured `TypeText    First Name    adsads` off that input
+# 20 s later. TypeText's clear does not clear a `runtime_omnistudio_common-input` (the append class,
+# docs/errors/entries/576d7e8859), so the plain OmniScript text input joins the masked ones.
+_OMNI_FILL_TAGS = (_OMNI_DATE_PICKER, _OMNI_MASKED_INPUT, _OMNI_PLAIN_INPUT)
+
+# The value's own shape names the family `keywords_omni._normalise_for` compares with. Nothing here
+# guesses: a value that looks like neither is plain text and the keyword's own default stands.
+_MONEY_RX = re.compile(r'^\s*[$£€]\s*[\d,]+(\.\d+)?\s*$')
+_PHONE_RX = re.compile(r'^\s*\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\s*$')
+_ISO_RX = re.compile(r'^\s*(\d{4})-(\d{2})-(\d{2})\s*$')
+_US_RX = re.compile(r'^\s*(\d{1,2})[-/](\d{1,2})[-/](\d{4})\s*$')
+
+OMNI_TEXT_FAMILY = 'omni-text'
+
+
+def omni_value_family(value: str) -> str:
+    """`omni-currency` / `omni-telephone` / `omni-text` -- the family `Omni Type` normalises the
+    read-back with. Read off the VALUE's own shape, because that is the only evidence a recorded
+    event carries; anything else is plain text, which is the keyword's own default."""
+    v = str(value or '')
+    if _MONEY_RX.match(v):
+        return 'omni-currency'
+    if _PHONE_RX.match(v):
+        return 'omni-telephone'
+    return OMNI_TEXT_FAMILY
+
+
+def omni_iso_date(value: str) -> str | None:
+    """`Omni Date` takes `YYYY-MM-DD` and the widget commits `MM-DD-YYYY` (its own
+    [Documentation]). The recorder writes what the page rendered, which on this script is
+    month-first (`1/1/1990`, `09-02-2025`). Anything this cannot read returns None and NOTHING is
+    composed -- a date the composer had to guess is not a proposal."""
+    v = str(value or '')
+    m = _ISO_RX.match(v)
+    if m:
+        return '%s-%s-%s' % m.groups()
+    m = _US_RX.match(v)
+    if not m:
+        return None
+    mo, da, yr = int(m.group(1)), int(m.group(2)), m.group(3)
+    if not (1 <= mo <= 12 and 1 <= da <= 31):
+        return None
+    return '%s-%02d-%02d' % (yr, mo, da)
+
+
+def omni_fill_line(composed: str, *xpaths, omni_key: str | None = None,
+                   indent: str = '    ') -> tuple:
+    """(the Omni line, the dormant backup, why) for one composed fill on an OmniStudio control, or
+    ('', '', why) when nothing should change.
+
+    `composed` is the line the composer ALREADY decided -- the one that would otherwise run -- so
+    the label and the value are the parser's own, not the placeholder the recorder wrote.
+    `omni_key` is the element's `data-omni-key` (= `OmniProcessElement.Name`), which is what
+    `keywords_omni.__host` resolves and therefore what both keywords take as their first argument.
+    Without it there is no honest proposal here and the stock line stands -- said out loud in the
+    `why`, never as a silent miss."""
+    cells = _cells(composed)
+    if len(cells) < 3 or cells[0] not in ('TypeText', 'TypeSecret'):
+        return '', '', 'not a composed fill line'
+    value = cells[2]
+    blob = _paths(*xpaths)
+    tag = next((t for t in _OMNI_FILL_TAGS if t in blob), None)
+    if tag is None:
+        return '', '', 'no OmniStudio fill component in the element path'
+    key = str(omni_key or '').strip()
+    if not key:
+        return '', '', ('an OmniStudio %s, but the element carries no data-omni-key: the stock '
+                        'TypeText line stands' % tag.rsplit('-', 1)[-1])
+    if tag == _OMNI_DATE_PICKER:
+        iso = omni_iso_date(value)
+        if not iso:
+            return '', '', 'a date-picker control, but %r is not a date this can read' % value
+        line = RT._rf('Omni Date', key, iso)
+        why = ('OmniStudio date picker: a typed value never commits on it '
+               '(Omni Date drives the calendar)')
+    elif tag == _OMNI_MASKED_INPUT:
+        line = RT._rf('Omni Type', key, value, omni_value_family(value))
+        why = 'OmniStudio masked input: it reformats on blur (Omni Type normalises the read-back)'
+    else:
+        line = RT._rf('Omni Type', key, value, omni_value_family(value))
+        why = "OmniStudio text input: TypeText's clear does not clear it (the value APPENDS)"
+    backup = '%s#   backup: %s   (stock recorder line, unverified)' % (indent, composed.strip())
+    return '%s%s    %s' % (indent, line.strip(), UNVERIFIED), backup, why
+
+
+def verify_backup(composed: str, indent: str = '    ') -> str:
+    """The dormant read-back line that belongs AFTER a fill step, or '' when this is not a fill.
+
+    THE STEP IS THE ACTION, THE VERDICT IS A SEPARATE LINE (user, 2026-09-19). The composer does
+    not lean on validation buried inside a keyword: it emits the assertion a person can un-comment,
+    quoting the label and the value as they read them on the page. `Verify Input Value` is the
+    job library's own read-back-only keyword (`resources/garzai_typetext_override.robot`:
+    `[Arguments] ${locator} ${expected} ${anchor}=1`) -- GetInputValue + Values Match, no typing and
+    no repair."""
+    cells = _cells(composed)
+    if len(cells) < 3 or cells[0] not in ('TypeText', 'TypeSecret'):
+        return ''
+    return '%s#   verify: %s' % (indent, RT._rf('Verify Input Value', cells[1], cells[2]).strip())
 
 
 def xpath_form(row: dict, body: str) -> str | None:

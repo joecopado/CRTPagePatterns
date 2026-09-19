@@ -1,9 +1,9 @@
 {
  "bundle": "resources/garzai_parser",
- "bytes": 1719086,
+ "bytes": 1752691,
  "entry": "tools/recorder/crt_override/compose_live.py",
  "files": 56,
- "generated": "2026-09-19T06:25:14",
+ "generated": "2026-09-19T08:41:33",
  "generator": "tools/recorder/crt_override/build_parser_bundle.py",
  "sha256": {
   "docs/recorder/patterns/library.json": "c734f0f0dd1c3f138928aa875cdac2dc3cbe41588dd4e64e6fc1509bfd31c203",
@@ -51,17 +51,17 @@
   "tools/qforce-lite/discovery/page_chrome.py": "95b4a0f27bb2ee282491dcfd127b156aa726d4a803d876023d25396f1c954aec",
   "tools/qforce-lite/predict.py": "848b4383b7a7a78dd9b621f281c3f1413eeac9fddddcd0544e0e3aceee423fb0",
   "tools/qforce-lite/text_match.py": "bb4c3b8ff8abe4bd6181b648d22138cd0230766a2c84ff0bbda9669290e45538",
-  "tools/recorder/crt_override/compose_live.py": "cebaefb814fa829f49c73d31cf271be05edef214d3f4fa352a8e930db3a804d9",
-  "tools/recorder/crt_override/descriptor.py": "f1ca26a53015ce4fbbd1c032c567eda75f37f6a86054e879d2205a463d38f757",
+  "tools/recorder/crt_override/compose_live.py": "2a47b1733bdc144c5200aa9423fae0a24d294a02e53fa3eb05f9978ea4bf5119",
+  "tools/recorder/crt_override/descriptor.py": "f6d5a8b93df2a697bae60b512767a521de6f476ac020cbe1aef13245fa4e511e",
   "tools/recorder/disambiguation_args.py": "02c066836c4164d9a42fc6e557198523269a8aacf406f0dc7dca691f8c57b0f1",
   "tools/recorder/metadata_dom_parity.py": "a30c46b7f940e59e76fb24965a79d6710cffd20267f27e7a88f26f096ebf905e",
   "tools/recorder/pattern_library.py": "53750ce6f624e5175e1193580d33a79fe0fae3561315354ab1a5223251bbbeeb",
   "tools/recorder/pom/__init__.py": "1d3e859413cba4f1cce129b7498adcc4d29f377a14ea2b4489213bd7f2a673aa",
   "tools/recorder/pom/keys.py": "d86e467414e917ac8019dcba2b0307b0a99f96942afedfc0b3947d86d0b3d711",
   "tools/recorder/pom/match.py": "dff1931feeeaf1cf17fc95a21702ae766d86e211612850b04bb1c8f6975e5df9",
-  "tools/recorder/pom/store.py": "9af88c608b050bf1f4ecfcb905c38edae4d57097d149aa8422cc2bb2f559f1a6",
-  "tools/recorder/pom_asset.py": "98c28f695f1d75d1f107612fb2dba31346dbfe9c3c8a2bb031dfa4564bc0e174",
-  "tools/recorder/review_table.py": "1ede8e38170597f7373b61bb490fac0656178ec560fca4be3bd08ebd5ee6c0ec"
+  "tools/recorder/pom/store.py": "c141450d699789785de1d79022934f191348e6355e13504280b1748955535ac9",
+  "tools/recorder/pom_asset.py": "3dacac03b3d1568557cc583e8d2a6c452a8e58f70ec61371f21511436ec38e14",
+  "tools/recorder/review_table.py": "467120d91ef7314084cc6c68c0437e4270289c61d39abf0cd59b5c7f91ca8d3d"
  },
  "variant": "traced"
 }

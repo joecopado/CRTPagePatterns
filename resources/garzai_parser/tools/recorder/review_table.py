@@ -2164,7 +2164,11 @@ def cmd_writeback(a) -> int:
             continue
         family = r.get('family_corrected') or r.get('element_type')
         label = r.get('label_corrected') or r.get('label') or ''
-        eid = element_id(family, label, r.get('container'), r.get('attrs'))
+        # WRITER 3 of 3 (F70, 2026-09-19): what a control is CALLED on this page is decided in ONE
+        # place for every writer -- `store.identify_control` -- so a reviewed control lands on the
+        # element a driven step or a capture already made, instead of minting a second name for it.
+        eid = STORE_MOD.identify_control(rec, label, family, attrs=r.get('attrs'),
+                                         tag=r.get('tag'), container=r.get('container'))
         el = rec['elements'].setdefault(eid, {})
         # same fold as pom_asset: a reviewed control absorbs any `capture-stamp` placeholder
         # another page's state stamp left for it, so one control is never two records

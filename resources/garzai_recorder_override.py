@@ -202,6 +202,87 @@ def parsed_get(row: dict) -> tuple:
             row.get('group_size'))
 
 
+# ----------------------------------------------------------------------------- the class rule
+# `families_compatible` folds button / link / menuitem / tab / option into ONE click family, which
+# is right for "can this row be clicked" and wrong for "is this the SAME control". Measured
+# 2026-09-19 on fsc7f: the user picked `Home` in the OmniScript's Phone Type combobox (an `li`
+# option, descriptor family `button`) and the descriptor branch claimed parser row 11 -- the app
+# navigation's `Home` link (family `link`, tag `a`, region `chrome`; measured on the committed
+# capture docs/dom-captures/fsc7f-omnistudio/01-applicationform-record-omniscript.html, row 11,
+# group_size 2) -- so a correct stock line `ClickText    Home` was DEGRADED into
+# `ClickText    Home    anchor=1    partial_match=False`, which at run time clicks the nav link and
+# leaves the form untouched. The F42 class (a confident wrong answer) arriving through the label door.
+#
+# So a label match must also agree on the CONTROL CLASS, one step finer than the family: an option
+# in a listbox is never a tab and never a navigation link.
+_OPTION_ROLES = {'option', 'treeitem'}
+_OPTION_TAGS = {'li', 'option'}
+_NAV_ROLES = {'tab', 'menuitem', 'link', 'treeitem'}
+
+
+def control_class(tag, role, family=None) -> str:
+    """`option` / `nav` / `button` / `other` -- one step finer than the family, from whatever the
+    side in hand can say. `other` is the unknown and agrees with everything."""
+    t, r = str(tag or '').casefold(), str(role or '').casefold()
+    f = str(family or '').casefold()
+    if r in _OPTION_ROLES or t in _OPTION_TAGS:
+        return 'option'
+    if r in _NAV_ROLES or t == 'a' or f in ('link', 'tab', 'menuitem'):
+        return 'nav'
+    if t in ('button', 'input') or f == 'button':
+        return 'button'
+    return 'other'
+
+
+def classes_agree(a: str, b: str) -> bool:
+    """Two control classes name the same kind of control. `other` agrees with everything;
+    `option` agrees only with `option`."""
+    if a == 'other' or b == 'other':
+        return True
+    return a == b
+
+
+def row_class(row: dict) -> str:
+    attrs = (row.get('attrs') or {}) if isinstance(row, dict) else {}
+    return control_class(row.get('tag_corrected') or row.get('tag'), attrs.get('role'),
+                         row.get('family_corrected') or row.get('element_type') or row.get('type'))
+
+
+def desc_class(desc: dict) -> str:
+    return control_class(desc.get('tag'), desc.get('role'), desc.get('family'))
+
+
+# The app chrome is the nav bar, the global header, the utility bar and the search box -- the
+# parser already says so per row (`region`, from the template's own `chromeContainers`). A chrome
+# row may only answer for an element that is ITSELF in the chrome, and the element's own path is
+# the evidence: when the descriptor carries no path the rule does not fire, because an unknown is
+# COULD-NOT-CHECK, never a refusal.
+_CHROME_PATH_FRAGMENTS = ('one-appnav', 'one-app-nav-bar', 'onesearch', 'one-search',
+                          'oneutilitybar', 'one-utility', 'globalheader', 'global-header',
+                          'navigationmenuitem', 'one-tab-bar')
+
+
+def _in_chrome_path(path: str) -> bool:
+    p = str(path or '').casefold()
+    return any(frag in p for frag in _CHROME_PATH_FRAGMENTS)
+
+
+def row_may_claim(row: dict, desc: dict):
+    """(True, None) when this row may answer for this descriptor's element, or (False, why not).
+
+    Two refusals, both measured (fsc7f 2026-09-19, ledger F42's class):
+      * the control classes disagree -- a listbox option is not a tab and not a nav link;
+      * the row lives in the app chrome while the element's own path does not.
+    """
+    rc, dc = row_class(row), desc_class(desc)
+    if not classes_agree(rc, dc):
+        return False, 'the row is a %s and the element is a %s' % (rc, dc)
+    path = desc.get('xpath') or desc.get('alt_xpath') or ''
+    if str(row.get('region') or '').casefold() == 'chrome' and path and not _in_chrome_path(path):
+        return False, 'the row is in the app chrome and the element is not (...%s)' % str(path)[-50:]
+    return True, None
+
+
 def find_row(rows, desc: dict, get=_default_get):
     """(row, why) -- the row this descriptor names, by label + family, or (None, why not).
 
@@ -210,18 +291,36 @@ def find_row(rows, desc: dict, get=_default_get):
     compatible controls in DOM order, counted BY THE PAGE, against the row's own `index` (the
     parser's position among the same-label matches). When the two disagree, or the page could not
     count, nothing is returned -- an ambiguous label is a COULD-NOT-DISAMBIGUATE, never a guess.
+
+    A same-label row must ALSO pass `row_may_claim`: the control classes have to agree (a listbox
+    option is not a tab and not a navigation link) and a row in the app chrome may not answer for
+    an element outside it. Refusing leaves (None, why), which is the caller's signal to let the
+    STOCK recorder line stand unchanged -- a plain `ClickText    Home` is a better answer than a
+    confident wrong one (fsc7f 2026-09-19, ledger F42's class).
     """
     if not rows or not desc:
         return None, 'no descriptor'
     fam = desc.get('family')
-    tried = []
+    tried, refused = [], []
     for text, rung in label_candidates(desc):
         want = norm_label(text)
         if not want:
             continue
         cands = [r for r in rows
                  if norm_label(get(r)[0]) == want and families_compatible(fam, get(r)[1])]
-        tried.append('%s=%r -> %d' % (rung, text[:40], len(cands)))
+        # ... and the class rule, one step finer than the family (F42's class, 2026-09-19)
+        kept, refused_here = [], []
+        for r in cands:
+            ok, why_not = row_may_claim(r, desc)
+            if ok:
+                kept.append(r)
+            else:
+                refused_here.append(why_not)
+        refused.extend(refused_here)
+        cands = kept
+        tried.append('%s=%r -> %d%s' % (rung, text[:40], len(cands),
+                                        (' (%d refused: %s)' % (len(refused_here), refused_here[0]))
+                                        if refused_here else ''))
         if not cands:
             continue
 
@@ -241,7 +340,13 @@ def find_row(rows, desc: dict, get=_default_get):
                     _rung(hits[0]), text[:40], idx, desc.get('label_group_size'))
         return None, ('COULD-NOT-DISAMBIGUATE: %d rows carry label %r and the page counted index %r'
                       % (len(cands), text[:40], idx))
-    return None, 'no row carries this descriptor label (%s)' % ('; '.join(tried) or 'none offered')
+    why = 'no row carries this descriptor label (%s)' % ('; '.join(tried) or 'none offered')
+    if refused:
+        # SAY WHY IT WAS REFUSED. A silent refusal reads exactly like "the page has no such row",
+        # and the difference is the whole of F42: one is a control we could not name, the other is
+        # a control we deliberately declined to mis-name.
+        why += '; refused %d same-label row(s): %s' % (len(refused), '; '.join(refused[:3]))
+    return None, why
 
 
 def attribute_identity(desc, row, refused=None):
@@ -405,6 +510,16 @@ function labelIndex(el, label, fam){
   }
   return {index: found, group_size: k, scanned: c.list.length, capped: c.capped};
 }
+/* The OmniStudio element's own metadata id. `data-omni-key` equals `OmniProcessElement.Name` and
+   sits on the element HOST (`runtime_omnistudio_common-input`, `-masked-input`, `-date-picker`),
+   never on the <input> the user actually clicked, so this walks UP -- through shadow hosts, via the
+   same `up()` every label rung uses. It is what `keywords_omni.__host` resolves, which makes it the
+   first argument of `Omni Type` / `Omni Date`; without it the composer leaves the stock TypeText
+   line alone (measured 2026-09-19: TypeText's clear does not clear an OmniScript text input and the
+   value APPENDS, so the keyword choice is not cosmetic). */
+function omniKey(el){ var cur = el, h = 0;
+  while (cur && h < 8){ var k = attr(cur,'data-omni-key'); if (k) return k; cur = up(cur); h++; }
+  return null; }
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
   while (r && r !== document && r.host && g < 12){ out.push(r.host.tagName.toLowerCase()); r = r.host.getRootNode ? r.host.getRootNode() : document; g++; }
@@ -423,6 +538,7 @@ window.__gzDescribe = function(el){
     d.title = attr(el,'title');
     d.role = attr(el,'role');
     d.data_testid = attr(el,'data-testid') || attr(el,'data-test-id');
+    d.omni_key = omniKey(el);          /* OmniProcessElement.Name, off the element HOST */
     d.text = txt(el).slice(0,80);
     var nl = nearestLabel(el);
     d.label = nl[0] || null;
@@ -472,7 +588,7 @@ function stampAndDescribe(el){var out={nonce:null,descriptor:null};try{if(el&&el
 window.__gzCompose=function(self,r,event,ctx){window.__gzRec=self;var x=ctx?self.handler.getXPathForElement(ctx):undefined;
  var alt;try{if(ctx&&ctx.nodeType===1){alt=axp(ctx);if(alt){window.__gzSeen[alt]=Date.now();Object.keys(window.__gzPending).forEach(function(k){var pe=window.__gzPendingEl[k];if(k===alt||(pe&&(pe===ctx||pe.contains(ctx)||ctx.contains(pe)))){clearTimeout(window.__gzPending[k]);delete window.__gzPending[k];delete window.__gzPendingEl[k];window.__gzSeen[k]=Date.now()}})}}}catch(e){}
  var mark=stampAndDescribe(ctx);
- enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
+ enqueue(function(){return ask({rendered:r,xpath:x,alt_xpath:alt,nonce:mark.nonce,descriptor:mark.descriptor}).then(function(j){var line=(j&&typeof j.line==='string')?j.line:r;((j&&j.pre)||[]).forEach(function(pp){self.pushStep(pp,event,x)});if(line!==''){self.pushStep(line,event,x);(j&&j.backups||[]).forEach(function(b){self.pushStep(b,event,x)})}}).catch(function(e){console.log('gz compose failed',e);self.pushStep(r,event,x)})})};
 function safetyNet(ev,kind){try{var tg=ev.composedPath?ev.composedPath()[0]:ev.target;if(!tg||tg.nodeType!==1)return;var el=tg;
  if(kind==='click'){el=tg.closest('button,a,[role="button"],[role="option"],[role="tab"],[role="menuitem"],[role="checkbox"],input,select,option,[class*="zn-arrow"],lightning-button-icon,lightning-button,lightning-icon')||tg}
  var self=window.__gzRec;if(!self){console.log('gz safety-net: no recorder instance yet');return}
@@ -485,7 +601,7 @@ document.addEventListener('click',function(ev){safetyNet(ev,'click')},true);
 document.addEventListener('change',function(ev){safetyNet(ev,'change')},true);
 try{fetch(U+'/ping').catch(function(){})}catch(e){}})();
 """
-STATE = {"version": "2026-09-18l guards", "form": "keyword", "org": None, "patched": None,
+STATE = {"version": "2026-09-19m focus", "form": "keyword", "org": None, "patched": None,
          "replacements": 0, "served": 0, "decisions": [], "server": None, "error": None}
 
 # --------------------------------------------------------------- the parser bundle (page with no review)
@@ -1041,6 +1157,118 @@ def _is_duplicate(drv, target, action=None, desc=None, window_s=2.5):
     return True
 
 
+# --------------------------------------------------------------------------- the OmniStudio pair
+# ONE intent, two stock recorder events: a click on an OmniScript combobox's input (written as a
+# ~1,200-character positional `ClickElement /html[1]/...`) and then a `ClickText <option>` on an
+# `li` of the listbox it opened. The job library already owns that intent as one keyword --
+# `resources/garzai_omni.robot` -> `Omni Select`. The pairing is SERVER-SIDE and has exactly three
+# moves: a combobox-open click returns line '' and is HELD (its line, the label, the time); the
+# next event, if it is that combobox's option click inside %.0f s, returns the composed pair with
+# the two stock lines as dormant `#   backup:` lines; ANY other next event first flushes the held
+# click as its own pass-through line, ahead of its own (the `pre` list the page pushes first).
+# Measured on the user's fsc7f recording, 2026-09-19: 5 pairs, 10 pane lines, 5 of them 1,200
+# characters of absolute path.
+_OMNI_HOLD = {"held": False, "line": "", "label": None, "t": 0.0}
+
+
+def _omni_clear():
+    _OMNI_HOLD.update({"held": False, "line": "", "label": None, "t": 0.0})
+
+
+def _omni_flush():
+    """The held line, as a one-item `pre` list, and the hold cleared. A held line that is empty
+    flushes nothing -- there is no step to restore."""
+    out = [_OMNI_HOLD["line"]] if (_OMNI_HOLD["held"] and (_OMNI_HOLD["line"] or "").strip()) else []
+    _omni_clear()
+    return out
+
+
+def _omni_pair(req, decision, line, backups):
+    """(pre, line, backups). `pre` are lines the page pushes BEFORE this event's own."""
+    cl = _parser()
+    if cl is None:
+        return [], line, backups          # no parser bundle: no pairing, stock lines pass through
+    rendered = req.get("rendered") or ""
+    paths = (req.get("xpath") or "", req.get("alt_xpath") or "")
+    desc = req.get("descriptor") or {}
+    now = time.time()
+    pre = []
+    if _OMNI_HOLD["held"] and now - _OMNI_HOLD["t"] > cl.OMNI_PAIR_WINDOW_S:
+        pre = _omni_flush()               # the option click never came: the held line stands alone
+    if _OMNI_HOLD["held"] and cl.omni_combobox_option(rendered, *paths):
+        option = _cells(rendered)[1]
+        pair, pair_backups = cl.omni_pair_lines(_OMNI_HOLD["label"], option,
+                                                _OMNI_HOLD["line"], rendered)
+        if pair:
+            decision["why"] = ("OmniStudio combobox pick: the open click and the option click "
+                               "composed as one Omni Select (%r -> %r); the two stock lines are "
+                               "dormant backups" % (cl.omni_label(_OMNI_HOLD["label"]), option))
+            decision["omni"] = "paired"
+            _omni_clear()
+            return pre, pair, pair_backups
+        # no label to name the control with: a keyword whose first argument is blank is a guess.
+        decision["omni"] = "no label on the combobox: the two stock lines stand"
+        return pre + _omni_flush(), line, backups
+    if not req.get("synthetic") and cl.omni_combobox_opener(rendered, *paths,
+                                                            family=desc.get("family")):
+        pre = pre + _omni_flush()         # two openers in a row: the first one stands alone
+        _OMNI_HOLD.update({"held": True, "line": line if isinstance(line, str) else rendered,
+                           "label": desc.get("label") or desc.get("aria_label") or desc.get("placeholder"),
+                           "t": now})
+        decision["why"] = "OmniStudio combobox opened: HELD for its option click (up to %.0f s)" % cl.OMNI_PAIR_WINDOW_S
+        decision["omni"] = "held"
+        return pre, "", []
+    if _OMNI_HOLD["held"]:
+        decision["omni"] = "flushed the held combobox click"
+        pre = pre + _omni_flush()
+    return pre, line, backups
+
+
+def _omni_fill(req, decision, line, backups):
+    """(line, backups) for a FILL event: the OmniStudio keyword when the element is an OmniStudio
+    fill component, and -- always -- the dormant read-back line that belongs after it.
+
+    Routing is by the COMPONENT TAG in the element's own path, and the first argument is the
+    element's `data-omni-key` the page-side describer now collects:
+      * `runtime_omnistudio_common-date-picker` -> `Omni Date` (a typed value never commits on that
+        widget; the user's executed run left the field BLANK, 2026-09-19 12:17);
+      * `runtime_omnistudio_common-masked-input` -> `Omni Type` (it reformats on blur);
+      * `runtime_omnistudio_common-input`        -> `Omni Type` (TypeText's clear does not clear it:
+        `TypeText First Name ads` into a field holding `ads` ended `adsads`, 2026-09-19 12:28).
+    No key, or a date this cannot read: the stock line stands and the decision says why.
+
+    THE STEP IS THE ACTION, THE VERDICT IS A SEPARATE LINE (user, 2026-09-19). Whatever the fill
+    ends up being, a dormant `#   verify: Verify Input Value    <label>    <value>` follows it, so
+    the assertion is a step a person can un-comment -- never validation hidden inside a keyword."""
+    cl = _parser()
+    if cl is None or not isinstance(line, str) or not line.strip():
+        return line, backups
+    desc = req.get("descriptor") or {}
+    stock = line
+    try:
+        omni, backup, why = cl.omni_fill_line(
+            line, req.get("xpath") or "", req.get("alt_xpath") or "",
+            omni_key=desc.get("omni_key"),
+            indent=(line[: len(line) - len(line.lstrip())] or "    "))
+    except Exception as exc:
+        decision["omni_fill"] = "error: %s" % exc
+        omni, backup, why = "", "", None
+    if omni:
+        decision["omni_fill"] = why
+        decision["why"] = "%s; %s" % (decision.get("why") or "", why)
+        line, backups = omni, [backup] + list(backups)
+    elif why:
+        decision["omni_fill"] = why          # named, never a silent miss
+    try:
+        verify = cl.verify_backup(stock, indent=(stock[: len(stock) - len(stock.lstrip())] or "    "))
+    except Exception:
+        verify = ""
+    if verify:
+        backups = list(backups) + [verify]
+        decision["verify_line"] = True
+    return line, backups
+
+
 class _H(BaseHTTPRequestHandler):
     def log_message(self, *a):  # quiet
         pass
@@ -1082,6 +1310,11 @@ class _H(BaseHTTPRequestHandler):
         rendered = req.get("rendered") or ""
         xp = req.get("xpath")
         desc = req.get("descriptor") or {}
+        if desc:
+            # The element's OWN path travels with the descriptor: `descriptor.row_may_claim` needs
+            # it for the chrome rule (a row in the nav bar may not answer for an element outside
+            # it). The page side is unchanged -- this is the path the event already carried.
+            desc = dict(desc, xpath=req.get("xpath") or "", alt_xpath=req.get("alt_xpath") or "")
         nonce = req.get("nonce")
         decision = {"in": rendered[:80], "xpath": (xp or "")[-60:], "out": None, "row": None, "why": None,
                     "label": (desc.get("label") or desc.get("text") or None),
@@ -1174,10 +1407,19 @@ class _H(BaseHTTPRequestHandler):
         except Exception as exc:
             decision["why"] = "error: %s" % exc; decision["out"] = rendered
         backups = proposal_backups or _backups(decision.get("row"), decision["out"], rendered)
-        decision["backups"] = len(backups)
+        pre = []
+        try:
+            pre, out_line, backups = _omni_pair(req, decision, decision["out"], backups)
+            out_line, backups = _omni_fill(req, decision, out_line, backups)
+            decision["out"] = out_line
+        except Exception as exc:
+            # the pair is an improvement on top of a decision that is already made: a failure here
+            # leaves that decision exactly as it was, and says so
+            decision["omni"] = "error: %s" % exc
+        decision["backups"] = len(backups); decision["pre"] = len(pre)
         STATE["decisions"].append(decision); STATE["decisions"] = STATE["decisions"][-50:]
         _log(json.dumps(decision))
-        self._send({"line": decision["out"], "backups": backups})
+        self._send({"line": decision["out"], "backups": backups, "pre": pre})
 
 
 def _serve():

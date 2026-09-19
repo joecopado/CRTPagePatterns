@@ -328,9 +328,15 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
         # On a single-surface app the "container" is whatever prose surrounded the control on this
         # visit (a chat message, a run card), not structure -- so it must not enter the identity or
         # every visit mints a new id and the asset relearns a page it already knows.
-        eid = element_id(c['family'], c['label'], c['container'], c['attrs'],
-                         drop_container=(K.single_surface_prefix(pk.get("host"), pk.get("pattern") or "")
-                                         and not pk.get('salesforce')))
+        # WHAT a control is CALLED on this page is decided in ONE place for every writer
+        # (F70, 2026-09-19): a control this capture writer files, a driven `--op kw` step and a
+        # review write-back must land on ONE element, or the truth splits -- the `opens` and the
+        # verified rung on a copy with `tag: null` that ClickItem can never resolve, the shape on
+        # a copy that does not know what the control does.
+        eid = STORE_MOD.identify_control(
+            rec, c['label'], c['family'], attrs=c['attrs'], tag=c['tag'], container=c['container'],
+            drop_container=(K.single_surface_prefix(pk.get("host"), pk.get("pattern") or "")
+                            and not pk.get('salesforce')))
         el = rec['elements'].setdefault(eid, {})
         # a `capture-stamp` placeholder another page's stamp left behind for this control is
         # folded in here, so one control is never two records (store.absorb_stamp_placeholder)

@@ -163,6 +163,87 @@ def parsed_get(row: dict) -> tuple:
             row.get('group_size'))
 
 
+# ----------------------------------------------------------------------------- the class rule
+# `families_compatible` folds button / link / menuitem / tab / option into ONE click family, which
+# is right for "can this row be clicked" and wrong for "is this the SAME control". Measured
+# 2026-09-19 on fsc7f: the user picked `Home` in the OmniScript's Phone Type combobox (an `li`
+# option, descriptor family `button`) and the descriptor branch claimed parser row 11 -- the app
+# navigation's `Home` link (family `link`, tag `a`, region `chrome`; measured on the committed
+# capture docs/dom-captures/fsc7f-omnistudio/01-applicationform-record-omniscript.html, row 11,
+# group_size 2) -- so a correct stock line `ClickText    Home` was DEGRADED into
+# `ClickText    Home    anchor=1    partial_match=False`, which at run time clicks the nav link and
+# leaves the form untouched. The F42 class (a confident wrong answer) arriving through the label door.
+#
+# So a label match must also agree on the CONTROL CLASS, one step finer than the family: an option
+# in a listbox is never a tab and never a navigation link.
+_OPTION_ROLES = {'option', 'treeitem'}
+_OPTION_TAGS = {'li', 'option'}
+_NAV_ROLES = {'tab', 'menuitem', 'link', 'treeitem'}
+
+
+def control_class(tag, role, family=None) -> str:
+    """`option` / `nav` / `button` / `other` -- one step finer than the family, from whatever the
+    side in hand can say. `other` is the unknown and agrees with everything."""
+    t, r = str(tag or '').casefold(), str(role or '').casefold()
+    f = str(family or '').casefold()
+    if r in _OPTION_ROLES or t in _OPTION_TAGS:
+        return 'option'
+    if r in _NAV_ROLES or t == 'a' or f in ('link', 'tab', 'menuitem'):
+        return 'nav'
+    if t in ('button', 'input') or f == 'button':
+        return 'button'
+    return 'other'
+
+
+def classes_agree(a: str, b: str) -> bool:
+    """Two control classes name the same kind of control. `other` agrees with everything;
+    `option` agrees only with `option`."""
+    if a == 'other' or b == 'other':
+        return True
+    return a == b
+
+
+def row_class(row: dict) -> str:
+    attrs = (row.get('attrs') or {}) if isinstance(row, dict) else {}
+    return control_class(row.get('tag_corrected') or row.get('tag'), attrs.get('role'),
+                         row.get('family_corrected') or row.get('element_type') or row.get('type'))
+
+
+def desc_class(desc: dict) -> str:
+    return control_class(desc.get('tag'), desc.get('role'), desc.get('family'))
+
+
+# The app chrome is the nav bar, the global header, the utility bar and the search box -- the
+# parser already says so per row (`region`, from the template's own `chromeContainers`). A chrome
+# row may only answer for an element that is ITSELF in the chrome, and the element's own path is
+# the evidence: when the descriptor carries no path the rule does not fire, because an unknown is
+# COULD-NOT-CHECK, never a refusal.
+_CHROME_PATH_FRAGMENTS = ('one-appnav', 'one-app-nav-bar', 'onesearch', 'one-search',
+                          'oneutilitybar', 'one-utility', 'globalheader', 'global-header',
+                          'navigationmenuitem', 'one-tab-bar')
+
+
+def _in_chrome_path(path: str) -> bool:
+    p = str(path or '').casefold()
+    return any(frag in p for frag in _CHROME_PATH_FRAGMENTS)
+
+
+def row_may_claim(row: dict, desc: dict):
+    """(True, None) when this row may answer for this descriptor's element, or (False, why not).
+
+    Two refusals, both measured (fsc7f 2026-09-19, ledger F42's class):
+      * the control classes disagree -- a listbox option is not a tab and not a nav link;
+      * the row lives in the app chrome while the element's own path does not.
+    """
+    rc, dc = row_class(row), desc_class(desc)
+    if not classes_agree(rc, dc):
+        return False, 'the row is a %s and the element is a %s' % (rc, dc)
+    path = desc.get('xpath') or desc.get('alt_xpath') or ''
+    if str(row.get('region') or '').casefold() == 'chrome' and path and not _in_chrome_path(path):
+        return False, 'the row is in the app chrome and the element is not (...%s)' % str(path)[-50:]
+    return True, None
+
+
 def find_row(rows, desc: dict, get=_default_get):
     """(row, why) -- the row this descriptor names, by label + family, or (None, why not).
 
@@ -171,18 +252,36 @@ def find_row(rows, desc: dict, get=_default_get):
     compatible controls in DOM order, counted BY THE PAGE, against the row's own `index` (the
     parser's position among the same-label matches). When the two disagree, or the page could not
     count, nothing is returned -- an ambiguous label is a COULD-NOT-DISAMBIGUATE, never a guess.
+
+    A same-label row must ALSO pass `row_may_claim`: the control classes have to agree (a listbox
+    option is not a tab and not a navigation link) and a row in the app chrome may not answer for
+    an element outside it. Refusing leaves (None, why), which is the caller's signal to let the
+    STOCK recorder line stand unchanged -- a plain `ClickText    Home` is a better answer than a
+    confident wrong one (fsc7f 2026-09-19, ledger F42's class).
     """
     if not rows or not desc:
         return None, 'no descriptor'
     fam = desc.get('family')
-    tried = []
+    tried, refused = [], []
     for text, rung in label_candidates(desc):
         want = norm_label(text)
         if not want:
             continue
         cands = [r for r in rows
                  if norm_label(get(r)[0]) == want and families_compatible(fam, get(r)[1])]
-        tried.append('%s=%r -> %d' % (rung, text[:40], len(cands)))
+        # ... and the class rule, one step finer than the family (F42's class, 2026-09-19)
+        kept, refused_here = [], []
+        for r in cands:
+            ok, why_not = row_may_claim(r, desc)
+            if ok:
+                kept.append(r)
+            else:
+                refused_here.append(why_not)
+        refused.extend(refused_here)
+        cands = kept
+        tried.append('%s=%r -> %d%s' % (rung, text[:40], len(cands),
+                                        (' (%d refused: %s)' % (len(refused_here), refused_here[0]))
+                                        if refused_here else ''))
         if not cands:
             continue
 
@@ -202,7 +301,13 @@ def find_row(rows, desc: dict, get=_default_get):
                     _rung(hits[0]), text[:40], idx, desc.get('label_group_size'))
         return None, ('COULD-NOT-DISAMBIGUATE: %d rows carry label %r and the page counted index %r'
                       % (len(cands), text[:40], idx))
-    return None, 'no row carries this descriptor label (%s)' % ('; '.join(tried) or 'none offered')
+    why = 'no row carries this descriptor label (%s)' % ('; '.join(tried) or 'none offered')
+    if refused:
+        # SAY WHY IT WAS REFUSED. A silent refusal reads exactly like "the page has no such row",
+        # and the difference is the whole of F42: one is a control we could not name, the other is
+        # a control we deliberately declined to mis-name.
+        why += '; refused %d same-label row(s): %s' % (len(refused), '; '.join(refused[:3]))
+    return None, why
 
 
 def attribute_identity(desc, row, refused=None):
@@ -366,6 +471,16 @@ function labelIndex(el, label, fam){
   }
   return {index: found, group_size: k, scanned: c.list.length, capped: c.capped};
 }
+/* The OmniStudio element's own metadata id. `data-omni-key` equals `OmniProcessElement.Name` and
+   sits on the element HOST (`runtime_omnistudio_common-input`, `-masked-input`, `-date-picker`),
+   never on the <input> the user actually clicked, so this walks UP -- through shadow hosts, via the
+   same `up()` every label rung uses. It is what `keywords_omni.__host` resolves, which makes it the
+   first argument of `Omni Type` / `Omni Date`; without it the composer leaves the stock TypeText
+   line alone (measured 2026-09-19: TypeText's clear does not clear an OmniScript text input and the
+   value APPENDS, so the keyword choice is not cosmetic). */
+function omniKey(el){ var cur = el, h = 0;
+  while (cur && h < 8){ var k = attr(cur,'data-omni-key'); if (k) return k; cur = up(cur); h++; }
+  return null; }
 function hostChain(el){
   var out = [], r = el.getRootNode ? el.getRootNode() : document, g = 0;
   while (r && r !== document && r.host && g < 12){ out.push(r.host.tagName.toLowerCase()); r = r.host.getRootNode ? r.host.getRootNode() : document; g++; }
@@ -384,6 +499,7 @@ window.__gzDescribe = function(el){
     d.title = attr(el,'title');
     d.role = attr(el,'role');
     d.data_testid = attr(el,'data-testid') || attr(el,'data-test-id');
+    d.omni_key = omniKey(el);          /* OmniProcessElement.Name, off the element HOST */
     d.text = txt(el).slice(0,80);
     var nl = nearestLabel(el);
     d.label = nl[0] || null;
