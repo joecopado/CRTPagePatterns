@@ -43,11 +43,14 @@ Library           QForce
 Library           Collections    # Set To Dictionary below; measured missing in Live Testing 2026-09-19 (every TypeText failed "No keyword with name 'Set To Dictionary' found")
 
 *** Variables ***
-# fail (default, builds): a mismatch FAILS the step. warn (Live Testing recording sessions, set it
-# in the suite's Variables): the mismatch is printed as CAUGHT-BUG, kept in @{GZ_MISMATCHES}, and
-# execution continues -- the user asked for this on 2026-09-19 after every failure stopped the
-# session and forced a re-select-and-rerun. `Gz Mismatch Tally` prints the list at the end.
-${GZ_ON_MISMATCH}    fail
+# THE STEP IS THE ACTION; THE VERDICT IS AN OBSERVATION (user, 2026-09-19: "validations should be
+# outside of the executed steps ... when a test step fails I have to click Stop, rehighlight,
+# re-execute"). Default `warn`: TypeText types, reads back, prints the verdict WITH the actual
+# value to the console (VERIFIED-PASS / CAUGHT-BUG / COULD-NOT-CHECK), keeps it in
+# @{GZ_MISMATCHES}, and NEVER stops the run. `Gz Mismatch Tally` prints the list at the end.
+# A build that wants the step itself to fail on a mismatch sets `${GZ_ON_MISMATCH}    fail` in its
+# Variables, or asserts with the separate `Verify Input Value` line after the step.
+${GZ_ON_MISMATCH}    warn
 @{GZ_MISMATCHES}
 
 
@@ -96,7 +99,7 @@ TypeText
         Gz Report Mismatch    CAUGHT-BUG    GarzAI TypeText('${locator}'): value did not land. asked for '${input_text}', field holds '${actual}' -- never re-typed over a non-blank mismatch (D13, CLAUDE.md).
         RETURN
     END
-    Log    GarzAI TypeText('${locator}'): read back '${actual}' -- matches '${input_text}'.    console=True
+    Log    VERIFIED-PASS: GarzAI TypeText('${locator}'): read back '${actual}' -- matches '${input_text}'.    console=True
 
 
 Type Text Select All
