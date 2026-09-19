@@ -52,6 +52,7 @@ for _p in ('tools/recorder', 'tools/dom-miner'):
         sys.path.insert(0, _abs)
 
 import review_table as RT          # noqa: E402  (parser + xpath ladder + identity xpath)
+import descriptor as DESC         # noqa: E402  (the page's own description of the element, and the row rule)
 import pattern_library as PL       # noqa: E402  (buckets + the verified recipes)
 import disambiguation_args as DA   # noqa: E402  (index -> QWeb's numeric anchor)
 from pom import keys as PK         # noqa: E402  (the page key, for provenance)
@@ -365,7 +366,7 @@ def _recipe_step_for(parsed: Parsed, target_path: str) -> tuple[dict | None, str
 
 
 def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: str,
-                         rendered: str, form: str = 'keyword') -> dict:
+                         rendered: str, form: str = 'keyword', descriptor: dict | None = None) -> dict:
     """html in, line out -- no driver, no network, no org contact.
 
     `target_identity_xpath` names the recorded element inside this capture (live, the caller holds
@@ -377,9 +378,19 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
     parsed = parse_capture(html, url, org)
     out = {'line': None, 'xpath_line': None, 'row': None, 'why': None,
            'page_key': parsed.page_key, 'parse_ms': parsed.parse_ms, 'rows': len(parsed.rows)}
-    els = parsed.resolve(target_identity_xpath)
+    els = parsed.resolve(target_identity_xpath) if target_identity_xpath else []
     if len(els) != 1:
-        out['why'] = 'COULD-NOT-CHECK: the target xpath matched %d elements in the capture' % len(els)
+        # no identity, or one that names no single node: the page's own description still can
+        if descriptor:
+            row, why = DESC.find_row(parsed.rows, descriptor, get=DESC.parsed_get)
+            if row is not None:
+                out.update(compose_for_row(row, rendered, form))
+                out.update({'row': _row_summary(row), 'matched_by': 'descriptor', 'descriptor_why': why,
+                            'compose_ms': round((time.time() - t0) * 1000, 1)})
+                return out
+            out['descriptor_why'] = why
+        out['why'] = 'COULD-NOT-CHECK: the target xpath matched %d elements in the capture%s' % (
+            len(els), ('; and the descriptor named no row: %s' % out['descriptor_why']) if descriptor else '')
         out['compose_ms'] = round((time.time() - t0) * 1000, 1)
         return out
     target_path = parsed.path_of(els[0])
@@ -403,6 +414,7 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
         return out
     out.update(compose_for_row(row, rendered, form))
     out['row'] = _row_summary(row)
+    out['matched_by'] = 'identity'
     out['compose_ms'] = round((time.time() - t0) * 1000, 1)
     return out
 
@@ -466,10 +478,18 @@ def capture_allowed(cache: dict, now: float | None = None) -> tuple[bool, float]
 
 def compose_live_element(drv, target_element, rendered: str, org: str | None = None,
                          cache: dict | None = None, url: str | None = None,
-                         form: str = 'keyword') -> dict:
+                         form: str = 'keyword', descriptor: dict | None = None) -> dict:
     """The driver layer: one capture per page (cached on url + node count), one execute_script to
     find the recorded element among the parsed rows by DOM identity (`===`), then the SAME pure
     composition. Recaptures once when the target is not among the cached rows -- the page moved.
+
+    `descriptor` is what the PAGE said about the element (tools/recorder/crt_override/descriptor.py).
+    It is the second way in, and on a native-shadow control it is the only one: the serializer puts
+    that control in the capture and the parser gives it a row, but `document.evaluate` from the
+    driver cannot reach into a native shadow root, so every identity xpath answers zero and the
+    `===` match above finds nothing (ledger F40, Lightning Setup, 2026-09-18). Label + family
+    through the SAME rule `pom/match.py` states then names the row, and the answer says which way
+    it got there -- `matched_by: identity | descriptor`.
     """
     cache = cache if cache is not None else {}
     url = url or (drv.current_url or '')
@@ -505,8 +525,21 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
         if i >= 0:
             res = compose_for_row(parsed.rows[i], rendered, form)
             res.update({'row': _row_summary(parsed.rows[i]), 'page_key': parsed.page_key,
-                        'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra})
+                        'match_ms': match_ms, 'rows': len(parsed.rows), 'matched_by': 'identity',
+                        **out_extra})
             return res
+        # no identity: what the PAGE said about the element still names a row (F40)
+        if descriptor:
+            row, why = DESC.find_row(parsed.rows, descriptor, get=DESC.parsed_get)
+            if row is not None:
+                res = compose_for_row(row, rendered, form)
+                res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
+                            'match_ms': match_ms, 'rows': len(parsed.rows),
+                            'matched_by': 'descriptor', 'descriptor_why': why, **out_extra})
+                if res.get('why'):
+                    res['why'] = '%s (by descriptor: %s)' % (res['why'], why)
+                return res
+            out_extra['descriptor_why'] = why
         # no row: a recipe STEP may name it (the dual-listbox move arrow)
         steps, owners = [], []
         for row in parsed.rows:

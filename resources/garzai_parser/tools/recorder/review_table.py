@@ -257,14 +257,141 @@ def find_node(cap: Capture, e: dict, nth: int, claimed: set | None = None):
     return cands[nth] if nth < len(cands) else cands[-1]
 
 
-def identity_xpath(cap: "Capture", node) -> str:
-    """Instrumentation to find the SAME node live in the session the capture was taken from: a
-    unique tag alone, else every attribute (generated ones included), else the node's first text
-    string on top. Never a locator."""
+# --------------------------------------------------------------------------- identity (build k)
+# 2026-09-18 (ledger F44): an identity that ends in `(...)[N]` counts nodes over the WHOLE page, so
+# one extra text input -- an App Launcher search box left in the DOM, an Add Line row -- shifts every
+# index and none of the seven Nightmare inputs matched its row. Position is now the LAST rung and it
+# is declared: every row carries `identity_kind` (attribute | label | positional) so a reader, and
+# the CRT composer, can tell a stable identity from one that shifts.
+_STABLE_NAMING_ATTRS = ('name', 'id', 'for', 'data-testid', 'data-test-id', 'data-name',
+                        'data-target-selection-name', 'data-component-id', 'data-field')
+_LABELLISH_ATTRS = ('aria-label', 'title', 'placeholder', 'alt')
+_FORM_ELEMENT_FALLBACK = {
+    'containerClassFragment': 'slds-form-element',
+    'labelClassFragments': ['slds-form-element__label', 'slds-checkbox__label', 'slds-radio__label'],
+    'targetInsideExcludedClassFragments': ['slds-form-element__label-wrapper',
+                                           'slds-form-element__help-preview'],
+    'targetTags': ['input', 'select', 'textarea'],
+}
+_FE_SPEC_CACHE: dict = {}
+
+
+def _form_element_spec() -> dict:
+    """The template's own `formElementLabel` block -- the SAME data `element_compiler` labels by.
+    Read from TEMPLATE (whichever the page selected), never re-specified here; a template without
+    the block falls back to the literals above and the rung still behaves like the parser's."""
+    spec = _FE_SPEC_CACHE.get(TEMPLATE)
+    if spec is None:
+        try:
+            spec = (json.load(open(TEMPLATE)) or {}).get('formElementLabel') or _FORM_ELEMENT_FALLBACK
+        except Exception:
+            spec = _FORM_ELEMENT_FALLBACK
+        _FE_SPEC_CACHE[TEMPLATE] = spec
+    return spec
+
+
+def _classes(node) -> str:
+    cls = node.get('class') if node is not None else None
+    return ' '.join(cls) if isinstance(cls, list) else (cls or '')
+
+
+def _is_form_element(node, spec: dict) -> bool:
+    """The enclosing FORM ELEMENT, not one of its sub-parts. The template names the sub-parts in
+    `excludeContainerClassFragments` for exactly this reason: `slds-form-element__control` and
+    `slds-form-element__label-wrapper` both CONTAIN the container fragment, and the label wrapper
+    holds the readonly helper input beside Contract Term -- climbing to it made the identity resolve
+    to that helper, so `_same_node` refused and the row fell back to position."""
+    cls = _classes(node)
+    frag = spec.get('containerClassFragment') or 'slds-form-element'
+    if frag not in cls:
+        return False
+    return not any(x in cls for x in (spec.get('excludeContainerClassFragments') or []))
+
+
+def _container_predicate(spec: dict) -> str:
+    frag = spec.get('containerClassFragment') or 'slds-form-element'
+    parts = ['contains(@class,%s)' % _lit(frag)]
+    parts += ['not(contains(@class,%s))' % _lit(x)
+              for x in (spec.get('excludeContainerClassFragments') or [])]
+    return ' and '.join(parts)
+
+
+def _form_element_label_node(node):
+    """The `<label>` a person reads for this control, through the template's formElementLabel shape:
+    climb to the enclosing form element and take its label-class element OUTSIDE the control's own
+    subtree. A control sitting inside the label wrapper (the readonly helper beside Contract Term)
+    is not the control and gets nothing. Returns (label node, form-element node), or None."""
+    spec = _form_element_spec()
+    tags = spec.get('targetTags') or []
+    if tags and (node.name or '').lower() not in tags:
+        return None
+    par, hops = node.parent, 0
+    while par is not None and hops < 4:
+        if any(x in _classes(par) for x in (spec.get('targetInsideExcludedClassFragments') or [])):
+            return None
+        par, hops = par.parent, hops + 1
+    cur, hops = node.parent, 0
+    while cur is not None and hops < int(spec.get('maxClimb') or 8):
+        if _is_form_element(cur, spec):
+            for cand in cur.find_all(True):
+                # an exact class TOKEN, never a substring: `slds-form-element__label-wrapper`
+                # contains `slds-form-element__label` and the wrapper DIV then answered as the
+                # label, so the identity read `//div[normalize-space(.)="Contract Term"]`
+                # (measured 2026-09-18 building this rung on the Zoo capture)
+                toks = _classes(cand).split()
+                if any(f in toks for f in (spec.get('labelClassFragments') or [])) \
+                        and node not in cand.find_all(True) and cand is not node:
+                    txt = _clean_label(_node_text(cand))
+                    if txt:
+                        return cand, cur
+        cur, hops = cur.parent, hops + 1
+    return None
+
+
+def _label_anchored_identity(cap: "Capture", node, preds: list) -> str | None:
+    """An identity anchored on the control's own LABEL instead of on its position in the page.
+
+    `//label[.="Contract Term"]/ancestor::*[contains(@class,"slds-form-element")][1]//input[@type="text"]`
+    -- and, when that form element holds more than one same-shaped control, its position INSIDE that
+    container, which an input added anywhere else on the page cannot move (F44). None when the label
+    text is not unique in the capture or the expression does not single out this node."""
+    found = _form_element_label_node(node)
+    if found is None:
+        return None
+    lab, _container = found
+    txt = _clean_label(_node_text(lab))
+    if not txt or len(txt) > 120:
+        return None
+    tail = '//%s%s' % (node.name, ('[' + ' and '.join(preds) + ']') if preds else '')
+    base = '//%s[normalize-space(.)=%s]/ancestor::*[%s][1]%s' % (
+        lab.name, _lit(txt), _container_predicate(_form_element_spec()), tail)
+    hits = cap.doc.xpath(base) if cap.count(base) else []
+    if not hits:
+        return None
+    if len(hits) == 1:
+        return base if _same_node(cap, hits[0], node) else None
+    for i, m in enumerate(hits, 1):
+        if _same_node(cap, m, node):
+            return '(%s)[%d]' % (base, i)
+    return None
+
+
+def identity_of(cap: "Capture", node) -> tuple[str, str]:
+    """(identity xpath, identity_kind) for one node.
+
+      attribute   unique without position: a unique tag, or a predicate set that includes a stable
+                  naming attribute (@name, a non-generated @id, @data-testid ...)
+      label       discriminated by what a PERSON reads: the node's own text, a label-like attribute
+                  (@aria-label/@title/@placeholder/@alt), or its form-element label
+      positional  nothing stable singles it out, so the identity counts nodes -- `(//input)[3]`.
+                  This is the one that shifts when the page gains an element (ledger F44).
+
+    Instrumentation to find the SAME node live in the session the capture was taken from. Never a
+    locator: a locator says how a keyword should address a control, this says which node it is."""
     base = '//%s' % node.name
     if cap.tag_count(node.name) == 1:
-        return base
-    preds = []
+        return base, 'attribute'
+    preds, stable, labellish = [], [], []
     for k, v in sorted(_attrs_of(node).items()):
         if k.startswith('lwc-') or k in ('class', 'style', 'part'):
             continue
@@ -277,23 +404,39 @@ def identity_xpath(cap: "Capture", node) -> str:
             # then matched 0 elements live (measured 2026-09-12, robotic.copado.com).
             continue
         preds.append('@%s=%s' % (k, _lit(v)))
+        if k in _STABLE_NAMING_ATTRS and v:
+            stable.append(k)
+        if k in _LABELLISH_ATTRS and v:
+            labellish.append(k)
     xp = base + ('[' + ' and '.join(preds) + ']' if preds else '')
     if cap.count(xp) == 1:
-        return xp
+        if stable:
+            return xp, 'attribute'
+        return xp, ('label' if labellish else 'attribute')
     first = next((_norm_text(str(t)) for t in node.descendants
                   if isinstance(t, NavigableString) and not isinstance(t, Comment) and str(t).strip()), '')
     if first:
         xp2 = xp + '[.//text()[normalize-space(.)=%s]]' % _lit(first[:120])
         if cap.count(xp2) == 1:
-            return xp2
+            return xp2, 'label'
         if cap.count(xp2):
             xp = xp2
+    # before counting nodes over the whole page: the control's own label, which an element added
+    # elsewhere cannot move (build k, ledger F44)
+    anchored = _label_anchored_identity(cap, node, preds)
+    if anchored:
+        return anchored, 'label'
     # still repeated: the node's position among the capture's matches (same structure on reload)
     matches = cap.doc.xpath(xp) if cap.count(xp) else []
     for i, m in enumerate(matches, 1):
         if _same_node(cap, m, node):
-            return '(%s)[%d]' % (xp, i)
-    return xp
+            return '(%s)[%d]' % (xp, i), 'positional'
+    return xp, 'positional'
+
+
+def identity_xpath(cap: "Capture", node) -> str:
+    """The identity alone (the kind is `identity_of`'s second value)."""
+    return identity_of(cap, node)[0]
 
 
 def _same_node(cap: "Capture", lx, bs) -> bool:
@@ -656,7 +799,7 @@ def build_rows(cap: Capture, org: str | None) -> tuple[list[dict], dict]:
             'node_found': node is not None,
             'label_guess': nearest_preceding_text(node) if (node is not None and not (ident.get('label_text') or '').strip()) else None,
             'region': region_of(node) if node is not None else 'unknown',
-            'raw': None, 'raw_context': [], 'identity_xpath': None,
+            'raw': None, 'raw_context': [], 'identity_xpath': None, 'identity_kind': None,
             'xpath': {'value': None, 'rung': None, 'unique_in_capture': None,
                       'generated_values': [], 'live': None, 'cross_org': None,
                       'reason': 'COULD-NOT-CHECK: node not found in the capture'},
@@ -665,7 +808,7 @@ def build_rows(cap: Capture, org: str | None) -> tuple[list[dict], dict]:
         }
         if node is not None:
             row['raw'], row['raw_context'] = raw_neighbourhood(node)
-            row['identity_xpath'] = identity_xpath(cap, node)
+            row['identity_xpath'], row['identity_kind'] = identity_of(cap, node)
             row['xpath'] = xpath_ladder(cap, node, e)
         entry = PL.match(row, _library)
         if entry:
@@ -1955,7 +2098,7 @@ def cmd_add(a) -> int:
            'hint_reason': 'ADDED BY THE REVIEWER: the parser produced no row for this control', 'calls': [],
            'group_size': None, 'index': None, 'anchor_candidates': [], 'disambiguation_status': None,
            'confidence': 'verified', 'node_found': False, 'raw': a.raw or '', 'raw_context': [],
-           'identity_xpath': None, 'region': 'page', 'label_guess': None,
+           'identity_xpath': None, 'identity_kind': None, 'region': 'page', 'label_guess': None,
            'xpath': {'value': xp or None, 'rung': 'reviewer', 'unique_in_capture': None, 'count_in_capture': None,
                      'generated_values': generated_values_in(xp) if xp else [], 'live': None, 'cross_org': None},
            'live': {'keyword': None, 'xpath': None},
