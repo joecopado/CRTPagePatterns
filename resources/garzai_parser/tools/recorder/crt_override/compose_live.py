@@ -454,21 +454,41 @@ def _dormant(indent: str, text: str) -> str:
 
 
 def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_option: str,
-                    indent: str = '    ') -> tuple[str, list]:
+                    indent: str = '    ', stock_filter: str | None = None) -> tuple[str, list]:
     """(the one composed line, the dormant backup lines) for one combobox pick.
 
     Returns ('', []) when there is no label to name the control with -- a keyword whose first
     argument would be blank is not a proposal, it is a guess, and the stock lines stand instead.
 
-    Returns ('', [two backups]) for a PLACEHOLDER pick: nothing is composed AND the held open
-    click is dropped too, but both stock lines are kept as dormant backups. The empty line with a
-    NON-empty backup list is what tells the caller apart from the no-label case."""
+    Returns ('', [backups]) for a PLACEHOLDER pick: nothing is composed AND the held open
+    click is dropped too, but every stock line is kept as a dormant backup. The empty line with a
+    NON-empty backup list is what tells the caller apart from the no-label case.
+
+    EVERY STOCK LINE THE PAIR ABSORBED IS ITS OWN BACKUP, IN THE ORDER THEY WERE RECORDED (user,
+    build n8: "those clicked interactions and typed are the true backups" -- a combobox pick whose
+    only backup was one TypeText was not enough). The RAW positional opener line and its
+    LABEL-FORM translation are both kept, in that order, when they differ -- `omni_open_click_line`
+    used to keep the label form ALONE (2026-09-19 run 5: "why are absolute paths coming up as
+    backup options?"), which is right for the PRIMARY backup but wrong for "never drop a stock
+    line the pair absorbed": both now stand, dormant, never as a live step. `stock_filter` is the
+    typed filter-box keystroke a SENTINEL-armed pick absorbed (F143-3/F143-4, build n8) -- there is
+    none for a plain click-only pick (Alt-click or a gesture-free literal), so it is optional and
+    slots in between the opener and the option, matching recording order: opener, filter, option."""
     lab = omni_label(label)
     opt = (option or '').strip()
     if not lab or not opt:
         return '', []
     open_line, _ = omni_open_click_line(label, stock_open)
-    backups = [_dormant(indent, s) for s in (open_line, stock_option) if (s or '').strip()]
+    raw_open = (stock_open or '').strip()
+    backups = []
+    if raw_open and open_line.strip() != raw_open:
+        backups.append(_dormant(indent, raw_open))
+    if open_line.strip():
+        backups.append(_dormant(indent, open_line))
+    if (stock_filter or '').strip():
+        backups.append(_dormant(indent, stock_filter))
+    if (stock_option or '').strip():
+        backups.append(_dormant(indent, stock_option))
     if omni_placeholder_option(opt):
         return '', backups
     line = '%s%s    %s' % (indent, RT._rf('Omni Select', lab, opt).strip(), UNVERIFIED)
@@ -894,19 +914,21 @@ DOM_TYPE_GENERATOR = {
     'text': ('Gz Unique Text', []),
     'search': ('Gz Unique Text', []),
 }
+# F143-2 (F146-1/-2): the describer's `familyOf()` (descriptor.py) NEVER returns 'picklist',
+# 'combobox', 'date', 'datetime', 'number', 'email', 'textarea' or 'search' -- it collapses every
+# <input> (including <textarea> and a `role=searchbox`) to 'input_field', and everything OmniStudio
+# renders as a custom element falls to its own `return tag` fallback (the RAW tag name, e.g.
+# `runtime_omnistudio_common-combobox`, never the word 'combobox'). Those eight rows were therefore
+# dead on the live path -- a reachability audit (`test_probe1_CAUGHT_BUG_eight_of_nine_...`, now
+# flipped to require it) greps this table's keys against `familyOf`'s own literal `return '...'`
+# strings and the raw-tag families a live capture actually carries, and fails on any key neither
+# names. Rather than guess at more literals `familyOf` might one day emit, the dead rows are
+# DELETED: the receiving-keyword/host door (`generator_door`) and the DOM `type` attribute
+# (`DOM_TYPE_GENERATOR`) already cover date/combobox/email/number, so nothing here regresses.
 FAMILY_GENERATOR = {
-    'picklist': ('Gz Pick', []),
-    'combobox': ('Gz Pick', []),
-    'date': ('Gz Date', ['+30']),
-    'datetime': ('Gz Date', ['+30']),
-    'number': ('Gz Number', ['1', '100']),
-    'email': ('Gz Email', []),
     'input_field': ('Gz Unique Text', []),
-    'textarea': ('Gz Unique Text', []),
-    'search': ('Gz Unique Text', []),
 }
 FAMILY_NO_GENERATOR = {
-    'lookup': 'a lookup: its value must name a record that EXISTS, which no generator knows',
     'checkbox': 'a checkbox is clicked, never typed into',
     'radio': 'a radio is clicked, never typed into',
 }
@@ -949,31 +971,106 @@ def _pick_cells(label, options) -> tuple:
     return ['Gz Pick', omni_label(label) or 'value'] + kept, 'a valid value from the options%s' % note
 
 
-def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=False) -> tuple:
+def _datetime_note(meta) -> str:
+    """The disclosure a `datetime` field's metadata carries wherever `Gz Date` is chosen for it --
+    F143-6 (F146-6): it used to appear only on the `asdf` (auto/metadata) path and vanish on the
+    explicit `@@date+N` and receiving-keyword/host doors, which compose the byte-identical value
+    with no sign only half the field is generated."""
+    if meta and str(meta.get('type') or '').casefold() == 'datetime':
+        return (' -- the DATE half only: the time half is not generated here (a datetime is a '
+                'compound control; routing it is BACKLOG 80)')
+    return ''
+
+
+def generator_door(kind, receiving, lab, desc=None, options=None, meta=None) -> tuple:
+    """(cells, why) when the RECEIVING KEYWORD or a descriptor HOST fact names the generator before
+    metadata or the DOM type get a vote, or (None, None) to let the caller fall through to
+    `generator_call`'s metadata / DOM-type / family ladder (F143-1, the root defect).
+
+    `Omni Date` / `Omni Select` are OmniStudio's own compound keywords, and a date-picker or
+    combobox HOST -- named by the element's own xpath, `_OMNI_DATE_PICKER` / `_OMNI_COMBOBOX` --
+    answers even before the line has been routed to one of those keywords (the omniKey/host walk
+    already knows the widget). Both outrank a bare `type="text"`, which Lightning and OmniStudio
+    render for a date picker, a combobox and a lookup alike.
+
+    `(None, None)` means neither the keyword nor the host has an opinion -- the caller falls
+    through to metadata, then the DOM type, then the family. `(None, why)` means the door DOES
+    apply but has nothing usable (e.g. `Omni Select` with no known options) -- that IS the answer,
+    a disclosed COULD-NOT-CHECK, never a fallthrough to a worse guess."""
+    if kind != 'auto':
+        return None, None
+    d = desc or {}
+    blob = ' '.join(str(d.get(k) or '') for k in ('xpath', 'alt_xpath'))
+    if receiving == 'Omni Date' or _OMNI_DATE_PICKER in blob:
+        src = ("the receiving keyword 'Omni Date'" if receiving == 'Omni Date'
+               else "the descriptor's own element path is inside a %r host" % _OMNI_DATE_PICKER)
+        return ['Gz Date', '+30', '--iso'], '%s: names a date%s' % (src, _datetime_note(meta))
+    if receiving == 'Omni Select' or _OMNI_COMBOBOX in blob:
+        src = ("the receiving keyword 'Omni Select'" if receiving == 'Omni Select'
+               else "the descriptor's own element path is inside a %r host" % _OMNI_COMBOBOX)
+        cells, why = _pick_cells(lab, options or d.get('options'))
+        return cells, '%s: names a pick -- %s' % (src, why)
+    return None, None
+
+
+def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=False,
+                   receiving='') -> tuple:
     """(the generator call as Robot CELLS, why) for one sentinel, or (None, why).
 
-    `iso=True` asks `Gz Date` for `YYYY-MM-DD`, which is what `Omni Date` takes."""
+    `iso=True` asks `Gz Date` for `YYYY-MM-DD`, which is what `Omni Date` takes. `receiving` is the
+    keyword that will actually run with this value (`Omni Date`, `Omni Select`, a plain `TypeText`,
+    ...) -- see `generator_door`, which this consults FIRST, ahead of metadata."""
     lab = omni_label(label)
     args = list(args or [])
+    # F143-7 (F146-7): the EXPLICIT `@@` grammar overriding the metadata type is deliberate and
+    # tested (`@@text 40` in an email field) -- but it used to override `SF_TYPE_NO_GENERATOR` too,
+    # the table whose entire purpose is to say a type has NO honest generator, silently: `@@unique`
+    # in a lookup composed a run-stamped string with no sign the type had ever been consulted. The
+    # override still wins (the person asked explicitly), but the refusal reason is now quoted.
+    _override_note = ''
+    if kind not in ('auto', None) and meta and meta.get('type'):
+        _t = str(meta.get('type')).casefold()
+        if _t in SF_TYPE_NO_GENERATOR:
+            _override_note = ('; the metadata type %r has no generator -- %s -- overridden by the '
+                              'explicit sentinel' % (_t, SF_TYPE_NO_GENERATOR[_t]))
+
+    def _explicit(cells, why):
+        return cells, why + _override_note
+
     if kind == 'email':
-        return ['Gz Email'], 'the sentinel names the generator'
+        return _explicit(['Gz Email'], 'the sentinel names the generator')
     if kind == 'phone':
-        return ['Gz Phone'], 'the sentinel names the generator'
+        return _explicit(['Gz Phone'], 'the sentinel names the generator')
     if kind == 'unique':
-        return ['Gz Unique Text', (args[0] if args and args[0] else lab) or 'GZ'], \
-               'the sentinel names the generator'
+        return _explicit(['Gz Unique Text', (args[0] if args and args[0] else lab) or 'GZ'],
+                         'the sentinel names the generator')
     if kind == 'text':
-        return ['Gz Text', args[0]], 'the sentinel names the generator'
+        return _explicit(['Gz Text', args[0]], 'the sentinel names the generator')
     if kind == 'int':
-        return ['Gz Number', args[0], args[1]], 'the sentinel names the generator'
+        return _explicit(['Gz Number', args[0], args[1]], 'the sentinel names the generator')
     if kind == 'date':
         cells = ['Gz Date', args[0] if args else '+30'] + (['--iso'] if iso else [])
-        return cells, 'the sentinel names the generator'
+        return _explicit(cells, 'the sentinel names the generator' + _datetime_note(meta))
     if kind == 'pick':
         opts = options or (meta or {}).get('picklist_values')
-        return _pick_cells(lab, opts)
+        cells, why = _pick_cells(lab, opts)
+        # F143-5b (F146-5): "no usable option is known" reads the same whether the listbox was
+        # simply closed or the field is not a picklist AT ALL -- the org map already knows which,
+        # and used to quote the type without ever joining the two facts.
+        if not cells and meta and meta.get('type'):
+            t = str(meta.get('type')).casefold()
+            if t not in ('picklist', 'multipicklist', 'combobox'):
+                why += ' -- %s.%s is type %r, not a picklist: no option was ever going to exist' \
+                    % (meta.get('object'), meta.get('name'), t)
+        return _explicit(cells, why)
     if kind != 'auto':
         return None, 'unknown sentinel kind %r' % kind
+
+    # THE RECEIVING KEYWORD / HOST DOOR ANSWERS FIRST (F143-1), before metadata or the DOM type get
+    # a vote: it is the one door a generic `type="text"` cannot fool.
+    door_cells, door_why = generator_door(kind, receiving, lab, desc=desc, options=options, meta=meta)
+    if door_why is not None:
+        return door_cells, door_why
 
     # `asdf`: the METADATA type routes it, the descriptor is the backstop.
     if meta and meta.get('type'):
@@ -987,7 +1084,21 @@ def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=Fa
             cells = ['Gz Unique Text', lab or 'GZ'] if kw == 'Gz Unique Text' else [kw] + list(a)
             if kw == 'Gz Date' and iso:
                 cells = cells + ['--iso']
-            why = 'metadata type %r on %s.%s' % (t, meta.get('object'), meta.get('name'))
+            length_why = ''
+            # F143-10: the org map's `length` sits on every embedded field entry and used to be
+            # dropped on the floor -- a `string` field of length 10 composed the identical call as
+            # one of length 80, so a short Salesforce text field truncates the value (and the run
+            # stamp inside it) BY THE BROWSER, with no console line at all. `Gz Unique Text` takes
+            # `max_length` as its own second argument; compose it whenever the map knows the length.
+            if kw == 'Gz Unique Text' and meta.get('length'):
+                try:
+                    n = int(meta['length'])
+                except (TypeError, ValueError):
+                    n = 0
+                if n > 0:
+                    cells = cells + [str(n)]
+                    length_why = ' (max_length %d from the org map)' % n
+            why = 'metadata type %r on %s.%s%s' % (t, meta.get('object'), meta.get('name'), length_why)
             if t == 'datetime':
                 why += (' -- the DATE half only: the time half is not generated here (a datetime '
                         'is a compound control; routing it is BACKLOG 80)')
@@ -1128,10 +1239,22 @@ def generated_data_lines(composed, label=None, fields=None, desc=None, options=N
     # renders in a US locale -- and that is a DEFAULT, not a fact read from the org map: the map
     # carries field types, not the running user's locale, so a non-US org needs `--iso` or its own
     # format on the line. Said here rather than implied.
-    iso = cells0[0] == 'Omni Date'
-    cells, gen_why = generator_call(kind, args, lab, meta=meta, desc=desc, options=options, iso=iso)
+    receiving = cells0[0] if cells0 else ''
+    iso = receiving == 'Omni Date'
+    cells, gen_why = generator_call(kind, args, lab, meta=meta, desc=desc, options=options,
+                                    iso=iso, receiving=receiving)
     if not cells:
-        return '', composed, '%s, but %s (%s)' % (why, gen_why, meta_why)
+        full_why = '%s, but %s (%s)' % (why, gen_why, meta_why)
+        marked = composed
+        # F143-5 (F146-5): a `@@pick`/`asdf` this door could not resolve to a real option used to
+        # ship UNMARKED -- the disclosure lived only in `why`, a surface the PANE never shows, while
+        # the six characters `@@pick` (or `asdf`) reached the recorded line exactly as if nobody had
+        # noticed. That is precisely what `Gz Sentinel Verdict` calls a landed sentinel when it
+        # reads the value back. The line itself now carries the mark.
+        if 'no usable option is known' in (gen_why or ''):
+            marked = (composed.split(UNVERIFIED)[0].rstrip()
+                     + '    # COULD-NOT-CHECK: no option known; a literal sentinel would land')
+        return '', marked, full_why
     var = variable_name(lab, taken, prefix=prefix or (meta or {}).get('object'))
     return (variable_line(var, cells, indent),
             replace_value_cell(composed, '${%s}' % var),

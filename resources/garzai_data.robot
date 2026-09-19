@@ -90,17 +90,28 @@ Gz Generated Tally
 
 
 Gz Unique Text
-    [Documentation]    `<base> <run stamp>` -- unique per run, so a second run of the same
-    ...    recording does not trip a duplicate rule. `max_length` truncates from the LEFT of the
-    ...    base (never of the stamp: the stamp is the cleanup tag and losing it loses the record),
-    ...    and says so on the console when it fires. 0 means no limit.
+    [Documentation]    `<run stamp> <base>` -- unique per run, so a second run of the same
+    ...    recording does not trip a duplicate rule. THE STAMP IS FIRST (F150/F146): a value that
+    ...    reads `<base> <stamp>` BEGINS WITH THE FIELD'S OWN LABEL for the common case (base ==
+    ...    the label, e.g. `First Name 20260919-...`), and `confirm.field_value`'s label-echo guard
+    ...    -- built to catch `get_field_value("Stage") -> "Stage"` -- correctly refuses it as a
+    ...    label echo. Putting the stamp first means the value can never start with the label while
+    ...    the stamp is still findable anywhere with `LIKE '%<stamp>%'`.
+    ...    `max_length` truncates from the RIGHT of the base (never the stamp: the stamp is the
+    ...    cleanup tag and losing it loses the record), and REFUSES -- COULD-NOT-CHECK, never a
+    ...    silently truncated stamp -- when there is no room left for the stamp plus at least one
+    ...    base character. Says so on the console when it truncates. 0 means no limit.
     [Arguments]    ${base}    ${max_length}=0
     ${stamp}=    Gz Run Stamp
-    ${value}=    Evaluate    ((str($base).strip() or 'GZ') + ' ' + $stamp)
+    ${clean_base}=    Evaluate    (str($base).strip() or 'GZ')
+    ${value}=    Evaluate    ($stamp + ' ' + $clean_base)
     ${limit}=    Evaluate    int($max_length)
     IF    ${limit} > 0 and len($value) > ${limit}
-        ${keep}=    Evaluate    max(0, ${limit} - len($stamp) - 1)
-        ${value}=    Evaluate    (str($base).strip()[:${keep}] + ' ' + $stamp).strip()[-${limit}:]
+        IF    ${limit} < len($stamp) + 2
+            Fail    COULD-NOT-CHECK: Gz Unique Text('${base}', ${max_length}): max_length is shorter than the run stamp needs room for (${max_length} < ${{len($stamp) + 2}}) -- there is no room to keep the cleanup tag whole, so nothing is generated.
+        END
+        ${keep}=    Evaluate    ${limit} - len($stamp) - 1
+        ${value}=    Evaluate    ($stamp + ' ' + $clean_base[:${keep}]).strip()[:${limit}]
         Log To Console    GarzAI data: Gz Unique Text truncated the BASE to fit ${limit} characters; the run stamp is kept whole (it is the cleanup tag).
     END
     ${value}=    Gz Log Generated    Gz Unique Text    ${value}
