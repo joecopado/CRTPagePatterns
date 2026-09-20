@@ -1,10 +1,21 @@
 *** Settings ***
 Documentation             Example resource file with custom keywords. NOTE: Some keywords below may need
 ...                       minor changes to work in different instances.
+# The CANONICAL CRT set is five libraries and the standard template says to keep all five even
+# when a suite uses only some (`tools/qforce-lite/templates/crt/resources/common.robot`).
+# QWeb was MISSING here (F211): `Set Library Search Order    QForce    QWeb` below names it,
+# and it resolved only because CRT resolves it natively -- locally the order line was naming a
+# library this file never imported.
+Library                   QWeb
 Library                   QForce
+Library                   Collections
 Library                   String
 Library                   DateTime
-Library    Collections
+# The generator library. It is declared HERE, not only in garzai_data.robot, because the
+# template's rule is that the canonical set travels whole -- and because a common.robot that
+# declares no generator is exactly how this recorder came to invent run-stamped strings
+# instead of using Faker (the user, 2026-09-20).
+Library                   FakerLibrary
 
 *** Variables ***
 # IMPORTANT: Please read the readme.txt to understand needed variables and how to handle them!!
@@ -17,7 +28,13 @@ ${BROWSER}                chrome
 # `--variable` value overrides them whenever one is given. The home page URL is derived AT CALL
 # TIME by `Home Url` (below): `${login_url}` when it is set, else the live instance's own URL
 # (`GetInstanceUrl`, QForce) -- the JWT path has no login URL at all and needs none.
-${login_url}              ${EMPTY}
+# The standard template gives this a real default and a specific meaning: it is the JWT TOKEN
+# ENDPOINT, not a page to visit -- https://login.salesforce.com for production and Developer
+# Edition, https://test.salesforce.com for a sandbox. The separate ${loginUrl} (camelCase) is
+# the already-authenticated frontdoor URL Copado CI/CD injects for the TARGET org. Keeping
+# this empty, as this file used to, is what made `${home_url}` fail on every run.
+${login_url}              https://login.salesforce.com
+${loginUrl}               ${EMPTY}
 ${home_url}               ${EMPTY}
 
 
