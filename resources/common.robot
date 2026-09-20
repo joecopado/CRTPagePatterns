@@ -132,7 +132,15 @@ Home Url
     ...                   (QForce; valid once `Gz Login` / `JwtLogin` has established the session). Never a
     ...                   Variables-table derivation: `${login_url}` is undefined on the JWT path and the table
     ...                   line errored on every run (F188).
-    ${base}=              Set Variable    ${login_url}
+    # F216 (the challenge swarm): this used ${login_url} as its base, and F211 then filled that
+    # with the template's JWT TOKEN ENDPOINT -- so this keyword returned
+    # https://login.salesforce.com/lightning/page/home, the login host, never the org's home page,
+    # and the GetInstanceUrl fallback below became dead code because ${login_url} is never empty
+    # now. Each change was right alone; nobody owned the composite. The base is the TARGET ORG:
+    # ${loginUrl} (the already-authenticated frontdoor Copado CI/CD injects) when it is set, else
+    # the live instance the session is actually on. ${login_url} is a token endpoint and is never
+    # a page to visit -- the comment six lines above the Variables table says exactly that.
+    ${base}=              Set Variable    ${loginUrl}
     IF    not $base
         ${base}=          GetInstanceUrl
     END
