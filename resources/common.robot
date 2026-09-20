@@ -45,8 +45,14 @@ Setup Browser
     Set Library Search Order                          QForce    QWeb
     # options=: Chrome 142+ asks 'wants to access other apps and services on this device' when a page
     # calls a device-local address (the GarzAI composer on 127.0.0.1:18077); this flag turns that
-    # check off for the session. PROVEN on Chrome 152 in the container: the F188 session
-    # (2026-09-20) served 86 composer calls to 127.0.0.1 with no prompt. Every entry resource that
+    # check off for the session. The F188 container session (Chrome 152) served 86 composer calls
+    # to 127.0.0.1 with no prompt -- but that is NOT a controlled proof and F219 said so: the
+    # Local Network Access grant is per ORIGIN per PROFILE, so 86 completed calls are equally
+    # consistent with this flag working, with the profile already holding a grant, or with a
+    # person clicking Allow. Errors entry 905cef44e8 records the prompt's literal text observed
+    # on this same org BEFORE the flag, which is most of a before/after pair, not a controlled
+    # one. Keep the flag; a negative control is owed. The F188 session
+    # (2026-09-20) is the evidence above. Every entry resource that
     # opens a browser carries this now, not only the recorder's (F214).
     Open Browser          about:blank                 ${BROWSER}    options=--disable-features=LocalNetworkAccessChecks
     SetConfig             LineBreak                   ${EMPTY}               #\ue000
