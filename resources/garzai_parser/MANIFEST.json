@@ -1,9 +1,9 @@
 {
  "bundle": "resources/garzai_parser",
- "bytes": 1857508,
+ "bytes": 1901340,
  "entry": "tools/recorder/crt_override/compose_live.py",
  "files": 57,
- "generated": "2026-09-19T18:51:15",
+ "generated": "2026-09-20T00:40:20",
  "generator": "tools/recorder/crt_override/build_parser_bundle.py",
  "sha256": {
   "docs/recorder/patterns/library.json": "931709344cb7742005c5a5b8b6a2dd5157367b5182eb9dfd5bf3afe291bbcb62",
@@ -51,7 +51,7 @@
   "tools/qforce-lite/discovery/page_chrome.py": "95b4a0f27bb2ee282491dcfd127b156aa726d4a803d876023d25396f1c954aec",
   "tools/qforce-lite/predict.py": "848b4383b7a7a78dd9b621f281c3f1413eeac9fddddcd0544e0e3aceee423fb0",
   "tools/qforce-lite/text_match.py": "bb4c3b8ff8abe4bd6181b648d22138cd0230766a2c84ff0bbda9669290e45538",
-  "tools/recorder/crt_override/compose_live.py": "d437c2ae2d1d6f5dbc97bf88d8f74f7d1f12501df76fbaa3d4d8871da2a72d93",
+  "tools/recorder/crt_override/compose_live.py": "4008ccf269fe8196e9d2b6e93c322abac89463ea27e2df8245dc322b51dd8fa3",
   "tools/recorder/crt_override/descriptor.py": "81d660d04a6a75f1e320f2d74aff53b75a26bcc0cbb9cbe62a1f735e4c33a6f9",
   "tools/recorder/disambiguation_args.py": "02c066836c4164d9a42fc6e557198523269a8aacf406f0dc7dca691f8c57b0f1",
   "tools/recorder/metadata_dom_parity.py": "a30c46b7f940e59e76fb24965a79d6710cffd20267f27e7a88f26f096ebf905e",
@@ -59,9 +59,9 @@
   "tools/recorder/pom/__init__.py": "1d3e859413cba4f1cce129b7498adcc4d29f377a14ea2b4489213bd7f2a673aa",
   "tools/recorder/pom/keys.py": "286c3379751d4d992d0e908f5a5cf2266c63326525666665deab8f176fc42e77",
   "tools/recorder/pom/match.py": "dff1931feeeaf1cf17fc95a21702ae766d86e211612850b04bb1c8f6975e5df9",
-  "tools/recorder/pom/scope.py": "9a772c0fc12420562a7af7a0aabab03b6104f98b3794e3a9be0f9cb11a2bfc97",
-  "tools/recorder/pom/store.py": "3e2f5bcb77db81b5a376f29e46269f1e389be391022f1a701df47dc23eee086f",
-  "tools/recorder/pom_asset.py": "fc6e7375d607c2b01adab0ba391a64dcb5a06992a930c30a8630441954f50b73",
+  "tools/recorder/pom/scope.py": "25216cf52508dae79483e383d151aff7eafff29c644c1e70508a8faa7df646e6",
+  "tools/recorder/pom/store.py": "291ce8899a24bd02a6ed2285ce572f54301989f72508139f1e227bd1dd4468ec",
+  "tools/recorder/pom_asset.py": "3b24c8425301ffb09b2e220b27a20fb2535a84e2552b2044e0aa967158111770",
   "tools/recorder/review_table.py": "803686371a90c1b465ed14e50af86138fafb90f292be2882bb33446fce5a2a5d"
  },
  "variant": "traced"

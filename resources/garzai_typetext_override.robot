@@ -41,6 +41,7 @@ Documentation     GarzAI TypeText override (2026-09-18): shadows the library's o
 ...               each retyped attempt landed on top of the last.
 Library           QForce
 Library           Collections    # Set To Dictionary below; measured missing in Live Testing 2026-09-19 (every TypeText failed "No keyword with name 'Set To Dictionary' found")
+Library           ${CURDIR}/garzai_verdicts.py    # F192: the ONE session ledger every verdict line lands in, plus the listener that sees a step that raised or was stopped
 Resource          ${CURDIR}/garzai_data.robot    # Gz Sentinel Verdict: a read-back that IS a sentinel is CAUGHT-BUG, never a quiet pass
 
 *** Variables ***
@@ -65,10 +66,37 @@ TypeText
     ...    Same signature QForce/QWeb's own TypeText publishes (locator, input_text, anchor=1,
     ...    timeout=0, **kwargs), so importing this resource is a drop-in: no caller changes.
     [Arguments]    ${locator}    ${input_text}    ${anchor}=1    ${timeout}=0    &{kwargs}
+    # THE COMBOBOX FAMILY (F192, fix 2). `gz_family=combobox` is the composer's mark on a fill
+    # whose descriptor says the control is a combobox with a typeable input (F188 CAUGHT-BUG 4:
+    # `Phone Type` read back the typed stamp VERIFIED-PASS, then the control cleared it). For
+    # that family the read-back is the SELECTED OPTION AFTER BLUR, never the input's text, and
+    # there is no repair pass: re-typing into a combobox is not a repair. The mark is popped
+    # before the real TypeText sees the kwargs.
+    ${gz_family}=    Evaluate    str($kwargs.pop('gz_family', '') or '').strip().lower()
     IF    'clear_key' not in $kwargs
         Set To Dictionary    ${kwargs}    clear_key={CONTROL + a}
     END
     QForce.TypeText    ${locator}    ${input_text}    anchor=${anchor}    timeout=${timeout}    &{kwargs}
+    IF    '${gz_family}' == 'combobox'
+        ${actual}=    Gz Combobox Selected Option    ${locator}    ${anchor}
+        ${is_blank}=    Evaluate    $actual in (None, '') or str($actual).strip() == ''
+        IF    ${is_blank}
+            Gz Report Mismatch    COULD-NOT-CHECK    GarzAI TypeText('${locator}'): a combobox -- after blur no option is selected and the input is blank; the control cleared the typed '${input_text}' (or never took it). Not a pass; pick an offered option instead of typing.
+            RETURN
+        END
+        ${landed}=    Gz Sentinel Verdict    GarzAI TypeText('${locator}')    ${actual}
+        IF    ${landed}
+            RETURN
+        END
+        ${matches}=    Values Match    ${input_text}    ${actual}
+        IF    not ${matches}
+            Gz Report Mismatch    CAUGHT-BUG    GarzAI TypeText('${locator}'): a combobox -- asked for '${input_text}', the selected option after blur is '${actual}'.
+            RETURN
+        END
+        Log    VERIFIED-PASS: GarzAI TypeText('${locator}'): selected option after blur is '${actual}' -- matches '${input_text}'.    console=True
+        Gz Record Verdict    VERIFIED-PASS    GarzAI TypeText('${locator}')    ${actual}
+        RETURN
+    END
     ${actual}=    Read Input Value Or Blank    ${locator}    ${anchor}
     ${is_blank}=    Evaluate    $actual in (None, '') or str($actual).strip() == ''
     IF    ${is_blank}
@@ -110,6 +138,7 @@ TypeText
         RETURN
     END
     Log    VERIFIED-PASS: GarzAI TypeText('${locator}'): read back '${actual}' -- matches '${input_text}'.    console=True
+    Gz Record Verdict    VERIFIED-PASS    GarzAI TypeText('${locator}')    ${actual}
 
 
 Type Text Select All
@@ -137,8 +166,59 @@ Verify Input Value
     END
     ${matches}=    Values Match    ${expected}    ${actual}
     IF    not ${matches}
+        Gz Record Verdict    CAUGHT-BUG    GarzAI Verify Input Value('${locator}')    ${actual}
         Fail    GarzAI Verify Input Value('${locator}'): expected '${expected}', field holds '${actual}'.
     END
+    Gz Record Verdict    VERIFIED-PASS    GarzAI Verify Input Value('${locator}')    ${actual}
+    RETURN    ${actual}
+
+
+Gz Combobox Selected Option
+    [Documentation]    THE SELECTED OPTION AFTER BLUR (F192, fix 2) for any combobox family --
+    ...    lightning-base-combobox, an OmniStudio combobox, a typeable combobox input -- never the
+    ...    input's text while it still has focus. F188 CAUGHT-BUG 4: `Phone Type` (a combobox
+    ...    with a typeable input) was routed as text, read back the typed stamp VERIFIED-PASS,
+    ...    and the control then cleared the invalid value: a vacuous green, the signature
+    ...    failure. So: (1) blur the focused element (deep, through shadow roots) and let the
+    ...    control react; (2) read `data-value` on the input -- lightning-base-combobox stamps
+    ...    the SELECTED option's value there; (3) else the input's rendered value, which after
+    ...    blur is what the control kept (an invalid typed value is cleared by then). Returns
+    ...    '' when nothing is selected -- the caller turns that into COULD-NOT-CHECK naming the
+    ...    control, never a pass. The blur is a plain `blur()` on the active element, never a
+    ...    TAB: Tab moves focus into the next control and on some comboboxes commits the
+    ...    highlighted option, which would be this keyword choosing a value.
+    [Arguments]    ${locator}    ${anchor}=1
+    Run Keyword And Ignore Error    ExecuteJavascript    (function(){var a=document.activeElement;while(a&&a.shadowRoot&&a.shadowRoot.activeElement){a=a.shadowRoot.activeElement}if(a&&a.blur){a.blur();try{a.dispatchEvent(new Event('change',{bubbles:true,composed:true}))}catch(e){}}return true})()
+    Sleep    0.3s    # the control's own reaction to the blur is not synchronous (an LWC re-render)
+    ${status}    ${dv}=    Run Keyword And Ignore Error    GetAttribute    ${locator}    data-value    anchor=${anchor}    element_type=input
+    IF    '${status}' == 'PASS' and $dv not in (None, '') and str($dv).strip() != ''
+        RETURN    ${dv}
+    END
+    ${value}=    Read Input Value Or Blank    ${locator}    ${anchor}
+    RETURN    ${value}
+
+
+Verify Combobox Selection
+    [Documentation]    The dormant `verify:` line for a combobox fill: the selected option after
+    ...    blur (`Gz Combobox Selected Option`) against `${expected}`; blank is COULD-NOT-CHECK
+    ...    naming the control, never a pass. Same shape as `Verify Input Value`.
+    [Arguments]    ${locator}    ${expected}    ${anchor}=1
+    ${actual}=    Gz Combobox Selected Option    ${locator}    ${anchor}
+    ${is_blank}=    Evaluate    $actual in (None, '') or str($actual).strip() == ''
+    IF    ${is_blank}
+        Gz Record Verdict    COULD-NOT-CHECK    GarzAI Verify Combobox Selection('${locator}')    ${EMPTY}
+        Fail    COULD-NOT-CHECK: GarzAI Verify Combobox Selection('${locator}'): no option is selected after blur (the control cleared the typed value, or nothing was picked) -- not a pass.
+    END
+    ${landed}=    Gz Sentinel Verdict    GarzAI Verify Combobox Selection('${locator}')    ${actual}
+    IF    ${landed}
+        Fail    CAUGHT-BUG: sentinel landed -- GarzAI Verify Combobox Selection('${locator}'): the selected option is the sentinel '${actual}'.
+    END
+    ${matches}=    Values Match    ${expected}    ${actual}
+    IF    not ${matches}
+        Gz Record Verdict    CAUGHT-BUG    GarzAI Verify Combobox Selection('${locator}')    ${actual}
+        Fail    GarzAI Verify Combobox Selection('${locator}'): expected '${expected}', the selected option after blur is '${actual}'.
+    END
+    Gz Record Verdict    VERIFIED-PASS    GarzAI Verify Combobox Selection('${locator}')    ${actual}
     RETURN    ${actual}
 
 
@@ -197,6 +277,12 @@ Gz Report Mismatch
     ...    log it at WARN and CONTINUE.
     [Arguments]    ${verdict}    ${message}
     Log To Console    ${verdict}: ${message}
+    # F192: every verdict lands in the ONE session ledger, whatever ${GZ_ON_MISMATCH} says. The
+    # step is the message's own `GarzAI TypeText('<locator>')` prefix; the value read back is
+    # what the message quotes after `field holds` (or blank for a COULD-NOT-CHECK).
+    ${step}=    Evaluate    (re.match(r"\\s*([^:]+)", $message) or [None, $message])[1].strip()    modules=re
+    ${value}=    Evaluate    (re.search(r"(?:field holds|selected option after blur is) '([^']*)'", $message) or [None, ''])[1]    modules=re
+    Gz Record Verdict    ${verdict}    ${step}    ${value}
     IF    '${GZ_ON_MISMATCH}' == 'warn'
         Append To List    ${GZ_MISMATCHES}    ${verdict}: ${message}
         Set Suite Variable    ${GZ_MISMATCHES}
@@ -207,11 +293,14 @@ Gz Report Mismatch
 
 
 Gz Mismatch Tally
-    [Documentation]    Prints every mismatch kept while ${GZ_ON_MISMATCH} was warn, and returns the
-    ...    count -- run it as the last step of a recording session.
-    ${n}=    Get Length    ${GZ_MISMATCHES}
-    Log To Console    GarzAI TypeText mismatches this session: ${n}
-    FOR    ${m}    IN    @{GZ_MISMATCHES}
-        Log To Console    - ${m}
-    END
+    [Documentation]    THE ONE TALLY (F192). Prints EVERY verdict of the session -- TypeText
+    ...    read-backs, sentinel landings, Omni verdicts, and every step Robot itself saw RAISE
+    ...    or get STOPPED -- as one table (step, verdict class, value read back) plus the line
+    ...    `VERIFIED-PASS n / CAUGHT-BUG n / COULD-NOT-CHECK n / PASS-GUARDED n`, and returns
+    ...    the number of red steps (CAUGHT-BUG + COULD-NOT-CHECK): 0 only when every step was
+    ...    green. Run it as the last step of a recording session. Until F192 this printed
+    ...    `TypeText mismatches this session: 0` over a run with two raises, three stops and one
+    ...    vacuous green (F188 CAUGHT-BUG 6). The name is kept so the suite's last step still
+    ...    works; `Gz Verdict Tally` is the same keyword.
+    ${n}=    Gz Verdict Tally
     RETURN    ${n}

@@ -92,9 +92,22 @@ def stable_attrs(attrs: dict | None) -> dict:
 
 
 def element_id(family: str | None, label: str | None, container: str | None, attrs: dict | None,
-               drop_container: bool = False) -> str:
-    """Structural identity of a control on a page: family + label + container + best stable attr.
-    Not a counter, not a hash of position -- the same control gets the same id on the next visit.
+               drop_container: bool = False, tag: str | None = None) -> str:
+    """Structural identity of a control on a page: family + label + container + best stable attr +
+    the real HTML tag. Not a counter, not a hash of position -- the same control gets the same id
+    on the next visit.
+
+    THE TAG JOINS THE IDENTITY (D20, 2026-09-20; F122). Before this, a `button` and an `a` that
+    agreed on family/label/container/attr collided at this function's return value and silently
+    became one element -- the second write's tag overwriting the first's, against this docstring's
+    own promise and the `tag=` doctrine (`ClickItem` silently finds nothing without an explicit
+    `tag=`, and it must be the REAL HTML tag). Measured on the live store, 2026-09-19: 349 elements
+    are `family=button` with `tag=a`, and 10 of 2,221 distinct keys occur with more than one tag
+    across records -- exactly the fold this closes. `tag` defaults to `None` (an empty trailing
+    segment) so a caller that does not know the shape yet (a driven `--op kw` step) still mints a
+    stable id; `identify_control`'s label/family fallback -- not a string match on this id -- is
+    what still finds that element again later, shaped or not. Existing on-disk keys are re-keyed by
+    `migrate_keys.py --steps tag`, never silently orphaned.
 
     `drop_container` omits the container from the identity, for a SINGLE-SURFACE app
     (keys.SINGLE_SURFACE_HOSTS) where the "container" is not structure at all but whatever prose
@@ -124,7 +137,8 @@ def element_id(family: str | None, label: str | None, container: str | None, att
             attr = f"{k}={sa[k]}"
             break
     norm = lambda s: re.sub(r"\s+", " ", (s or "")).strip().strip("*").strip()[:60]
-    parts = [family or "generic", norm(label), "" if drop_container else norm(container), attr]
+    parts = [family or "generic", norm(label), "" if drop_container else norm(container), attr,
+             (tag or "")]
     return "|".join(parts)
 
 
@@ -366,7 +380,7 @@ def identify_control(rec: dict, label: str | None, family: str | None, attrs: di
     record ("what else is this control called here?") without matching itself.
     """
     els = rec.get("elements") or {}
-    base = element_id(family, label, container, attrs, drop_container)
+    base = element_id(family, label, container, attrs, drop_container, tag)
     if base in els and base != exclude:
         return base
     relabelled = same_control_id(rec, base, family, label, container)

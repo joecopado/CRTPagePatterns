@@ -1,26 +1,30 @@
 *** Settings ***
-Documentation     GarzAI generated data (2026-09-19, build n7) -- the small, stdlib-only value
-...               generator the composed pane calls. THE CONTAINER MAY NOT HAVE `faker`, so
-...               nothing here imports anything outside the Python standard library and Robot's
-...               own BuiltIn/String/DateTime/Collections.
+Documentation     GarzAI generated data (build n10, 2026-09-20) -- FakerLibrary generates, this
+...               resource keeps the four things FakerLibrary does not do: a valid picklist value
+...               (`Gz Pick`), the tally of every generated value (`Gz Generated Tally`), the
+...               cleanup SOQL a person runs (`Gz Cleanup Hint`), and the sentinel-landed verdict
+...               (`Gz Sentinel Verdict`).
 ...
 ...               WHY THIS EXISTS (user, 2026-09-19): "Every value is hard-coded, so the second run
 ...               fails on duplication rules." A recorded fill whose typed value is a SENTINEL
-...               (`asdf`, or the explicit `@@` grammar) composes a VARIABLE line above the fill --
-...               `${lead_last_name}=    Gz Unique Text    Last Name` -- and the fill uses the
-...               variable, so a later verify or cleanup step reuses the SAME value.
+...               (`asdf`, or the one plain override `@@<provider>`) composes a VARIABLE line above
+...               the fill -- `${lead_first_name}=    FakerLibrary.First Name` -- and the fill uses
+...               the variable, so a later verify step reuses the SAME value.
 ...
-...               THE RUN STAMP IS THE CLEANUP TAG. `Gz Run Stamp` mints one stamp per run
-...               (`yyyymmdd-hhmmss-rand4`), keeps it in the global `${GZ_RUN_STAMP}`, and every
-...               text-shaped generated value carries it. A teardown step deletes by that tag:
-...                   ${stamp}=    Gz Run Stamp
-...                   ...    SELECT Id FROM Lead WHERE LastName LIKE '%${stamp}%'
-...               Teardown is a STEP, not a Suite Teardown -- CRT Live Testing skips Teardown
-...               (CLAUDE.md), so a cleanup that only runs there never runs at all.
+...               THE USER'S RULE (2026-09-20, twice): "don't like the friggin dates and crazy
+...               reinvention of randomized data. That shit is way too complicated and FakerLibrary
+...               does so well already as long as it's treated properly." So build n10 RETIRED the
+...               in-house generators (Gz Unique Text, Gz Email, Gz Phone, Gz Number, Gz Date,
+...               Gz Text, Gz Run Stamp) and the argument grammar (`@@date+N`, `@@unique <base>`,
+...               `@@int a b`, `@@text n`). NO RUN STAMP IN ANY VISIBLE VALUE: a company reads like a
+...               company. Traceability is the tally at the end and the cleanup hint's SOQL
+...               (`CreatedById = <user> AND CreatedDate = TODAY`); nothing here deletes anything.
 ...
-...               EVERY KEYWORD LOGS ITS VALUE TO THE CONSOLE ONCE, because a generated value that
-...               nobody can read is a value nobody can check. `print()` is invisible in Live
-...               Testing, so the log goes through `Log To Console`.
+...               EVERY GENERATED VALUE IS LOGGED TO THE CONSOLE ONCE by the listener library
+...               `garzai_data_tally.py` (it sees every `FakerLibrary.*` keyword end and reads the
+...               assigned variable back), because a generated value that nobody can read is a
+...               value nobody can check. `print()` is invisible in Live Testing, so the log goes
+...               through the console logger.
 ...
 ...               COULD-NOT-CHECK IS A REAL ANSWER. `Gz Pick` with no options it can trust FAILS
 ...               with the word COULD-NOT-CHECK in the message. It never invents a picklist value:
@@ -28,18 +32,15 @@ Documentation     GarzAI generated data (2026-09-19, build n7) -- the small, std
 ...
 ...               The composer-side twin of the sentinel table is
 ...               `tools/recorder/crt_override/compose_live.py` (`sentinel_spec`,
-...               `SF_TYPE_GENERATOR`); `Gz Is Sentinel` below must agree with it, and
-...               `tools/recorder/tests/test_crt_override_generated_data_2026_09_19.py` asserts
-...               they do over the same table.
+...               `sentinel_landed`); `Gz Is Sentinel` below must agree with `sentinel_landed`,
+...               and `tools/recorder/tests/test_crt_override_faker_2026_09_20.py` asserts it.
 Library           Collections
+Library           ${CURDIR}/garzai_verdicts.py    # F192: the ONE session ledger a sentinel landing is recorded in
+Library           FakerLibrary
+Library           ${CURDIR}/garzai_data_tally.py
 
 
 *** Variables ***
-# Minted by `Gz Run Stamp` on first use and kept for the whole run. A suite that wants a stamp of
-# its own (re-running a cleanup against yesterday's data) sets it in its own Variables.
-${GZ_RUN_STAMP}          ${EMPTY}
-# RFC 2606 reserved: nothing generated here can ever be delivered to a real mailbox.
-${GZ_EMAIL_DOMAIN}       example.invalid
 # Path to a JSON file the suite ships with, read by `Gz Field Options`. Two shapes are accepted:
 # the flat `{"Lead": {"Salutation": ["Mr.", "Ms."]}}`, and an org-map projection
 # `{"objects": {"Lead": {"inventory": {"fields": {"value": {"Salutation": {"picklist_values": [...],
@@ -48,147 +49,44 @@ ${GZ_EMAIL_DOMAIN}       example.invalid
 ${GZ_FIELD_OPTIONS}      ${EMPTY}
 # The object `Gz Pick` looks a bare label up under when the caller gave no options.
 ${GZ_DEFAULT_OBJECT}     ${EMPTY}
-@{GZ_GENERATED}
 
 
 *** Keywords ***
-Gz Run Stamp
-    [Documentation]    The ONE run stamp for this run: `yyyymmdd-hhmmss-rand4`. Minted on first
-    ...    use, kept in the global `${GZ_RUN_STAMP}`, carried inside every text-shaped generated
-    ...    value, and the tag a cleanup step deletes by. Calling it twice returns the same stamp --
-    ...    two stamps in one run would mean two cleanup tags and one of them would be missed.
-    IF    $GZ_RUN_STAMP not in (None, '')
-        RETURN    ${GZ_RUN_STAMP}
-    END
-    ${stamp}=    Evaluate
-    ...    datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + ''.join(random.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(4))
-    ...    modules=datetime, random
-    Set Global Variable    ${GZ_RUN_STAMP}    ${stamp}
-    Log To Console    GarzAI data: run stamp ${stamp} -- every generated value carries it; a cleanup step deletes by it.
-    RETURN    ${stamp}
-
-
 Gz Log Generated
-    [Documentation]    One console line per generated value, and the value kept in
-    ...    @{GZ_GENERATED} so `Gz Generated Tally` can print the whole run's data at the end.
+    [Documentation]    One console line per generated value, kept in the tally so
+    ...    `Gz Generated Tally` can print the whole run's data at the end. FakerLibrary values
+    ...    reach the tally through the listener without this; `Gz Pick` calls it.
     [Arguments]    ${keyword}    ${value}
-    Log To Console    GarzAI data: ${keyword} -> '${value}'
-    Append To List    ${GZ_GENERATED}    ${keyword} -> ${value}
-    Set Suite Variable    ${GZ_GENERATED}
+    Gz Note Generated    ${keyword}    ${value}
     RETURN    ${value}
 
 
 Gz Generated Tally
-    [Documentation]    Prints every value generated this run and returns the count -- run it as a
-    ...    step before the cleanup step, so the pane shows what is about to be deleted.
-    ${n}=    Get Length    ${GZ_GENERATED}
-    Log To Console    GarzAI data: ${n} generated values this run (run stamp '${GZ_RUN_STAMP}')
-    FOR    ${v}    IN    @{GZ_GENERATED}
+    [Documentation]    Prints every value generated this run -- every `FakerLibrary.*` assignment
+    ...    the listener saw and every `Gz Pick` -- and returns the count. Run it as a step at the
+    ...    end, before `Gz Cleanup Hint`, so the pane shows what the run put into the org.
+    ${values}=    Gz Generated Values
+    ${n}=    Get Length    ${values}
+    Log To Console    GarzAI data: ${n} generated values this run
+    FOR    ${v}    IN    @{values}
         Log To Console    - ${v}
     END
     RETURN    ${n}
 
 
-Gz Unique Text
-    [Documentation]    `<run stamp> <base>` -- unique per run, so a second run of the same
-    ...    recording does not trip a duplicate rule. THE STAMP IS FIRST (F150/F146): a value that
-    ...    reads `<base> <stamp>` BEGINS WITH THE FIELD'S OWN LABEL for the common case (base ==
-    ...    the label, e.g. `First Name 20260919-...`), and `confirm.field_value`'s label-echo guard
-    ...    -- built to catch `get_field_value("Stage") -> "Stage"` -- correctly refuses it as a
-    ...    label echo. Putting the stamp first means the value can never start with the label while
-    ...    the stamp is still findable anywhere with `LIKE '%<stamp>%'`.
-    ...    `max_length` truncates from the RIGHT of the base (never the stamp: the stamp is the
-    ...    cleanup tag and losing it loses the record), and REFUSES -- COULD-NOT-CHECK, never a
-    ...    silently truncated stamp -- when there is no room left for the stamp plus at least one
-    ...    base character. Says so on the console when it truncates. 0 means no limit.
-    [Arguments]    ${base}    ${max_length}=0
-    ${stamp}=    Gz Run Stamp
-    ${clean_base}=    Evaluate    (str($base).strip() or 'GZ')
-    ${value}=    Evaluate    ($stamp + ' ' + $clean_base)
-    ${limit}=    Evaluate    int($max_length)
-    IF    ${limit} > 0 and len($value) > ${limit}
-        IF    ${limit} < len($stamp) + 2
-            Fail    COULD-NOT-CHECK: Gz Unique Text('${base}', ${max_length}): max_length is shorter than the run stamp needs room for (${max_length} < ${{len($stamp) + 2}}) -- there is no room to keep the cleanup tag whole, so nothing is generated.
-        END
-        ${keep}=    Evaluate    ${limit} - len($stamp) - 1
-        ${value}=    Evaluate    ($stamp + ' ' + $clean_base[:${keep}]).strip()[:${limit}]
-        Log To Console    GarzAI data: Gz Unique Text truncated the BASE to fit ${limit} characters; the run stamp is kept whole (it is the cleanup tag).
-    END
-    ${value}=    Gz Log Generated    Gz Unique Text    ${value}
-    RETURN    ${value}
-
-
-Gz Email
-    [Documentation]    A unique address in the RFC 2606 reserved domain `${GZ_EMAIL_DOMAIN}`
-    ...    (`example.invalid`) -- it cannot resolve, so nothing generated here can be delivered to
-    ...    a real person. Carries the run stamp.
-    [Arguments]    ${base}=gz
-    ${stamp}=    Gz Run Stamp
-    ${local}=    Evaluate    (re.sub(r'[^a-z0-9]+', '.', str($base).strip().lower()).strip('.') or 'gz')    modules=re
-    ${value}=    Evaluate    $local + '.' + $stamp + '@' + $GZ_EMAIL_DOMAIN
-    ${value}=    Gz Log Generated    Gz Email    ${value}
-    RETURN    ${value}
-
-
-Gz Phone
-    [Documentation]    A number in the 555-0100..555-0199 block North American numbering reserves
-    ...    for fiction -- it can never reach a real line. Rendered `(555) 555-01NN`; a formatted
-    ...    read-back compares by DIGITS (`Values Match` tier 3), so the widget may reformat it.
-    ...    A phone carries no run stamp: there is nowhere in ten digits to put one, so a suite that
-    ...    cleans up by tag tags a TEXT field, not this.
-    ${n}=    Evaluate    random.randint(100, 199)    modules=random
-    ${value}=    Set Variable    (555) 555-0${n}
-    ${value}=    Gz Log Generated    Gz Phone    ${value}
-    RETURN    ${value}
-
-
-Gz Number
-    [Documentation]    A random integer in [min, max], inclusive, as a string. No run stamp -- a
-    ...    number field has nowhere to carry one.
-    [Arguments]    ${min}    ${max}
-    ${lo}=    Evaluate    int($min)
-    ${hi}=    Evaluate    int($max)
-    IF    ${hi} < ${lo}
-        Fail    COULD-NOT-CHECK: Gz Number(${min}, ${max}): max is below min, so there is no value to generate.
-    END
-    ${value}=    Evaluate    str(random.randint(${lo}, ${hi}))    modules=random
-    ${value}=    Gz Log Generated    Gz Number    ${value}
-    RETURN    ${value}
-
-
-Gz Date
-    [Documentation]    Today plus `offset` DAYS. `+30`, `30` and `-1` all read the same way.
-    ...    `format`: the default `MM/DD/YYYY` is what a Salesforce date input renders in a US
-    ...    locale; `--iso` gives `YYYY-MM-DD`, which is what `Omni Date` takes.
-    ...    THE OFFSET IS THE POINT: a recorded literal date drifts into the past and the field
-    ...    rejects it; an offset picks a date the same distance away on every later run.
-    [Arguments]    ${offset}    ${format}=us
-    ${days}=    Evaluate    int(str($offset).strip().lstrip('+'))
-    ${fmt}=    Evaluate    '%Y-%m-%d' if str($format).strip().lower() in ('--iso', 'iso', 'yyyy-mm-dd') else '%m/%d/%Y'
-    ${value}=    Evaluate    (datetime.date.today() + datetime.timedelta(days=${days})).strftime($fmt)    modules=datetime
-    ${value}=    Gz Log Generated    Gz Date    ${value}
-    RETURN    ${value}
-
-
-Gz Text
-    [Documentation]    `length` characters. The run stamp is embedded when the length allows it
-    ...    (and the console line SAYS when it did not), so a long text field is still cleanable by
-    ...    tag while a short one is honest about not being.
-    [Arguments]    ${length}
-    ${n}=    Evaluate    int($length)
-    IF    ${n} <= 0
-        Fail    COULD-NOT-CHECK: Gz Text(${length}): a length of ${n} has no value to generate.
-    END
-    ${stamp}=    Gz Run Stamp
-    ${fits}=    Evaluate    ${n} >= len($stamp) + 1
-    IF    ${fits}
-        ${value}=    Evaluate    ($stamp + ' ' + ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(${n})))[:${n}]    modules=random
-    ELSE
-        ${value}=    Evaluate    ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(${n}))    modules=random
-        Log To Console    GarzAI data: Gz Text(${n}) is too short to carry the run stamp '${stamp}' -- this value is NOT cleanable by tag.
-    END
-    ${value}=    Gz Log Generated    Gz Text    ${value}
-    RETURN    ${value}
+Gz Cleanup Hint
+    [Documentation]    Prints the SOQL a person runs to find what this run created -- by the
+    ...    creating user and today's date, because no generated value carries a tag any more --
+    ...    and returns it. NOTHING IS DELETED BY THIS KEYWORD: run the query, look at the rows,
+    ...    delete them yourself. `user` is the running user's Id (`005...`) or username; with
+    ...    neither given the query names the placeholder so nobody pastes it blind.
+    [Arguments]    ${object}    ${user}=${EMPTY}
+    ${by}=    Evaluate    ("CreatedBy.Username = '%s'" % $user) if '@' in str($user) else ("CreatedById = '%s'" % (str($user).strip() or '<your user id>'))
+    ${soql}=    Set Variable    SELECT Id, Name, CreatedDate FROM ${object} WHERE ${by} AND CreatedDate = TODAY
+    Log To Console    GarzAI cleanup hint: the records this run created are the ones a person finds with
+    Log To Console    ${SPACE * 4}${soql}
+    Log To Console    ${SPACE * 4}-- nothing is deleted by this keyword; run the query, check the rows, delete them yourself.
+    RETURN    ${soql}
 
 
 Gz Pick
@@ -263,21 +161,22 @@ Gz Field Options
 
 Gz Is Sentinel
     [Documentation]    True when a value IS a sentinel -- the bare `asdf` (case-insensitive,
-    ...    surrounding whitespace ignored) or the explicit `@@` grammar (`@@email`, `@@phone`,
-    ...    `@@pick`, `@@unique <base>`, `@@date+N`, `@@date-N`, `@@int <min> <max>`,
-    ...    `@@text <len>`). NOTHING ELSE: `asdfasdf`, `test`, `qwer` are values a person typed on
-    ...    purpose, and treating one as a sentinel would silently replace data they meant.
-    ...    The composer's own `compose_live.sentinel_spec` is the twin of this table.
+    ...    surrounding whitespace ignored) or ANYTHING starting with `@@` (`@@company`, `@@pick`,
+    ...    and a malformed `@@nope` alike: a person never means `@@x` as data, so a value that
+    ...    still carries the prefix after the fill was never generated). NOTHING ELSE:
+    ...    `asdfasdf`, `test`, `qwer` are values a person typed on purpose, and treating one as a
+    ...    sentinel would silently replace data they meant.
+    ...    The composer's own `compose_live.sentinel_landed` is the twin of this rule.
     [Arguments]    ${value}
-    ${hit}=    Evaluate    bool(re.fullmatch(r'(?i)\\s*(asdf|@@(email|phone|pick)|@@unique(\\s+\\S.*)?|@@date\\s*[+-]\\s*\\d+|@@int\\s+-?\\d+\\s+-?\\d+|@@text\\s+\\d+)\\s*', str($value)))    modules=re
+    ${hit}=    Evaluate    bool(re.fullmatch(r'(?i)\\s*(asdf|@@\\S.*?)\\s*', str($value)))    modules=re
     RETURN    ${hit}
 
 
 Gz Sentinel Verdict
     [Documentation]    THE SENTINEL-LANDED VERDICT. A value read back off the page that is ITSELF
     ...    a sentinel means the generated-data rule never fired for that field and the literal
-    ...    `asdf` went into the record -- `CAUGHT-BUG: sentinel landed`, never a quiet pass.
-    ...    Returns True when it fired, so the caller can stop before printing a pass.
+    ...    `asdf` (or a `@@...`) went into the record -- `CAUGHT-BUG: sentinel landed`, never a
+    ...    quiet pass. Returns True when it fired, so the caller can stop before printing a pass.
     ...    Honours `${GZ_ON_MISMATCH}` the same way the TypeText override does (default `warn`:
     ...    print, keep, continue).
     [Arguments]    ${where}    ${actual}
@@ -287,6 +186,7 @@ Gz Sentinel Verdict
     END
     ${line}=    Set Variable    ${where}: the value read back is the SENTINEL '${actual}' -- the generated-data rule never fired for this field, so a literal sentinel went into the record.
     Log To Console    CAUGHT-BUG: sentinel landed -- ${line}
+    Gz Record Verdict    CAUGHT-BUG    ${where}    sentinel landed: '${actual}'
     ${mode}=    Get Variable Value    ${GZ_ON_MISMATCH}    warn
     IF    '${mode}' == 'warn'
         Log    CAUGHT-BUG: sentinel landed -- ${line}    level=WARN

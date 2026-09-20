@@ -13,10 +13,14 @@ recorded element found among the parsed rows by DOM identity, and the parser's p
 form (and xpath form) as the answer, marked `# unverified: parser proposal`.
 
 Nothing here parses HTML, classifies a control or invents a locator: `review_table.build_rows`
-(the JSON parser + the xpath ladder + the identity xpath), `pattern_library` (buckets + the
-verified recipes) and `disambiguation_args.to_call_kwargs` (the ONE place index becomes QWeb's
-numeric anchor) are consumed as they are. The review is still what turns `unverified` into
-`verified`; this only stops a blank page from being worse than a reviewed one.
+(the JSON parser + the xpath ladder + the identity xpath) and `pattern_library` (buckets + the
+verified recipes) are consumed as they are. The parser's `index` is consumed as a DESCRIPTION
+only (`disambiguation.index` in the answer): a numeric anchor is never composed from a capture
+count (F189, 2026-09-20 -- `Company anchor=8` hung 3 of 3 in the container while the anchor-less
+lines landed 4 of 4). With the element in hand the driver layer takes a live census
+(`live_disambiguation`) and decides bare label / text anchor / xpath-live from it. The review is
+still what turns `unverified` into `verified`; this only stops a blank page from being worse
+than a reviewed one.
 
 Two layers, deliberately split so `build_override` can inline the second one later:
 
@@ -54,7 +58,6 @@ for _p in ('tools/recorder', 'tools/dom-miner'):
 import review_table as RT          # noqa: E402  (parser + xpath ladder + identity xpath)
 import descriptor as DESC         # noqa: E402  (the page's own description of the element, and the row rule)
 import pattern_library as PL       # noqa: E402  (buckets + the verified recipes)
-import disambiguation_args as DA   # noqa: E402  (index -> QWeb's numeric anchor)
 from pom import keys as PK         # noqa: E402  (the page key, for provenance)
 
 UNVERIFIED = '# unverified: parser proposal'
@@ -91,13 +94,38 @@ def _label_of(row: dict) -> str:
     return RT._clean_label(row.get('label_corrected') or row.get('label') or '')
 
 
-def _anchor_of(row: dict) -> str | None:
-    """The member's position among same-label matches, as QWeb's numeric anchor -- via the ONE
-    converter. A control that occurs once carries neither (D4, narrowed by stream 1C)."""
+def _described_index(row: dict) -> int | None:
+    """The member's position among the same-label matches the parser counted in the CAPTURE --
+    a DESCRIPTION, carried in the answer as `disambiguation.index` and never as a call argument.
+
+    Until build n9 this became `anchor=<n>` through `disambiguation_args.to_call_kwargs`: QWeb's
+    INDEX MODE, which counts by QWeb's own live scorer over the live page. The two counts are not
+    the same number (F188 CAUGHT-BUG 3, 2026-09-20: Lead New modal, `Company anchor=8` /
+    `Title anchor=9` / `Email anchor=7` resolved nothing and hung 3 of 3; the anchor-less lines on
+    the same modal landed 4 of 4; the committed new-Account capture reports `Shipping City` as
+    index 2 of 2 while the label occurs once). The live decision is `live_disambiguation`."""
     idx = row.get('index_corrected') if 'index_corrected' in row else row.get('index')
     if not idx or (row.get('group_size') or 1) <= 1:
         return None
-    return DA.to_call_kwargs({'index': idx}).get('anchor')
+    try:
+        n = int(str(idx).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if n >= 1 else None
+
+
+_NUMERIC_ANCHOR_CELL = re.compile(r'^anchor=(\d+)$')
+
+
+def strip_numeric_anchor(body: str) -> tuple[str, int | None]:
+    """(body without its `anchor=<digits>` cell, the number that was there or None). A TEXT anchor
+    (`anchor=September`) is a real disambiguator and is kept; a body with no numeric anchor comes
+    back byte-identical."""
+    cells = _cells(body or '')
+    hit = next((c for c in cells if _NUMERIC_ANCHOR_CELL.match(c)), None)
+    if hit is None:
+        return body, None
+    return '    '.join(c for c in cells if not _NUMERIC_ANCHOR_CELL.match(c)), int(hit[len('anchor='):])
 
 
 def _unescape_xpath_step(step: str) -> str | None:
@@ -199,7 +227,9 @@ def _recipe_first_action(entry: dict, row: dict, value: str | None) -> str | Non
     for line in kw_lines:
         if line.strip().startswith('#'):
             return None
-        return line.strip()
+        # the library renders `{anchor_kw}` from the same capture count (F189): stripped here so
+        # the recipe rung and the generic rung answer one shape
+        return strip_numeric_anchor(line.strip())[0]
     return None
 
 
@@ -214,7 +244,9 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
     value = cells[-1] if len(cells) >= 3 else None
     fam = row.get('family_corrected') or row.get('element_type')
     label = _label_of(row)
-    anchor = _anchor_of(row)
+    # No numeric anchor is composed here, ever (F189): the parser's index is a description of
+    # the CAPTURE and the live decision belongs to `live_disambiguation` in the driver layer.
+    anchor = None
     xp = _xp_of(row)
     c0 = (row.get('calls') or [{}])[0] or {}
     kw = row.get('keyword_corrected') or c0.get('keyword')
@@ -367,7 +399,10 @@ def _host_prefix(host: str, *xpaths) -> str | None:
     (`omniscript-select[2]` vs `omniscript-select[5]`), so the prefix names the instance."""
     for xp in xpaths:
         s = str(xp or '')
-        i = s.rfind('/' + host)
+        # the host SEGMENT (`/<host>[n]`), never a longer tag that starts with the same letters:
+        # `/lightning-base-combobox-item[3]` on an option path is not the `lightning-base-combobox`
+        # host, and a bare `rfind('/' + host)` matched it (measured in this build's own test)
+        i = s.rfind('/' + host + '[')
         if i < 0:
             continue
         j = s.find('/', i + 1)
@@ -450,7 +485,19 @@ def omni_open_click_line(label: str | None, stock_open: str) -> tuple[str, str]:
 
 
 def _dormant(indent: str, text: str) -> str:
-    return '%s#   backup: %s   (stock recorder line, unverified)' % (indent, (text or '').strip())
+    return '%s#   backup: %s' % (indent, annotate((text or '').strip(), 'stock recorder line, unverified'))
+
+
+def annotate(line: str, note: str) -> str:
+    """Append a note to a composed line AS A ROBOT COMMENT CELL, never as a bare cell. F196 (the
+    user, 2026-09-20): a dormant backup ending in `   (xpath form, unverified: parser proposal)`
+    stopped being runnable the moment its `Comment    backup:` prefix was removed -- the bare
+    parenthesised cell became TypeText's third argument. 2,267 of 2,419 dormant lines in the n9
+    goldens had that tail. A line that already carries a `#` comment gets the note folded into it."""
+    line = (line or '').rstrip()
+    if '    #' in line or line.lstrip().startswith('#'):
+        return '%s; %s' % (line, note)
+    return '%s    # %s' % (line, note)
 
 
 def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_option: str,
@@ -492,6 +539,222 @@ def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_optio
     if omni_placeholder_option(opt):
         return '', backups
     line = '%s%s    %s' % (indent, RT._rf('Omni Select', lab, opt).strip(), UNVERIFIED)
+    return line, backups
+
+
+# ------------------------------------------------ open-then-choose, EVERY family (Loop 4 item 2)
+# Ledger F188 (the user's CRT editor session, fsc7f, 2026-09-20): four comboboxes on one page
+# recorded as a raw opening click with no pick, and the Lead modal's own picklists had no one-step
+# shape at all. The OmniStudio pair above was the first family; this table is the census of ALL of
+# them (`tools/recorder/open_then_choose_census.py` reads it, and so does the composer), and the
+# `lightning-base-combobox` rules below are the second family, keyed EXACTLY like the first: on the
+# host prefix of the event's own path -- the live describer's control identity -- never on the
+# reviewed page key. A recipe bound to a reviewed page (`page_gate`) is what skipped every one-step
+# pick on fsc7f; nothing here reads a page key, a row table or a recipe.
+#
+# `one_step` names the keyword form that EXISTS (CRT QForce / `tools/qforce-lite` / the CRT job
+# resources); `could_not_check` names, in words, why a family has no one-step rule yet. A family
+# has one or the other, never neither (the test pins it).
+PICK_FAMILIES = {
+    'omni_combobox': {
+        'host': _OMNI_COMBOBOX, 'opener': 'click on the combobox input',
+        'option': 'ClickText on an <li> of its own listbox',
+        'selected_render': "the input's value (the option text)",
+        'one_step': 'Omni Select', 'status': 'composes (build n2+)'},
+    'lightning_picklist': {
+        'host': 'lightning-base-combobox', 'not_under': ('lightning-grouped-combobox',
+                                                          'lightning-lookup'),
+        'opener': 'click on <button role=combobox aria-haspopup=listbox> (LWC) or '
+                  '<input role=combobox readonly> (older base)',
+        'option': 'click on <lightning-base-combobox-item role=option> inside the SAME host',
+        'selected_render': "the trigger button's own text / data-value after the listbox closes",
+        'one_step': 'PickList', 'status': 'composes (this build)'},
+    'lightning_lookup': {
+        'host': 'lightning-grouped-combobox',
+        'opener': 'click on <input role=combobox>, then a typed filter',
+        'option': 'click on <lightning-base-combobox-item> after the server search returns',
+        'selected_render': 'a <lightning-pill> replaces the input',
+        'one_step': None,
+        'could_not_check': 'three stock lines (open, type, pick) and the option list is '
+                           'SERVER-rendered after the keystroke; `ComboBox` is the candidate '
+                           'keyword and its read-back is the pill, not the input -- next slice'},
+    'button_menu': {
+        'host': 'lightning-button-menu',
+        'opener': 'click on <button aria-haspopup=true>',
+        'option': 'click on <lightning-menu-item> / [role=menuitem]',
+        'selected_render': 'none (an action fires; nothing is selected)',
+        'one_step': None,
+        'could_not_check': 'no selected value to read back: the pair is a navigation, and the '
+                           'item is not in the DOM until the menu opens, so `ClickText <item>` '
+                           'alone cannot run -- needs a `Click Menu Item` keyword first'},
+    'app_launcher': {
+        'host': 'one-app-launcher-header',
+        'opener': 'click on button[title="App Launcher"], then a typed search',
+        'option': 'click on the app tile / menu item',
+        'selected_render': 'the URL changes to /lightning/app/<id>',
+        'one_step': 'LaunchApp', 'status': 'measured ONE step in F188 (`LaunchApp Sales`), '
+                                           'composed by the recorder itself'},
+    'native_select': {
+        'host': 'select', 'opener': 'none (the change event is the whole gesture)',
+        'option': '<option>', 'selected_render': "the <select>'s value",
+        'one_step': 'DropDown', 'status': 'composes (rule 8)'},
+    'aura_picklist': {
+        'host': 'forceInputPicklist',
+        'opener': 'click on <a role=button aria-haspopup> (uiPicklistLabel beside it)',
+        'option': 'click on <a role=option> inside uiMenuList',
+        'selected_render': "the anchor's own text",
+        'one_step': None,
+        'could_not_check': '`pick_list` already resolves the Aura trigger (its 4th tier), but no '
+                           'capture in the corpus holds an Aura listbox OPEN (customer-cpq/03 is '
+                           'named "picklist-open" and carries 0 role=option) and no walk has driven '
+                           'one -- next slice, same hold-and-pair shape'},
+    'omni_typeahead': {
+        'host': _OMNI_TYPEAHEAD,
+        'opener': 'TYPING opens the listbox (no opening click)',
+        'option': 'click on an <li>', 'selected_render': "the input's value",
+        'one_step': None,
+        'could_not_check': 'opens on typing, not on a click, so the opener rule does not apply; '
+                           '`Omni Typeahead` exists in the CRT resources and the pair is (type, '
+                           'pick) -- next slice'},
+    'dual_listbox': {
+        'host': 'lightning-dual-listbox',
+        'opener': 'click on an option in the left list', 'option': 'the move-right arrow',
+        'selected_render': 'the option appears under Selected',
+        'one_step': None,
+        'could_not_check': 'a multi-step move, not open-then-choose; the reviewed recipe (row 77) '
+                           'composes it on the reviewed page only -- out of this item'},
+    'date_picker': {
+        'host': 'runtime_omnistudio_common-date-picker',
+        'opener': 'click on the date input', 'option': 'a day cell',
+        'selected_render': "the input's committed value",
+        'one_step': 'Omni Date', 'status': 'composes (build n5/n6, `_omni_date_pair`); D19 says a '
+                                           'date is TYPED, the picker gesture is still recorded'},
+}
+_LBC = 'lightning-base-combobox'
+_LBC_ITEM = 'lightning-base-combobox-item'
+# `--None--` is what a Lightning picklist offers for "nothing chosen"; the OmniStudio list above
+# already carries it, and the Lead modal renders exactly that text on every unset picklist.
+LBC_PLACEHOLDER_OPTIONS = OMNI_PLACEHOLDER_OPTIONS
+
+
+def pick_family_of(*xpaths) -> str | None:
+    """The open-then-choose family the event's OWN path names, or None. The lookup's grouped host
+    wraps a base combobox, so the grouped host is asked first (a base-combobox inside a lookup is
+    that lookup's own shadow child, `component_classifier`'s OUTER-wins rule)."""
+    blob = _paths(*xpaths)
+    if 'lightning-grouped-combobox' in blob or 'lightning-lookup' in blob:
+        return 'lightning_lookup'
+    if _LBC in blob:
+        return 'lightning_picklist'
+    if _OMNI_COMBOBOX in blob:
+        return 'omni_combobox'
+    if _OMNI_TYPEAHEAD in blob:
+        return 'omni_typeahead'
+    if 'lightning-button-menu' in blob:
+        return 'button_menu'
+    if 'one-app-launcher' in blob:
+        return 'app_launcher'
+    if 'lightning-dual-listbox' in blob:
+        return 'dual_listbox'
+    return None
+
+
+def lbc_prefix(*xpaths) -> str | None:
+    """The `lightning-base-combobox[n]` INSTANCE's own path prefix: the pairing key."""
+    return _host_prefix(_LBC, *xpaths)
+
+
+def lbc_opener(rendered: str, *xpaths, desc: dict | None = None) -> bool:
+    """True when this event is the click that opens a standalone Lightning picklist's listbox: a
+    click (rendered `ClickText --None--` / `ClickElement ...`, or the safety net's synthetic one)
+    on the trigger -- a <button role=combobox> or an <input role=combobox> -- under
+    `lightning-base-combobox` with no lookup host above it."""
+    if pick_family_of(*xpaths) != 'lightning_picklist':
+        return False
+    blob = _paths(*xpaths)
+    if _LBC_ITEM in blob:
+        return False
+    cells = _cells(rendered)
+    if cells and cells[0] not in ('ClickElement', 'ClickItem', 'Click', 'ClickText'):
+        return False
+    d = desc or {}
+    role = (d.get('role') or '').lower()
+    tag = (d.get('tag') or '').lower()
+    if role == 'combobox' or (d.get('aria_haspopup') or '').lower() == 'listbox':
+        return True
+    # no descriptor role: the path's own last segment decides
+    last = blob.strip().rsplit('/', 1)[-1]
+    return tag in ('button', 'input') or last.startswith(('button[', 'input['))
+
+
+def lbc_option(rendered: str, *xpaths) -> bool:
+    """True when this event is a click on a `lightning-base-combobox-item` (the option)."""
+    cells = _cells(rendered)
+    if not cells or cells[0] not in ('ClickText', 'ClickElement', 'ClickItem', 'Click'):
+        return False
+    return _LBC_ITEM in _paths(*xpaths)
+
+
+def lbc_option_text(rendered: str, desc: dict | None = None) -> str:
+    """The option a person chose: the rendered `ClickText` cell first, the describer's text next."""
+    cells = _cells(rendered)
+    if len(cells) >= 2 and cells[0] == 'ClickText':
+        return cells[1].strip()
+    d = desc or {}
+    return (d.get('text') or d.get('title') or '').strip()
+
+
+def lbc_open_click_line(label: str | None, stock_open: str) -> tuple[str, str]:
+    """(the picklist OPEN click in a form a person can read, why). `*[@role="combobox"]` because
+    the trigger is a <button> on LWC pages and an <input> on older base pages; the label's
+    `following::` is the same rung the fill backups carry."""
+    lab = omni_label(label)
+    if not lab:
+        return (stock_open or '').strip(), 'no label on the picklist: the stock line is the only handle'
+    xp = '//label[normalize-space(.)=%s]/following::*[@role="combobox"][1]' % RT._lit(lab)
+    return RT._rf('ClickElement', RT._xp_arg(xp)), 'label form from the descriptor label %r' % lab
+
+
+def _dormant_note(indent: str, text: str, note: str) -> str:
+    return '%s#   backup: %s   (%s)' % (indent, (text or '').strip(), note)
+
+
+def pick_open_dormant(label: str | None, stock_open: str, indent: str = '    ',
+                      family: str = 'lightning_picklist') -> str:
+    """The dormant line an UNPAIRED opener leaves behind (opened and closed, or the hold lapsed):
+    the label form when there is a label, the stock line otherwise -- never a live click. A live
+    raw opening click is F188's shape: it opened a listbox, chose nothing, and the open listbox
+    intercepted the next control."""
+    if family == 'omni_combobox':
+        body, _ = omni_open_click_line(label, stock_open)
+    else:
+        body, _ = lbc_open_click_line(label, stock_open)
+    return _dormant_note(indent, body or stock_open, 'opened, no pick recorded -- not a step')
+
+
+def lbc_pair_lines(label: str | None, option: str, stock_open: str, stock_option: str,
+                   indent: str = '    ') -> tuple[str, list]:
+    """(the one composed `PickList` line, the dormant backups) for one Lightning picklist pick --
+    the same contract as `omni_pair_lines`: ('', []) with no label, ('', [backups]) for a
+    placeholder pick, and EVERY absorbed stock line dormant in recorded order: the raw opener
+    line, its label form, the option click. Each is a complete runnable step once `#   backup: `
+    is deleted (F151)."""
+    lab = omni_label(label)
+    opt = (option or '').strip()
+    if not lab or not opt:
+        return '', []
+    open_line, _ = lbc_open_click_line(label, stock_open)
+    raw_open = (stock_open or '').strip()
+    backups = []
+    if raw_open and open_line.strip() != raw_open:
+        backups.append(_dormant(indent, raw_open))
+    if open_line.strip():
+        backups.append(_dormant(indent, open_line))
+    if (stock_option or '').strip():
+        backups.append(_dormant(indent, stock_option))
+    if omni_placeholder_option(opt):
+        return '', backups
+    line = '%s%s    %s' % (indent, RT._rf('PickList', lab, opt).strip(), UNVERIFIED)
     return line, backups
 
 
@@ -785,20 +1048,78 @@ def verify_backup(composed: str, indent: str = '    ') -> str:
     return '%s#   verify: %s' % (indent, RT._rf('Verify Input Value', cells[1], cells[2]).strip())
 
 
+# ------------------------------------------------------- the typeable combobox (F192 fix 2)
+COMBOBOX_MARK = 'gz_family=combobox'
+
+
+def descriptor_is_typeable_combobox(desc) -> tuple[bool, str]:
+    """(True, why) when the descriptor says the typed-into control is a COMBOBOX with a typeable
+    input -- an `<input role="combobox">` (lightning-base-combobox with allow-input, the
+    OmniStudio typeahead/combobox input), or a family the review/parser already calls
+    `combobox` / `picklist`.  The page-side `familyOf` folds every `role=combobox` input into
+    `input_field`, so the ROLE is the evidence here, not the family."""
+    d = desc or {}
+    tag = str(d.get('tag') or '').casefold()
+    role = str(d.get('role') or '').casefold()
+    fam = str(d.get('family') or '').casefold()
+    if tag in ('input', '') and role == 'combobox':
+        return True, "the descriptor's role is combobox on a typeable input"
+    if fam in ('combobox', 'picklist') and tag not in ('button', 'a'):
+        return True, "the descriptor's family is %r" % fam
+    if role == 'combobox':
+        return False, 'role combobox on a <%s>: a button trigger is clicked, never typed into' % tag
+    return False, 'not a combobox (tag %r, role %r, family %r)' % (tag, role, fam)
+
+
+def combobox_fill_line(composed: str, desc, indent: str = '    ') -> tuple[str, str, str]:
+    """(the marked fill line, its dormant verify line, why) for a `TypeText` whose descriptor is
+    a typeable combobox; ('', '', why) for everything else, a non-fill, or a line already marked.
+
+    F188 CAUGHT-BUG 4 (fsc7f, 2026-09-20): `Phone Type` is a combobox with a typeable input.
+    The composer routed it as text, the TypeText override read the typed stamp back while the
+    input still had focus (VERIFIED-PASS), and the control cleared the invalid value on blur --
+    the vacuous green.  The mark `gz_family=combobox` tells the shipped TypeText override
+    (resources/garzai_typetext_override.robot) to read back the SELECTED OPTION AFTER BLUR --
+    never the input's text -- and to say COULD-NOT-CHECK naming the control when that is blank.
+    The dormant verify line is `Verify Combobox Selection`, the same read-back as a step.  The
+    mark is a trailing cell, so `replace_value_cell` (the generated-data rewrite) keeps it."""
+    if not isinstance(composed, str) or not composed.strip():
+        return '', '', 'nothing composed'
+    cells = _cells(composed)
+    if len(cells) < 3 or cells[0] not in ('TypeText', 'TypeSecret'):
+        return '', '', 'not a fill line'
+    if any(c.strip() == COMBOBOX_MARK for c in cells[3:]):
+        return '', '', 'already marked'
+    is_combo, why = descriptor_is_typeable_combobox(desc)
+    if not is_combo:
+        return '', '', why
+    ind = composed[: len(composed) - len(composed.lstrip())] or indent
+    line = ind + '    '.join(list(cells) + [COMBOBOX_MARK])
+    verify = '%s#   verify: %s' % (ind, RT._rf('Verify Combobox Selection', cells[1], cells[2]).strip())
+    return line, verify, 'typeable combobox: %s -- the read-back is the selected option after blur' % why
+
+
 # ============================================================ generated data from a typed sentinel
 # "Every value is hard-coded, so the second run fails on duplication rules." (user, 2026-09-19 --
 # docs/PLAN-OFFLINE-REPLAY-2026-09-19.md, "Backlog: generated data from a typed sentinel").
 #
 # The typed value is the HOTKEY. A recorded fill whose value is a SENTINEL composes a VARIABLE line
-# above the fill, set by the shipped `resources/garzai_data.robot` (stdlib only -- the CRT container
-# has no faker), and the fill uses the variable -- so a later verify or cleanup line can reuse the
-# same value, and every generated value carries the run stamp a teardown step deletes by.
+# above the fill, and the fill uses the variable, so a later verify line can reuse the same value.
 #
-# THE SENTINEL TABLE IS DELIBERATELY SMALL. Only `asdf` and the explicit `@@` grammar. `asdfasdf`,
-# `test`, `qwer` are NOT sentinels: a person types those as real data, and a false positive would
-# silently replace a value they meant with a generated one -- the same class of quiet wrong answer
-# as `get_field_value("Stage") -> "Stage"`. A malformed `@@...` is not a sentinel either, but it is
-# DISCLOSED in the `why` rather than passed through as if nobody had noticed.
+# BUILD n10 (2026-09-20, the user, twice): "don't like the friggin dates and crazy reinvention of
+# randomized data. That shit is way too complicated and FakerLibrary does so well already as long
+# as it's treated properly." So the variable line is FakerLibrary's own keyword, chosen by the
+# field's MEANING -- `${lead_first_name}=    FakerLibrary.First Name` -- and NO run stamp sits in
+# any visible value. Traceability is `Gz Generated Tally` (every generated value, at the end) and
+# `Gz Cleanup Hint` (the SOQL a person runs: CreatedById + CreatedDate = TODAY). The argument
+# grammar (`@@date+N`, `@@unique <base>`, `@@int a b`, `@@text n`) is RETIRED; a retired form is
+# disclosed as MALFORMED, never silently generated.
+#
+# THE SENTINEL TABLE IS DELIBERATELY SMALL: `asdf`, `@@pick`, and one plain override with no
+# arguments, `@@<provider name>` (`@@company`, `@@first name`, `@@date`). `asdfasdf`, `test`, `qwer`
+# are NOT sentinels: a person types those as real data, and a false positive would silently
+# replace a value they meant -- the same class of quiet wrong answer as
+# `get_field_value("Stage") -> "Stage"`.
 #
 # Click-recorded controls (a picklist option, a calendar day) cannot carry a typed sentinel, so they
 # get two markers instead: an ALT-CLICK on the option or the day ("any valid value here"), and -- on
@@ -810,123 +1131,223 @@ SENTINEL_BARE = 'asdf'
 # can argue with; the test file asserts every one of them stays a literal.
 SENTINEL_NEAR_MISSES = ('asdfasdf', 'test', 'qwer', 'asdfg', 'asd', 'aaaa', 'x', 'ASDF1')
 
+# The forms build n7-n9 accepted and build n10 retired. Named so the refusal can quote them.
+RETIRED_GRAMMAR = ('@@date+N', '@@date-N', '@@unique <base>', '@@int <min> <max>', '@@text <len>')
+
 # A picklist's option list is ELIDED on the composed line when it is long -- and the `why` always
 # says how many were dropped and where the whole list lives (an instrument may elide; it may never
 # elide SILENTLY -- CLAUDE.md, tools/guards/no_silent_truncation.py).
 PICK_OPTION_CAP = 12
 
+FAKER_LIB = 'FakerLibrary'
+_FAKER = {'inst': None, 'error': None}
+
+
+def provider_keyword(name) -> str:
+    """`first name` / `first_name` / `First Name` -> `First Name`: Robot's own rendering of a
+    FakerLibrary keyword (the dynamic library title-cases a snake_case method and turns `_` into
+    a space -- faker_classify.py's header, verified against the installed library)."""
+    return ' '.join(w.capitalize() for w in re.sub(r'[_\s]+', ' ', str(name or '')).strip().split())
+
+
+def provider_known(keyword) -> tuple:
+    """(True, '') when the installed `faker` has this provider; (False, why) when it does not;
+    (None, note) when `faker` is not importable here -- said, never assumed either way."""
+    if _FAKER['inst'] is None and _FAKER['error'] is None:
+        try:
+            import faker as _faker
+            _FAKER['inst'] = _faker.Faker()
+        except Exception as exc:                      # pragma: no cover - depends on the host
+            _FAKER['error'] = '%s: %s' % (type(exc).__name__, exc)
+    if _FAKER['inst'] is None:
+        return None, (' (provider unverified here: faker is not importable -- %s; FakerLibrary '
+                      'decides at run time)' % _FAKER['error'])
+    snake = str(keyword).strip().lower().replace(' ', '_')
+    if snake and callable(getattr(_FAKER['inst'], snake, None)):
+        return True, ''
+    return False, 'FakerLibrary has no provider %r' % keyword
+
 
 def sentinel_spec(value) -> tuple:
     """(kind, args, why) for a typed value that is a SENTINEL, or (None, None, why).
 
-    kinds: `auto` (the bare `asdf`: the generator comes from the field's own type), `email`,
-    `phone`, `unique`, `date`, `int`, `text`, `pick`.
+    kinds: `auto` (the bare `asdf`: the generator comes from the field's meaning and type),
+    `pick` (`@@pick`: a valid option), `provider` (`@@<provider name>`: args = [the FakerLibrary
+    keyword], e.g. `@@company` -> ['Company'], `@@first name` -> ['First Name']).
 
     The grammar, in full -- there is nothing else:
         asdf                  (case-insensitive, surrounding whitespace ignored)
-        @@email   @@phone   @@pick
-        @@unique <base>       (bare `@@unique` takes the field's label as the base)
-        @@date+N  @@date-N    (N days from today)
-        @@int <min> <max>
-        @@text <len>
+        @@pick
+        @@<provider name>     (letters, spaces or underscores; NO arguments)
+    A retired argument form (`@@date+30`, `@@unique Acme`, `@@int 1 100`, `@@text 40`) is a
+    MALFORMED SENTINEL: said out loud in `why`, typed as the literal it is, and then caught by the
+    sentinel-landed verdict if it reaches a record.
     """
     v = re.sub(r'\s+', ' ', str(value if value is not None else '')).strip()
     if not v:
         return None, None, 'no value to read'
     if v.casefold() == SENTINEL_BARE:
-        return 'auto', [], ("the bare sentinel %r: the generator is chosen by the field's own type"
-                            % v)
+        return 'auto', [], ("the bare sentinel %r: the generator is chosen by the field's own "
+                            "meaning and type" % v)
     if not v.startswith('@@'):
         return None, None, 'not a sentinel: %r is a literal value' % v[:60]
     body = v[2:].strip()
-    m = re.match(r'^(email|phone|pick)$', body, re.I)
-    if m:
-        return m.group(1).lower(), [], 'the explicit sentinel %r' % v
-    m = re.match(r'^unique(?:\s+(.+))?$', body, re.I)
-    if m:
-        base = (m.group(1) or '').strip()
-        return 'unique', [base], ('the explicit sentinel %r%s'
-                                  % (v, '' if base else " (no base given: the field's label is used)"))
-    m = re.match(r'^date\s*([+-])\s*(\d+)$', body, re.I)
-    if m:
-        return 'date', ['%s%s' % (m.group(1), m.group(2))], 'the explicit sentinel %r' % v
-    m = re.match(r'^int\s+(-?\d+)\s+(-?\d+)$', body, re.I)
-    if m:
-        return 'int', [m.group(1), m.group(2)], 'the explicit sentinel %r' % v
-    m = re.match(r'^text\s+(\d+)$', body, re.I)
-    if m:
-        return 'text', [m.group(1)], 'the explicit sentinel %r' % v
-    return None, None, ('MALFORMED SENTINEL %r: it starts with @@ but matches no rule in the '
-                        'grammar (@@email, @@phone, @@pick, @@unique <base>, @@date+N, @@date-N, '
-                        '@@int <min> <max>, @@text <len>), so it is typed as the literal text it '
-                        'is -- said out loud rather than silently generated' % v)
+    if body.casefold() == 'pick':
+        return 'pick', [], 'the explicit sentinel %r' % v
+    retired_word = body.split()[0].casefold() in ('unique', 'int') if body else False
+    if re.fullmatch(r'[A-Za-z][A-Za-z _]*', body) and not retired_word:
+        kw = provider_keyword(body)
+        ok, note = provider_known(kw)
+        if ok is False:
+            return None, None, ('MALFORMED SENTINEL %r: %s, so it is typed as the literal text it '
+                                'is -- said out loud rather than silently generated (type asdf and '
+                                'let the field decide, or @@<provider> with a real provider name, '
+                                'e.g. @@company)' % (v, note))
+        return 'provider', [kw], 'the explicit sentinel %r: %s.%s%s' % (v, FAKER_LIB, kw, note)
+    return None, None, ('MALFORMED SENTINEL %r: it starts with @@ but is not a bare provider name; '
+                        'the argument grammar (%s) was RETIRED 2026-09-20 (the user: FakerLibrary '
+                        'does it), so it is typed as the literal text it is -- said out loud rather '
+                        'than silently generated. Type asdf and let the field decide, or '
+                        '@@<provider> with no arguments (@@company, @@first name, @@date)'
+                        % (v, ', '.join(RETIRED_GRAMMAR)))
 
 
 def sentinel_landed(value) -> bool:
-    """True when a value READ BACK OFF THE PAGE is itself a sentinel -- the verdict
-    `CAUGHT-BUG: sentinel landed`, never a quiet pass. Mirrored by `Gz Is Sentinel` in
-    resources/garzai_data.robot, which is the copy that runs in the container."""
-    kind, _args, _why = sentinel_spec(value)
-    return kind is not None
+    """True when a value READ BACK OFF THE PAGE is itself a sentinel -- the bare `asdf`, or ANY
+    `@@...` (a person never means `@@x` as data, so a malformed one that was not generated and
+    still reached the record is a landed sentinel too) -- the verdict `CAUGHT-BUG: sentinel
+    landed`, never a quiet pass. Mirrored by `Gz Is Sentinel` in resources/garzai_data.robot,
+    which is the copy that runs in the container."""
+    v = re.sub(r'\s+', ' ', str(value if value is not None else '')).strip()
+    return bool(v) and (v.casefold() == SENTINEL_BARE or bool(re.fullmatch(r'@@\S.*', v)))
 
 
-# ------------------------------------------------------------------ metadata type -> generator
+# ------------------------------------------------------------------ meaning -> FakerLibrary provider
+# ONE TABLE. The recorder's own Faker chips and `annotate.py`'s `${VAR}=    FakerLibrary.<kw>`
+# preambles route through `tools/recorder/authoring/faker_classify.FAKER_METHODS` (keyword names
+# verified against the installed robotframework-faker, not guessed); this table is pinned to it by
+# `test_the_provider_table_agrees_with_the_one_faker_classify_already_ships` so the two cannot
+# drift. The third column is the provider's typical WIDTH in characters: a field the org map says
+# is narrower than that falls back to a bounded lorem value with the reason in `why`, because the
+# browser would otherwise truncate the value silently (F146-10).
+FAKER_PROVIDERS = {
+    'first':   ('First Name', [], 20),
+    'last':    ('Last Name', [], 20),
+    'name':    ('Name', [], 40),
+    'company': ('Company', [], 40),
+    'email':   ('Email', [], 40),
+    'phone':   ('Phone Number', [], 25),
+    'street':  ('Street Address', [], 50),
+    'city':    ('City', [], 30),
+    'state':   ('State', [], 25),
+    'country': ('Country', [], 45),
+    'postal':  ('Postcode', [], 10),
+    'url':     ('Url', [], 60),
+    'job':     ('Job', [], 60),
+    'date':    ('Date', [], 10),
+}
+# label shapes -> meaning, checked in this order (first hit wins). ANCHORED at the end of the
+# label on purpose: `Email Bounced Reason` is a reason, not an email, and `Company D-U-N-S Number`
+# is a number, not a company -- the word alone is not the meaning, the label's HEAD noun is.
+LABEL_MEANING = [
+    (re.compile(r'\bfirst\s*name\s*$', re.I), 'first'),
+    (re.compile(r'\blast\s*name\s*$|\bsurname\s*$', re.I), 'last'),
+    (re.compile(r'\be-?mail(\s*address)?\s*$', re.I), 'email'),
+    (re.compile(r'\b(phone|mobile|fax|telephone)(\s*number)?\s*$', re.I), 'phone'),
+    (re.compile(r'\b(zip|postal|post)\s*code\s*$|\bzip\s*$|\bpostcode\s*$', re.I), 'postal'),
+    (re.compile(r'\bstreet(\s*address)?\s*$|\baddress\s*line\s*\d*\s*$', re.I), 'street'),
+    (re.compile(r'\bcity\s*$', re.I), 'city'),
+    (re.compile(r'\bstate(\s*/\s*province)?\s*$|\bprovince\s*$', re.I), 'state'),
+    (re.compile(r'\bcountry\s*$', re.I), 'country'),
+    (re.compile(r'\burl\s*$|\bwebsite\s*$', re.I), 'url'),
+    (re.compile(r'\bjob\s*title\s*$|^\s*\*?\s*title\s*$', re.I), 'job'),
+    (re.compile(r'\b(company|organization)(\s*name)?\s*$|\baccount\s*name\s*$', re.I), 'company'),
+    (re.compile(r'\bdate\b|\bbirth', re.I), 'date'),
+    (re.compile(r'\bname\s*$', re.I), 'name'),
+]
+# a label that names a NUMBER, KEY, ID or CODE is not the thing before it (`Company D-U-N-S
+# Number` is not a company; `Data.com Key` is not data)
+_NOT_A_MEANING_RX = re.compile(r'\bnumber\b|\bno\.?\s*$|\bid\b|\bkey\b|\bcode\b|d-u-n-s', re.I)
+
+# Salesforce LocaleSidKey -> the strftime pattern a date INPUT renders and accepts in that locale.
+# en_US is MEASURED (fsc7f, the User record's LocaleSidKey, 2026-09-20; `10/8/2026` read back
+# equal to `10/08/2026` by `confirm.lenient_equal`). The rest are the Salesforce locale table's
+# short date formats and are UNMEASURED here -- a locale not in this table is COULD-NOT-CHECK,
+# never a default: a date typed in the wrong order is the quietest wrong answer there is.
+LOCALE_DATE_PATTERN = {
+    'en_US': '%m/%d/%Y',
+    'en_GB': '%d/%m/%Y', 'en_AU': '%d/%m/%Y', 'en_IE': '%d/%m/%Y', 'en_NZ': '%d/%m/%Y',
+    'en_IN': '%d/%m/%Y', 'en_CA': '%Y-%m-%d', 'en_ZA': '%Y/%m/%d',
+    'fr_FR': '%d/%m/%Y', 'fr_CA': '%Y-%m-%d', 'es_ES': '%d/%m/%Y', 'es_MX': '%d/%m/%Y',
+    'it_IT': '%d/%m/%Y', 'pt_BR': '%d/%m/%Y', 'pt_PT': '%d/%m/%Y',
+    'de_DE': '%d.%m.%Y', 'de_AT': '%d.%m.%Y', 'de_CH': '%d.%m.%Y',
+    'nl_NL': '%d-%m-%Y', 'da_DK': '%d-%m-%Y', 'sv_SE': '%Y-%m-%d', 'nb_NO': '%d.%m.%Y',
+    'fi_FI': '%d.%m.%Y', 'pl_PL': '%d.%m.%Y', 'ru_RU': '%d.%m.%Y',
+    'ja_JP': '%Y/%m/%d', 'zh_CN': '%Y/%m/%d', 'zh_TW': '%Y/%m/%d', 'ko_KR': '%Y.%m.%d',
+}
+ISO_PATTERN = '%Y-%m-%d'
+
+
+def date_pattern(locale, iso=False) -> tuple:
+    """(the strftime pattern, why) for a date the composed line will TYPE, or (None, why).
+
+    `iso` is the receiving keyword's own documented input (`Omni Date` takes `YYYY-MM-DD`) and
+    outranks the locale. Otherwise `locale` is `{'LocaleSidKey': ..., 'source': ...}` as
+    `build_override.py --locale` embeds it (the org user's User record, never the org map -- the
+    map carries field types, not the running user's locale). No locale is COULD-NOT-CHECK."""
+    if iso:
+        return ISO_PATTERN, "the receiving keyword's own input is YYYY-MM-DD"
+    if isinstance(locale, str):
+        locale = {'LocaleSidKey': locale, 'source': 'given as a string'}
+    key = str((locale or {}).get('LocaleSidKey') or '').strip()
+    if not key:
+        return None, ('COULD-NOT-CHECK: the org user\'s locale is unknown, so the date format a '
+                      'date input accepts is unknown -- build with --locale <LocaleSidKey> '
+                      '(SELECT LocaleSidKey FROM User WHERE Id = <the running user>) and the date '
+                      'is typed in that locale')
+    fmt = LOCALE_DATE_PATTERN.get(key)
+    if not fmt:
+        return None, ('COULD-NOT-CHECK: locale %r is not in LOCALE_DATE_PATTERN, so its date '
+                      'format is not known here -- add it with a measured read-back, never a guess'
+                      % key)
+    return fmt, 'typed in locale %s (%s: %s)' % (key, (locale or {}).get('source') or 'source not stated', fmt)
+
+
 # The ORG MAP's field type is what routes the keyword (CLAUDE.md: "Metadata routes the keyword, DOM
 # is the backstop"). Read off `<alias>.json` -> objects.<Obj>.inventory.fields.value.<f>.type, the
 # same projection `skeleton.py <alias>:<Object>` prints. A type with no row here has NO generator
-# and says so: a URL, a lookup reference, a checkbox and a base64 blob are not things a text
-# generator can invent a correct value for, and inventing one is the quiet-wrong-answer failure.
+# and says so: a lookup, a checkbox and a base64 blob are not things a generator can invent a
+# correct value for, and inventing one is the quiet-wrong-answer failure.
 SF_TYPE_GENERATOR = {
-    'email':           ('Gz Email', []),
-    'phone':           ('Gz Phone', []),
-    'date':            ('Gz Date', ['+30']),
-    'datetime':        ('Gz Date', ['+30']),
-    'picklist':        ('Gz Pick', []),
-    'multipicklist':   ('Gz Pick', []),
-    'combobox':        ('Gz Pick', []),
-    'int':             ('Gz Number', ['1', '100']),
-    'double':          ('Gz Number', ['1', '1000']),
-    'percent':         ('Gz Number', ['1', '100']),
-    'currency':        ('Gz Number', ['1000', '99000']),
-    'string':          ('Gz Unique Text', []),
-    'textarea':        ('Gz Unique Text', []),
-    'encryptedstring': ('Gz Unique Text', []),
+    'email': 'email', 'phone': 'phone', 'url': 'url',
+    'date': 'date', 'datetime': 'date',
+    'picklist': 'pick', 'multipicklist': 'pick', 'combobox': 'pick',
+    'int': 'number', 'double': 'number', 'percent': 'number', 'currency': 'number',
+    'string': 'text', 'textarea': 'text', 'encryptedstring': 'text',
 }
+NUMBER_BOUNDS = {'int': (1, 100), 'double': (1, 1000), 'percent': (1, 100),
+                 'currency': (1000, 99000), 'number': (1, 100)}
 SF_TYPE_NO_GENERATOR = {
-    'url': 'a URL field: no generator invents a URL that resolves',
     'reference': 'a lookup: its value must name a record that EXISTS, which no generator knows',
     'boolean': 'a checkbox is clicked, never typed into',
     'address': 'a compound control (one DB value, several inputs) -- dedicated keywords, BACKLOG 80',
     'base64': 'a file blob, not a typed value',
     'id': 'a record id is not generated data',
-    'time': 'NOT YET IMPLEMENTED: there is no Gz Time keyword in resources/garzai_data.robot',
+    'time': 'NOT YET IMPLEMENTED: no time provider is routed',
     'anytype': 'the type is literally `anytype`: there is nothing to route on',
 }
 
 # The BACKSTOP, for a label the org map does not carry: the control's own input type, then its
 # parser family. Always named in the `why`, so a reader can tell which door answered.
 DOM_TYPE_GENERATOR = {
-    'email': ('Gz Email', []),
-    'tel': ('Gz Phone', []),
-    'number': ('Gz Number', ['1', '100']),
-    'date': ('Gz Date', ['+30']),
-    'datetime-local': ('Gz Date', ['+30']),
-    'text': ('Gz Unique Text', []),
-    'search': ('Gz Unique Text', []),
+    'email': 'email', 'tel': 'phone', 'url': 'url', 'number': 'number',
+    'date': 'date', 'datetime-local': 'date', 'text': 'text', 'search': 'text',
 }
-# F146-2 (F146-1/-2): the describer's `familyOf()` (descriptor.py) NEVER returns 'picklist',
-# 'combobox', 'date', 'datetime', 'number', 'email', 'textarea' or 'search' -- it collapses every
-# <input> (including <textarea> and a `role=searchbox`) to 'input_field', and everything OmniStudio
-# renders as a custom element falls to its own `return tag` fallback (the RAW tag name, e.g.
-# `runtime_omnistudio_common-combobox`, never the word 'combobox'). Those eight rows were therefore
-# dead on the live path -- a reachability audit (`test_probe1_CAUGHT_BUG_eight_of_nine_...`, now
-# flipped to require it) greps this table's keys against `familyOf`'s own literal `return '...'`
-# strings and the raw-tag families a live capture actually carries, and fails on any key neither
-# names. Rather than guess at more literals `familyOf` might one day emit, the dead rows are
-# DELETED: the receiving-keyword/host door (`generator_door`) and the DOM `type` attribute
-# (`DOM_TYPE_GENERATOR`) already cover date/combobox/email/number, so nothing here regresses.
+# F146-2: the describer's `familyOf()` returns exactly button / checkbox / dropdown / input_field /
+# radio or a raw tag name -- never 'date', 'email', 'picklist' -- so this table carries only the
+# one row the live path can reach (`test_family_generator_and_family_no_generator_are_fully_reachable_live`).
 FAMILY_GENERATOR = {
-    'input_field': ('Gz Unique Text', []),
+    'input_field': 'text',
 }
 FAMILY_NO_GENERATOR = {
     'checkbox': 'a checkbox is clicked, never typed into',
@@ -934,24 +1355,38 @@ FAMILY_NO_GENERATOR = {
 }
 
 
-def field_meta(label, fields) -> tuple:
+def field_meta(label, fields, name=None) -> tuple:
     """(the org-map field entry, why) for a rendered LABEL, or (None, why).
 
     `fields` is the table `build_override.py --fields <alias>:<Object>` embeds: one entry per
     field, keyed by its rendered label AND by its API name, each carrying `type`, `object`,
     `name`, `length` and `picklist_values`. A label the table does not carry is a plain
-    could-not-check -- the descriptor door answers instead, and the `why` says so."""
+    could-not-check -- the descriptor door answers instead, and the `why` says so.
+
+    `name` is the input's own `name=` HTML attribute (the descriptor's `name` field), tried ONLY
+    after the label misses (F194's walk on fsc7f, error entry `47a40e6e97`): the frozen map labels
+    `NumberOfEmployees` as `Employees` while the live form renders `No. of Employees`, so the label
+    door misses even though `FIELDS` is keyed by API name too and the input itself carries
+    `name="NumberOfEmployees"`. Rendered labels drift from the map far more than API names do, so
+    the label is still tried FIRST and this is a fallback, not a replacement."""
     if not fields:
         return None, 'no org-map field table was embedded in this build'
     lab = omni_label(label)
-    if not lab:
-        return None, 'the control has no label to look up'
-    for key in (lab, lab.casefold()):
-        hit = fields.get(key)
+    if lab:
+        for key in (lab, lab.casefold()):
+            hit = fields.get(key)
+            if hit:
+                return hit, 'org-map field %s.%s (type %r)' % (hit.get('object'), hit.get('name'),
+                                                               hit.get('type'))
+    if name:
+        hit = fields.get(str(name))
         if hit:
-            return hit, 'org-map field %s.%s (type %r)' % (hit.get('object'), hit.get('name'),
-                                                           hit.get('type'))
-    return None, 'no org-map field is labelled %r in the embedded table' % lab
+            return hit, ('org-map field %s.%s (type %r), found by the input name= (the label %r '
+                         'is not the map\'s label for it)'
+                         % (hit.get('object'), hit.get('name'), hit.get('type'), lab))
+    if not lab:
+        return None, 'the control has no label and no name= to look up'
+    return None, 'no org-map field is labelled %r (or named %r) in the embedded table' % (lab, name)
 
 
 def _pick_cells(label, options) -> tuple:
@@ -972,20 +1407,114 @@ def _pick_cells(label, options) -> tuple:
 
 
 def _datetime_note(meta) -> str:
-    """The disclosure a `datetime` field's metadata carries wherever `Gz Date` is chosen for it --
-    F146-6 (F146-6): it used to appear only on the `asdf` (auto/metadata) path and vanish on the
-    explicit `@@date+N` and receiving-keyword/host doors, which compose the byte-identical value
-    with no sign only half the field is generated."""
+    """The disclosure a `datetime` field's metadata carries wherever a date is generated for it
+    (F146-6): the DATE half only, on every door that composes one."""
     if meta and str(meta.get('type') or '').casefold() == 'datetime':
         return (' -- the DATE half only: the time half is not generated here (a datetime is a '
                 'compound control; routing it is BACKLOG 80)')
     return ''
 
 
-def generator_door(kind, receiving, lab, desc=None, options=None, meta=None) -> tuple:
+def _length_of(meta):
+    try:
+        n = int((meta or {}).get('length') or 0)
+    except (TypeError, ValueError):
+        n = 0
+    return n if n > 0 else None
+
+
+def label_meaning(label) -> tuple:
+    """(meaning, why) from the rendered label alone, or (None, why)."""
+    lab = omni_label(label)
+    if not lab:
+        return None, 'no label'
+    excluded = bool(_NOT_A_MEANING_RX.search(lab))
+    for rx, cls in LABEL_MEANING:
+        if rx.search(lab):
+            if excluded and cls in ('company', 'name', 'job', 'date'):
+                return None, ('label %r names a number/key/id/code, not a %s' % (lab, cls))
+            return cls, 'label %r reads as %s' % (lab, cls)
+    return None, 'label %r has no provider meaning' % lab
+
+
+def _lorem_cells(length) -> tuple:
+    """A bounded lorem value for a text field nothing routes: `Word` when the field is 15-23 wide
+    or its width is unknown, `Text max_nb_chars=<n>` (capped at 200) from 24 up, and an exact
+    `Lexify` below 15 -- so the browser never truncates a generated value silently (F146-10)."""
+    if length is None:
+        return ['%s.Word' % FAKER_LIB], 'one Word (no length known)'
+    if length >= 24:
+        n = min(length, 200)
+        return ['%s.Text' % FAKER_LIB, 'max_nb_chars=%d' % n], 'Text bounded to %d of %d' % (n, length)
+    if length >= 15:
+        return ['%s.Word' % FAKER_LIB], 'one Word (fits %d)' % length
+    n = min(length, 8)
+    return ['%s.Lexify' % FAKER_LIB, 'text=%s' % ('?' * n)], 'Lexify of %d letters (length %d)' % (n, length)
+
+
+def faker_cells(cls, label=None, meta=None, iso=False, locale=None, meaning=None) -> tuple:
+    """(the FakerLibrary cells, why) for one generator CLASS -- a provider meaning ('first',
+    'company', ...), 'number', 'date', 'text', 'pick' -- or (None, why)."""
+    t = str((meta or {}).get('type') or '').casefold()
+    length = _length_of(meta)
+    if cls == 'pick':
+        cells, why = _pick_cells(label, (meta or {}).get('picklist_values'))
+        return cells, why
+    if cls == 'number':
+        lo, hi = NUMBER_BOUNDS.get(t, NUMBER_BOUNDS['number'])
+        # bounded by the field when the map knows its digits and the default would not fit
+        if length and length < len(str(hi)):
+            hi = 10 ** length - 1
+        return (['%s.Random Int' % FAKER_LIB, 'min=%d' % lo, 'max=%d' % hi],
+                'a whole number in [%d, %d]' % (lo, hi))
+    if cls == 'date':
+        fmt, why = date_pattern(locale, iso=iso)
+        if not fmt:
+            return None, why
+        return ['%s.Date' % FAKER_LIB, 'pattern=%s' % fmt], 'a date %s%s' % (why, _datetime_note(meta))
+    if cls == 'text':
+        m, m_why = (meaning, 'meaning given') if meaning else label_meaning(label)
+        if m and m in FAKER_PROVIDERS:
+            kw, extra, width = FAKER_PROVIDERS[m]
+            if m == 'date':
+                return faker_cells('date', label, meta, iso, locale)
+            if length and length < width:
+                cells, lw = _lorem_cells(length)
+                return cells, ('%s, but the org map says length %d and %s.%s is up to ~%d wide: %s'
+                               % (m_why, length, FAKER_LIB, kw, width, lw))
+            return ['%s.%s' % (FAKER_LIB, kw)] + list(extra), m_why
+        cells, lw = _lorem_cells(length)
+        return cells, '%s: %s' % (m_why, lw)
+    if cls in FAKER_PROVIDERS:
+        kw, extra, width = FAKER_PROVIDERS[cls]
+        if cls == 'date':
+            return faker_cells('date', label, meta, iso, locale)
+        if length and length < width:
+            cells, lw = _lorem_cells(length)
+            return cells, ('%s.%s is up to ~%d wide and the org map says length %d: %s'
+                           % (FAKER_LIB, kw, width, length, lw))
+        return ['%s.%s' % (FAKER_LIB, kw)] + list(extra), '%s.%s' % (FAKER_LIB, kw)
+    return None, 'no generator class %r' % cls
+
+
+def provider_cells(keyword, label=None, meta=None, iso=False, locale=None) -> tuple:
+    """(cells, why) for an EXPLICIT `@@<provider>` override. `Date` is typed in the locale (ISO
+    for an ISO keyword); `Random Int` and `Text` take the same bounds the auto route would."""
+    kw = provider_keyword(keyword)
+    if kw == 'Date':
+        return faker_cells('date', label, meta, iso, locale)
+    if kw == 'Random Int':
+        return faker_cells('number', label, meta, iso, locale)
+    if kw == 'Text':
+        n = min(_length_of(meta) or 200, 200)
+        return ['%s.Text' % FAKER_LIB, 'max_nb_chars=%d' % n], 'Text bounded to %d' % n
+    return ['%s.%s' % (FAKER_LIB, kw)], '%s.%s' % (FAKER_LIB, kw)
+
+
+def generator_door(kind, receiving, lab, desc=None, options=None, meta=None, locale=None) -> tuple:
     """(cells, why) when the RECEIVING KEYWORD or a descriptor HOST fact names the generator before
     metadata or the DOM type get a vote, or (None, None) to let the caller fall through to
-    `generator_call`'s metadata / DOM-type / family ladder (F146-1, the root defect).
+    `generator_call`'s meaning / metadata / DOM-type / family ladder (F146-1, the root defect).
 
     `Omni Date` / `Omni Select` are OmniStudio's own compound keywords, and a date-picker or
     combobox HOST -- named by the element's own xpath, `_OMNI_DATE_PICKER` / `_OMNI_COMBOBOX` --
@@ -993,10 +1522,9 @@ def generator_door(kind, receiving, lab, desc=None, options=None, meta=None) -> 
     already knows the widget). Both outrank a bare `type="text"`, which Lightning and OmniStudio
     render for a date picker, a combobox and a lookup alike.
 
-    `(None, None)` means neither the keyword nor the host has an opinion -- the caller falls
-    through to metadata, then the DOM type, then the family. `(None, why)` means the door DOES
-    apply but has nothing usable (e.g. `Omni Select` with no known options) -- that IS the answer,
-    a disclosed COULD-NOT-CHECK, never a fallthrough to a worse guess."""
+    `(None, None)` means neither the keyword nor the host has an opinion. `(None, why)` means the
+    door DOES apply but has nothing usable (e.g. `Omni Select` with no known options) -- that IS
+    the answer, a disclosed COULD-NOT-CHECK, never a fallthrough to a worse guess."""
     if kind != 'auto':
         return None, None
     d = desc or {}
@@ -1004,7 +1532,8 @@ def generator_door(kind, receiving, lab, desc=None, options=None, meta=None) -> 
     if receiving == 'Omni Date' or _OMNI_DATE_PICKER in blob:
         src = ("the receiving keyword 'Omni Date'" if receiving == 'Omni Date'
                else "the descriptor's own element path is inside a %r host" % _OMNI_DATE_PICKER)
-        return ['Gz Date', '+30', '--iso'], '%s: names a date%s' % (src, _datetime_note(meta))
+        cells, why = faker_cells('date', lab, meta, iso=True, locale=locale)
+        return cells, '%s: names a date -- %s' % (src, why)
     if receiving == 'Omni Select' or _OMNI_COMBOBOX in blob:
         src = ("the receiving keyword 'Omni Select'" if receiving == 'Omni Select'
                else "the descriptor's own element path is inside a %r host" % _OMNI_COMBOBOX)
@@ -1014,98 +1543,64 @@ def generator_door(kind, receiving, lab, desc=None, options=None, meta=None) -> 
 
 
 def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=False,
-                   receiving='') -> tuple:
+                   receiving='', locale=None) -> tuple:
     """(the generator call as Robot CELLS, why) for one sentinel, or (None, why).
 
-    `iso=True` asks `Gz Date` for `YYYY-MM-DD`, which is what `Omni Date` takes. `receiving` is the
-    keyword that will actually run with this value (`Omni Date`, `Omni Select`, a plain `TypeText`,
-    ...) -- see `generator_door`, which this consults FIRST, ahead of metadata."""
+    `iso=True` asks for `YYYY-MM-DD`, which is what `Omni Date` takes. `receiving` is the keyword
+    that will actually run with this value (`Omni Date`, `Omni Select`, a plain `TypeText`, ...)
+    -- see `generator_door`, which this consults FIRST. `locale` is the org user's locale as the
+    build embeds it (`build_override.py --locale`), the only thing that can say how a date is
+    typed."""
     lab = omni_label(label)
     args = list(args or [])
-    # F146-7 (F146-7): the EXPLICIT `@@` grammar overriding the metadata type is deliberate and
-    # tested (`@@text 40` in an email field) -- but it used to override `SF_TYPE_NO_GENERATOR` too,
-    # the table whose entire purpose is to say a type has NO honest generator, silently: `@@unique`
-    # in a lookup composed a run-stamped string with no sign the type had ever been consulted. The
-    # override still wins (the person asked explicitly), but the refusal reason is now quoted.
     _override_note = ''
     if kind not in ('auto', None) and meta and meta.get('type'):
         _t = str(meta.get('type')).casefold()
         if _t in SF_TYPE_NO_GENERATOR:
             _override_note = ('; the metadata type %r has no generator -- %s -- overridden by the '
                               'explicit sentinel' % (_t, SF_TYPE_NO_GENERATOR[_t]))
+        else:
+            _override_note = ('; the metadata type %r was not consulted: the explicit sentinel '
+                              'names the provider' % _t)
 
-    def _explicit(cells, why):
-        return cells, why + _override_note
-
-    if kind == 'email':
-        return _explicit(['Gz Email'], 'the sentinel names the generator')
-    if kind == 'phone':
-        return _explicit(['Gz Phone'], 'the sentinel names the generator')
-    if kind == 'unique':
-        return _explicit(['Gz Unique Text', (args[0] if args and args[0] else lab) or 'GZ'],
-                         'the sentinel names the generator')
-    if kind == 'text':
-        return _explicit(['Gz Text', args[0]], 'the sentinel names the generator')
-    if kind == 'int':
-        return _explicit(['Gz Number', args[0], args[1]], 'the sentinel names the generator')
-    if kind == 'date':
-        cells = ['Gz Date', args[0] if args else '+30'] + (['--iso'] if iso else [])
-        return _explicit(cells, 'the sentinel names the generator' + _datetime_note(meta))
+    if kind == 'provider':
+        cells, why = provider_cells(args[0] if args else '', lab, meta, iso=iso, locale=locale)
+        return cells, ('the sentinel names the provider: %s' % why) + _override_note
     if kind == 'pick':
         opts = options or (meta or {}).get('picklist_values')
         cells, why = _pick_cells(lab, opts)
-        # F143-5b (F146-5): "no usable option is known" reads the same whether the listbox was
-        # simply closed or the field is not a picklist AT ALL -- the org map already knows which,
-        # and used to quote the type without ever joining the two facts.
+        # F146-5: "no usable option is known" reads the same whether the listbox was simply
+        # closed or the field is not a picklist AT ALL -- the org map knows which; join the facts.
         if not cells and meta and meta.get('type'):
             t = str(meta.get('type')).casefold()
             if t not in ('picklist', 'multipicklist', 'combobox'):
                 why += ' -- %s.%s is type %r, not a picklist: no option was ever going to exist' \
                     % (meta.get('object'), meta.get('name'), t)
-        return _explicit(cells, why)
+        return cells, why + _override_note
     if kind != 'auto':
         return None, 'unknown sentinel kind %r' % kind
 
     # THE RECEIVING KEYWORD / HOST DOOR ANSWERS FIRST (F146-1), before metadata or the DOM type get
     # a vote: it is the one door a generic `type="text"` cannot fool.
-    door_cells, door_why = generator_door(kind, receiving, lab, desc=desc, options=options, meta=meta)
+    door_cells, door_why = generator_door(kind, receiving, lab, desc=desc, options=options,
+                                          meta=meta, locale=locale)
     if door_why is not None:
         return door_cells, door_why
 
-    # `asdf`: the METADATA type routes it, the descriptor is the backstop.
+    # `asdf`: the METADATA type routes it -- a picklist, a number and a date by type; a text-ish
+    # type by the label's MEANING, then a bounded lorem value -- and the descriptor is the backstop.
     if meta and meta.get('type'):
         t = str(meta.get('type')).casefold()
+        where = 'metadata type %r on %s.%s' % (t, meta.get('object'), meta.get('name'))
         if t in ('picklist', 'multipicklist', 'combobox'):
             cells, why = _pick_cells(lab, options or meta.get('picklist_values'))
-            return cells, ('metadata type %r on %s.%s: %s'
-                           % (t, meta.get('object'), meta.get('name'), why))
-        if t in SF_TYPE_GENERATOR:
-            kw, a = SF_TYPE_GENERATOR[t]
-            cells = ['Gz Unique Text', lab or 'GZ'] if kw == 'Gz Unique Text' else [kw] + list(a)
-            if kw == 'Gz Date' and iso:
-                cells = cells + ['--iso']
-            length_why = ''
-            # F146-10: the org map's `length` sits on every embedded field entry and used to be
-            # dropped on the floor -- a `string` field of length 10 composed the identical call as
-            # one of length 80, so a short Salesforce text field truncates the value (and the run
-            # stamp inside it) BY THE BROWSER, with no console line at all. `Gz Unique Text` takes
-            # `max_length` as its own second argument; compose it whenever the map knows the length.
-            if kw == 'Gz Unique Text' and meta.get('length'):
-                try:
-                    n = int(meta['length'])
-                except (TypeError, ValueError):
-                    n = 0
-                if n > 0:
-                    cells = cells + [str(n)]
-                    length_why = ' (max_length %d from the org map)' % n
-            why = 'metadata type %r on %s.%s%s' % (t, meta.get('object'), meta.get('name'), length_why)
-            if t == 'datetime':
-                why += (' -- the DATE half only: the time half is not generated here (a datetime '
-                        'is a compound control; routing it is BACKLOG 80)')
-            return cells, why
-        return None, ('COULD-NOT-CHECK: metadata type %r on %s.%s has no generator -- %s'
-                      % (t, meta.get('object'), meta.get('name'),
-                         SF_TYPE_NO_GENERATOR.get(t, 'no rule in SF_TYPE_GENERATOR names it')))
+            return cells, '%s: %s' % (where, why)
+        cls = SF_TYPE_GENERATOR.get(t)
+        if cls is None:
+            return None, ('COULD-NOT-CHECK: %s has no generator -- %s'
+                          % (where, SF_TYPE_NO_GENERATOR.get(t, 'no rule in SF_TYPE_GENERATOR names it')))
+        cells, why = faker_cells(cls, lab, meta, iso=iso, locale=locale)
+        return cells, '%s: %s' % (where, why)
 
     d = desc or {}
     fam = str(d.get('family') or '').casefold()
@@ -1114,24 +1609,19 @@ def generator_call(kind, args, label, meta=None, desc=None, options=None, iso=Fa
                       'no generator -- %s' % (lab, fam, FAMILY_NO_GENERATOR[fam]))
     etype = str(d.get('type') or d.get('etype') or '').casefold()
     if etype in DOM_TYPE_GENERATOR:
-        kw, a = DOM_TYPE_GENERATOR[etype]
-        cells = ['Gz Unique Text', lab or 'GZ'] if kw == 'Gz Unique Text' else [kw] + list(a)
-        if kw == 'Gz Date' and iso:
-            cells = cells + ['--iso']
-        return cells, 'no org-map field for %r: the descriptor\'s input type %r' % (lab, etype)
+        cells, why = faker_cells(DOM_TYPE_GENERATOR[etype], lab, None, iso=iso, locale=locale)
+        return cells, ('no org-map field for %r: the descriptor\'s input type %r -- %s'
+                       % (lab, etype, why))
     if fam in ('picklist', 'combobox'):
         cells, why = _pick_cells(lab, options)
         return cells, ('no org-map field for %r: the descriptor\'s family %r -- %s'
                        % (lab, fam, why))
     if fam in FAMILY_GENERATOR:
-        kw, a = FAMILY_GENERATOR[fam]
-        cells = ['Gz Unique Text', lab or 'GZ'] if kw == 'Gz Unique Text' else [kw] + list(a)
-        if kw == 'Gz Date' and iso:
-            cells = cells + ['--iso']
-        return cells, 'no org-map field for %r: the descriptor\'s family %r' % (lab, fam)
+        cells, why = faker_cells(FAMILY_GENERATOR[fam], lab, None, iso=iso, locale=locale)
+        return cells, ('no org-map field for %r: the descriptor\'s family %r -- %s'
+                       % (lab, fam, why))
     return None, ('COULD-NOT-CHECK: no org-map field for %r and neither the input type %r nor the '
                   'family %r names a generator' % (lab, etype, fam))
-
 
 # ----------------------------------------------------------------------------- the variable line
 def variable_name(label, taken=None, prefix=None) -> str:
@@ -1180,7 +1670,7 @@ def replace_value_cell(line, new_value) -> str:
 
 
 def variable_line(var, cells, indent='    ') -> str:
-    """`    ${lead_last_name}=    Gz Unique Text    Last Name`"""
+    """`    ${lead_last_name}=    FakerLibrary.Last Name`"""
     return '%s${%s}=    %s' % (indent, var, '    '.join(str(c) for c in cells))
 
 
@@ -1216,12 +1706,14 @@ def dormant_generate_pair(var_line, action_line, indent='    ') -> list:
 
 
 def generated_data_lines(composed, label=None, fields=None, desc=None, options=None,
-                         taken=None, indent='    ', prefix=None) -> tuple:
+                         taken=None, indent='    ', prefix=None, locale=None) -> tuple:
     """(the variable line, the rewritten fill line, why) for a composed line whose VALUE is a
     SENTINEL, or ('', composed, why) when it is not one or no generator fits.
 
     This runs LAST, after the OmniStudio routing, so an `asdf` typed into an OmniStudio masked
-    input becomes `Omni Type    <key>    ${phone_number}` and not a TypeText the widget ignores."""
+    input becomes `Omni Type    <key>    ${phone_number}` and not a TypeText the widget ignores.
+    `locale` is the org user's locale the build embeds (`build_override.py --locale`); a date
+    with none is a disclosed COULD-NOT-CHECK, never a default format."""
     if not isinstance(composed, str) or not composed.strip():
         return '', composed, 'nothing composed'
     value = value_cell(composed)
@@ -1232,17 +1724,17 @@ def generated_data_lines(composed, label=None, fields=None, desc=None, options=N
         return '', composed, why
     cells0 = _cells(composed)
     lab = omni_label(label or (cells0[1] if len(cells0) > 1 else ''))
-    meta, meta_why = field_meta(lab, fields)
-    # THE DATE FORMAT IS DECIDED BY THE KEYWORD THAT WILL RECEIVE IT, and by nothing else.
-    # `Omni Date` documents `YYYY-MM-DD`, so it gets `--iso`. A plain `TypeText` into a rendered
-    # date input gets `Gz Date`'s default `MM/DD/YYYY`, which is what a Salesforce date input
-    # renders in a US locale -- and that is a DEFAULT, not a fact read from the org map: the map
-    # carries field types, not the running user's locale, so a non-US org needs `--iso` or its own
-    # format on the line. Said here rather than implied.
+    dname = desc.get('name') if isinstance(desc, dict) else None
+    meta, meta_why = field_meta(lab, fields, name=dname)
+    # THE DATE FORMAT IS DECIDED BY THE KEYWORD THAT WILL RECEIVE IT, then by the org user's
+    # LOCALE. `Omni Date` documents `YYYY-MM-DD`, so it gets ISO. A plain `TypeText` into a
+    # rendered date input gets the locale's own pattern (D19: a date is TYPED in the org user's
+    # locale) -- read from the build's `--locale`, never from the org map, which carries field
+    # types and not the running user's locale; no locale is COULD-NOT-CHECK, never a US default.
     receiving = cells0[0] if cells0 else ''
     iso = receiving == 'Omni Date'
     cells, gen_why = generator_call(kind, args, lab, meta=meta, desc=desc, options=options,
-                                    iso=iso, receiving=receiving)
+                                    iso=iso, receiving=receiving, locale=locale)
     if not cells:
         full_why = '%s, but %s (%s)' % (why, gen_why, meta_why)
         marked = composed
@@ -1299,41 +1791,26 @@ def generated_pick_lines(label, option, options, taken=None, indent='    ', pref
             'Alt-click on the option: any valid value here -- %s' % why)
 
 
-def date_offset_days(iso, today=None) -> tuple:
-    """(the offset from TODAY in `+N`/`-N` form, why) for an ISO date, or (None, why).
-
-    Computed at COMPOSE time, which is the only moment `today` and the picked day are both known:
-    the pane then keeps the OFFSET, so the same recording picks a date the same distance away on
-    every later run instead of one that has drifted into the past."""
-    m = _ISO_RX.match(str(iso or ''))
-    if not m:
-        return None, 'not an ISO date: %r' % iso
-    import datetime as _dt
-    picked = _dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-    base = today or _dt.date.today()
-    n = (picked - base).days
-    return ('%+d' % n), ('%s is %+d days from %s (computed at compose time)' % (iso, n, base))
-
-
-def generated_date_lines(label, omni_key, iso, today=None, taken=None, indent='    ',
-                         prefix=None) -> tuple:
+def generated_date_lines(label, omni_key, iso, taken=None, indent='    ', prefix=None) -> tuple:
     """(the variable line, the `Omni Date` line, the dormant literal backup, why) for an
-    ALT-CLICKED calendar day, or ('', '', '', why)."""
+    ALT-CLICKED calendar day, or ('', '', '', why).
+
+    Build n10: the value is `FakerLibrary.Date    pattern=%Y-%m-%d` -- `Omni Date`'s own documented
+    input -- and the literal day that was clicked survives as the dormant backup. The offset
+    grammar (`+N` days from today) left with `@@date+N` (the user, 2026-09-20)."""
     key = str(omni_key or '').strip()
     if not key:
         return '', '', '', 'the element carries no data-omni-key: Omni Date has nothing to resolve'
-    off, why = date_offset_days(iso, today)
-    if off is None:
-        return '', '', '', why
+    if not _ISO_RX.match(str(iso or '')):
+        return '', '', '', 'not an ISO date: %r' % iso
     lab = omni_label(label) or key
     var = variable_name(lab, taken, prefix=prefix)
     literal = RT._rf('Omni Date', key, iso).strip()
-    return (variable_line(var, ['Gz Date', off, '--iso'], indent),
+    cells, why = faker_cells('date', lab, None, iso=True)
+    return (variable_line(var, cells, indent),
             '%s%s    %s' % (indent, RT._rf('Omni Date', key, '${%s}' % var).strip(), UNVERIFIED),
             '%s#   backup: %s   (the literal date that was recorded, unverified)' % (indent, literal),
             'Alt-click on the day: any valid date here -- %s' % why)
-
-
 def xpath_form(row: dict, body: str) -> str | None:
     """The same step in xpath form, from the ladder's xpath (review_table's own convention: a
     click of any flavour becomes ClickElement; TypeText and DropDown keep their keyword)."""
@@ -1352,28 +1829,271 @@ def xpath_form(row: dict, body: str) -> str | None:
     return None
 
 
-def compose_for_row(row: dict, rendered: str, form: str = 'keyword') -> dict:
-    """The line for ONE matched row. Split out so the pure and the live layers compose identically."""
+def _compose_body(row: dict, rendered: str) -> tuple:
+    """(body, xp_body, disambiguation) for ONE matched row -- the pure half shared by the offline
+    and the driver layers. `body` is None (let the recorder's line stand), '' (record nothing) or
+    the proposed keyword-form step; `xp_body` its xpath form; `disambiguation` the parser's
+    DESCRIPTION of the control's repeats, with no call argument derived from it."""
     entry = None
     try:
         entry = RT._pattern_entry(row)     # a library entry whose recipe is one to RUN
     except Exception:
         entry = None
     body = _body(row, rendered, entry)
+    n_stripped = None
+    if body:
+        body, n_stripped = strip_numeric_anchor(body)
     xp_body = xpath_form(row, body) if body else None
+    dis = {'index': _described_index(row) or n_stripped, 'group_size': row.get('group_size'),
+           'anchor_candidates': list(row.get('anchor_candidates') or []),
+           'decision': 'described-only', 'anchor': None, 'live_count': None, 'scope': None,
+           'why': 'the parser index is a capture count; no anchor is derived from it (F189)'}
+    return body, xp_body, dis
+
+
+def _render_row(row: dict, rendered: str, form: str, body, xp_body, dis: dict,
+                dormant_label: str | None = None) -> dict:
     if body is None:
-        return {'line': None, 'xpath_line': xp_body, 'why': 'no proposal for this action on this control'}
+        return {'line': None, 'xpath_line': xp_body, 'why': 'no proposal for this action on this control',
+                'disambiguation': dis}
     if body == '':
-        return {'line': '', 'xpath_line': None, 'why': 'recorder noise on an input (focus click / tab-out); nothing recorded'}
+        return {'line': '', 'xpath_line': None, 'why': 'recorder noise on an input (focus click / tab-out); nothing recorded',
+                'disambiguation': dis}
     ind = _indent(rendered)
     chosen = body
     if form == 'xpath' and xp_body:
         chosen = xp_body
     elif form == 'both' and xp_body and xp_body != body:
         chosen = body + '    # xpath form: ' + xp_body
+    why = 'parser proposal for row %s' % row.get('n')
+    decision = dis.get('decision')
+    if decision in ('text-anchor', 'xpath-live') or 'COULD-NOT' in (dis.get('why') or ''):
+        why += '; live disambiguation: %s' % dis.get('why')
     return {'line': '%s%s    %s' % (ind, chosen.strip(), UNVERIFIED),
             'xpath_line': ('%s%s    %s' % (ind, xp_body.strip(), UNVERIFIED)) if xp_body else None,
-            'why': 'parser proposal for row %s' % row.get('n')}
+            'dormant_label_line': ('%s%s' % (ind, dormant_label.strip())) if dormant_label else None,
+            'why': why, 'disambiguation': dis}
+
+
+def compose_for_row(row: dict, rendered: str, form: str = 'keyword') -> dict:
+    """The line for ONE matched row, offline: no driver, so no live census -- the label form is
+    bare and `disambiguation` says what the capture counted."""
+    body, xp_body, dis = _compose_body(row, rendered)
+    return _render_row(row, rendered, form, body, xp_body, dis)
+
+
+# ----------------------------------------------------------------------------- live disambiguation (F189)
+# The census the DRIVER layer takes before a label-form line is recorded. One execute_script, run
+# against the page the person is on, scoped to the open modal when the element they touched sits
+# in one (what QForce's `UseModal On` scopes to), else the whole page. It answers:
+#   count         visible, enabled controls (fill kind) or deepest text matches (text kind) whose
+#                 label/text equals the composed label, in that scope
+#   target_index  which of them is (or contains, or is inside) the element the person touched
+#   anchors       for each ladder candidate: how many times its text occurs live in the scope,
+#                 and whether the target is the NEAREST label match to it (centre Manhattan
+#                 distance -- a PROXY for QWeb's overlap-then-distance scorer, disclosed as such)
+# Everything walks the real DOM through document.evaluate (xpath pierces Lightning's synthetic
+# shadow; querySelectorAll and textContent do not -- CLAUDE.md) and climbs shadow hosts by hand,
+# because `parentElement`/`closest` stop at the synthetic boundary (measured 2026-09-19, the walk
+# shim). A native CLOSED shadow root is unreachable and reads as count 0 -> COULD-NOT-CHECK.
+_CENSUS_JS = r"""
+/* __gzCensus (F189) */
+var tgt = arguments[0], label = arguments[1], kind = arguments[2], cands = arguments[3] || [];
+function norm(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').replace(/^\*\s*/, '').replace(/\s*\*$/, '').trim(); }
+function up(el){
+  var p = el.parentNode;
+  if (p && p.nodeType === 1) return p;
+  if (p && p.host) return p.host;
+  var r = el.getRootNode && el.getRootNode();
+  return (r && r.host) ? r.host : null;
+}
+function xp(expr, ctx){
+  var out = [];
+  try { var r = document.evaluate(expr, ctx, null, 7, null); for (var i = 0; i < r.snapshotLength; i++) out.push(r.snapshotItem(i)); } catch (e) {}
+  return out;
+}
+function sval(el){ try { return document.evaluate('normalize-space(.)', el, null, 2, null).stringValue; } catch (e) { return String(el.textContent || ''); } }
+function lit(s){
+  if (s.indexOf('"') < 0) return '"' + s + '"';
+  if (s.indexOf("'") < 0) return "'" + s + "'";
+  return 'concat("' + s.split('"').join('", \'"\', "') + '")';
+}
+function visible(el){
+  try {
+    if (el.hidden) return false;
+    var r = el.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return false;
+    var cs = window.getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none') return false;
+    return true;
+  } catch (e) { return true; }
+}
+function enabled(el){ return !el.disabled && el.getAttribute('aria-disabled') !== 'true'; }
+function scopeOf(el){
+  var cur = el, g = 0;
+  while (cur && cur.nodeType === 1 && g++ < 300) {
+    var role = cur.getAttribute('role'), cls = cur.getAttribute('class') || '';
+    if (role === 'dialog' || role === 'alertdialog' || /(^|\s)slds-modal(\s|$)/.test(cls) || /(^|\s)uiModal(\s|$)/.test(cls)) return {node: cur, kind: 'modal'};
+    cur = up(cur);
+  }
+  return {node: document, kind: 'page'};
+}
+function byId(id){ var e = xp('//*[@id=' + lit(id) + ']', document); return e.length ? e[0] : null; }
+function labelsOf(el){
+  var out = [];
+  var id = el.getAttribute('id');
+  if (id) xp('//label[@for=' + lit(id) + ']', document).forEach(function (l) { out.push(sval(l)); });
+  var al = el.getAttribute('aria-label'); if (al) out.push(al);
+  var lb = el.getAttribute('aria-labelledby');
+  if (lb) lb.split(/\s+/).forEach(function (i) { var e = byId(i); if (e) out.push(sval(e)); });
+  var ph = el.getAttribute('placeholder'); if (ph) out.push(ph);
+  var cur = up(el), g = 0;
+  while (cur && cur.nodeType === 1 && g++ < 4) { if (cur.tagName.toLowerCase() === 'label') { out.push(sval(cur)); break; } cur = up(cur); }
+  return out.map(norm);
+}
+var L = norm(label);
+var sc = scopeOf(tgt), ctx = sc.node;
+var matches = [];
+if (kind === 'fill') {
+  xp('.//input[not(@type="hidden")] | .//textarea | .//select | .//*[@role="combobox"] | .//*[@role="textbox"] | .//*[@contenteditable="true"]', ctx)
+    .forEach(function (c) { if (visible(c) && enabled(c) && labelsOf(c).indexOf(L) >= 0) matches.push(c); });
+} else {
+  xp('.//text()[normalize-space(.)=' + lit(L) + ']/..', ctx).forEach(function (e) { if (visible(e) && matches.indexOf(e) < 0) matches.push(e); });
+}
+function isTgt(m){ return m === tgt || (m.contains && m.contains(tgt)) || (tgt.contains && tgt.contains(m)); }
+var ti = -1;
+for (var i = 0; i < matches.length; i++) { if (isTgt(matches[i])) { ti = i; break; } }
+function center(el){ var r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+var anchors = [];
+if (matches.length > 1 && ti >= 0) {
+  for (var k = 0; k < cands.length && k < 6; k++) {
+    var T = norm(cands[k]); if (!T || T === L) continue;
+    var found = xp('.//text()[normalize-space(.)=' + lit(T) + ']/..', ctx).filter(visible);
+    var rec = {text: T, occurrences: found.length, nearest_is_target: false};
+    if (found.length === 1) {
+      var a = center(found[0]), best = -1, bd = Infinity;
+      for (var j = 0; j < matches.length; j++) { var c = center(matches[j]); var d = Math.abs(c[0] - a[0]) + Math.abs(c[1] - a[1]); if (d < bd) { bd = d; best = j; } }
+      rec.nearest_is_target = (best === ti); rec.distance = Math.round(bd);
+    }
+    anchors.push(rec);
+  }
+}
+return JSON.stringify({count: matches.length, target_index: ti, scope: sc.kind, anchors: anchors, label: L});
+"""
+
+_LABEL_KEYWORDS = {'TypeText': 'fill', 'TypeSecret': 'fill', 'DropDown': 'fill',
+                   'ClickCheckbox': 'fill', 'ClickText': 'text'}
+_KWARG_CELL = re.compile(r'^[a-z_]+=')
+
+
+def _label_form(body: str) -> tuple | None:
+    """(keyword, label, census kind) when `body` locates by a LABEL a census can count; None for
+    an xpath locator, a ClickItem (an attribute value, not a label) or anything else."""
+    cells = _cells(body or '')
+    if len(cells) < 2 or cells[0] not in _LABEL_KEYWORDS:
+        return None
+    loc = cells[1]
+    if loc.startswith(('xpath\\=', 'xpath=')) or not loc.strip():
+        return None
+    return cells[0], loc, _LABEL_KEYWORDS[cells[0]]
+
+
+def live_disambiguation(drv, target_element, label: str, kind: str, candidates=None) -> dict:
+    """The census dict, or {'error': ...} when the page could not answer (never raises)."""
+    try:
+        raw = drv.execute_script(_CENSUS_JS, target_element, label, kind, list(candidates or [])[:6])
+        data = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        if not isinstance(data, dict) or 'count' not in data:
+            return {'error': 'the census answered %r' % (str(raw)[:80],)}
+        return data
+    except Exception as exc:
+        return {'error': 'the census raised: %s: %s' % (type(exc).__name__, exc)}
+
+
+def _with_text_anchor(body: str, text: str) -> str:
+    cells = _cells(body)
+    pos = next((i for i, c in enumerate(cells) if i > 0 and _KWARG_CELL.match(c)), len(cells))
+    return '    '.join(cells[:pos] + ['anchor=%s' % re.sub(r'\s+', ' ', text).strip()] + cells[pos:])
+
+
+def apply_live_disambiguation(body: str, xp_body: str | None, census: dict | None, row: dict) -> tuple:
+    """(live body, dormant label body or None, disambiguation) -- the F189 policy over a census:
+
+      * one visible, enabled match in scope and it is the target  -> the bare label
+      * the label repeats live: a ladder candidate that occurs ONCE live and to which the target
+        is the nearest match                                       -> `anchor=<that text>`
+      * the label repeats live and nothing verifies                 -> the xpath is the live line,
+        the label form goes dormant (a bare label would resolve a neighbour and read green)
+      * a ClickText whose target is DOM-order match #1              -> the bare label (that is the
+        element an unanchored ClickText picks -- measured, crt-qforce-qweb)
+      * the one live match is NOT the target                        -> the xpath (fails closed)
+      * count 0, no census, an error                                -> the bare label, COULD-NOT-CHECK
+    A number never comes out of here."""
+    dis = {'index': _described_index(row), 'group_size': row.get('group_size'),
+           'anchor_candidates': list(row.get('anchor_candidates') or []),
+           'anchor': None, 'live_count': None, 'scope': None}
+    lf = _label_form(body)
+    if not lf:
+        dis.update({'decision': 'not-applicable', 'why': 'the line does not locate by a label'})
+        return body, None, dis
+    kw, label, kind = lf
+    if not census or census.get('error') or 'count' not in census:
+        dis.update({'decision': 'bare-label',
+                    'why': 'COULD-NOT-CHECK: no live census (%s); the bare label stands unverified'
+                           % ((census or {}).get('error') or 'none taken')})
+        return body, None, dis
+    count, ti = int(census.get('count') or 0), int(census.get('target_index', -1))
+    dis.update({'live_count': count, 'scope': census.get('scope')})
+    if count == 0:
+        dis.update({'decision': 'bare-label',
+                    'why': 'COULD-NOT-CHECK: the census found no %s labelled %r in the %s; the bare label stands unverified'
+                           % ('control' if kind == 'fill' else 'text', label, census.get('scope'))})
+        return body, None, dis
+    if count == 1 and ti == 0:
+        dis.update({'decision': 'bare-label', 'why': 'unique live in the %s' % census.get('scope')})
+        return body, None, dis
+    if ti < 0:
+        dis.update({'decision': 'xpath-live' if xp_body else 'bare-label',
+                    'why': '%s live match%s labelled %r and the target is not among them (the one QWeb would pick is not the target); %s'
+                           % (count, '' if count == 1 else 'es', label,
+                              'the xpath names the element touched' if xp_body
+                              else 'COULD-NOT-DISAMBIGUATE: no xpath form either')})
+        return (xp_body, body, dis) if xp_body else (body, None, dis)
+    if kind == 'text' and ti == 0:
+        dis.update({'decision': 'bare-label',
+                    'why': 'repeats %d live; the target is DOM-order match #1, which an unanchored ClickText picks' % count})
+        return body, None, dis
+    for a in census.get('anchors') or []:
+        if a.get('occurrences') == 1 and a.get('nearest_is_target') and a.get('text'):
+            dis.update({'decision': 'text-anchor', 'anchor': a['text'],
+                        'why': 'repeats %d live; anchor %r occurs once and the target is its nearest match (%s px)'
+                               % (count, a['text'], a.get('distance', '?'))})
+            return _with_text_anchor(body, a['text']), None, dis
+    tried = ', '.join('%r x%s' % (a.get('text'), a.get('occurrences')) for a in (census.get('anchors') or [])) or 'none offered'
+    if xp_body:
+        dis.update({'decision': 'xpath-live',
+                    'why': 'repeats %d live (target is match #%d); no ladder anchor verified (%s); the xpath is the live line and the label form is dormant'
+                           % (count, ti + 1, tried)})
+        return xp_body, body, dis
+    dis.update({'decision': 'bare-label',
+                'why': 'COULD-NOT-DISAMBIGUATE: repeats %d live (target is match #%d), no ladder anchor verified (%s) and no xpath form'
+                       % (count, ti + 1, tried)})
+    return body, None, dis
+
+
+def compose_for_row_live(drv, target_element, row: dict, rendered: str, form: str = 'keyword') -> dict:
+    """The line for ONE matched row with the element in hand: the pure composition, then the live
+    census on a label-form line, then the F189 policy."""
+    body, xp_body, dis = _compose_body(row, rendered)
+    dormant = None
+    if body:
+        lf = _label_form(body)
+        if lf:
+            census = live_disambiguation(drv, target_element, lf[1], lf[2], row.get('anchor_candidates'))
+            body, dormant, dis = apply_live_disambiguation(body, xp_body, census, row)
+        else:
+            dis.update({'decision': 'not-applicable', 'why': 'the line does not locate by a label'})
+    return _render_row(row, rendered, form, body, xp_body, dis, dormant_label=dormant)
 
 
 def _row_summary(row: dict) -> dict:
@@ -1712,7 +2432,7 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                     'why': 'COULD-NOT-CHECK: identity match failed live: %s' % exc, **out_extra}
         match_ms = round((time.time() - t0) * 1000, 1)
         if i >= 0:
-            res = compose_for_row(parsed.rows[i], rendered, form)
+            res = compose_for_row_live(drv, target_element, parsed.rows[i], rendered, form)
             res.update({'row': _row_summary(parsed.rows[i]), 'page_key': parsed.page_key,
                         'match_ms': match_ms, 'rows': len(parsed.rows), 'matched_by': 'identity',
                         **out_extra})
@@ -1721,7 +2441,7 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
         if descriptor:
             row, why = DESC.find_row(parsed.rows, descriptor, get=DESC.parsed_get)
             if row is not None:
-                res = compose_for_row(row, rendered, form)
+                res = compose_for_row_live(drv, target_element, row, rendered, form)
                 res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
                             'match_ms': match_ms, 'rows': len(parsed.rows),
                             'matched_by': 'descriptor', 'descriptor_why': why, **out_extra})

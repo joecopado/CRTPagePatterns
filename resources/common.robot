@@ -9,7 +9,16 @@ Library    Collections
 *** Variables ***
 # IMPORTANT: Please read the readme.txt to understand needed variables and how to handle them!!
 ${BROWSER}                chrome
-${home_url}               ${login_url}/lightning/page/home
+# `${login_url}` is a CRT PROJECT variable (the UI-login path). A suite that authenticates by JWT
+# (`Gz Login`: JwtAuthenticate + JwtLogin) never defines it, and this table used to derive
+# `${home_url}` from it -- so EVERY run of the fsc7f suite printed
+# `Setting variable '${home_url}' failed: Variable '${login_url}' not found` on its line 19
+# (F188, 2026-09-20). The empty defaults below are what a Variables table may hold; a CRT /
+# `--variable` value overrides them whenever one is given. The home page URL is derived AT CALL
+# TIME by `Home Url` (below): `${login_url}` when it is set, else the live instance's own URL
+# (`GetInstanceUrl`, QForce) -- the JWT path has no login URL at all and needs none.
+${login_url}              ${EMPTY}
+${home_url}               ${EMPTY}
 
 
 *** Keywords ***
@@ -34,7 +43,10 @@ End suite
 Login
     [Documentation]       Login to Salesforce instance. Takes instance_url, username and password as
     ...                   arguments. Uses values given in Copado Robotic Testing's variables section by default.
-    [Arguments]           ${sf_instance_url}=${login_url}    ${sf_username}=${username}   ${sf_password}=${password}  
+    [Arguments]           ${sf_instance_url}=${login_url}    ${sf_username}=${username}   ${sf_password}=${password}
+    IF    not $sf_instance_url
+        Fail              Login: no login URL -- the project variable `login_url` is not set (a JWT suite authenticates with `Gz Login` / `JwtLogin` instead and never calls this keyword).
+    END
     GoTo                  ${sf_instance_url}
     TypeText              Username                    ${sf_username}             delay=1
     
@@ -86,13 +98,28 @@ Home
           JWT Authenticate            ${jwt_client_id}                ${username}    ${private_key}   sandbox=True
           JWT Login
     ELSE
-        GoTo                 ${home_url}
+        ${home}=             Home Url
+        GoTo                 ${home}
         ${login_status} =    IsText                      To access this page, you have to log in to Salesforce.    5
-        Run Keyword If       ${login_status}             Login            
+        Run Keyword If       ${login_status}             Login
     END
     ClickText            Home
     VerifyTitle          Home | Salesforce
-    
+
+
+Home Url
+    [Documentation]       The Lightning home page URL, derived when it is asked for (F192): `${login_url}/lightning/page/home`
+    ...                   when the project gives a login URL, else the live instance's own URL from `GetInstanceUrl`
+    ...                   (QForce; valid once `Gz Login` / `JwtLogin` has established the session). Never a
+    ...                   Variables-table derivation: `${login_url}` is undefined on the JWT path and the table
+    ...                   line errored on every run (F188).
+    ${base}=              Set Variable    ${login_url}
+    IF    not $base
+        ${base}=          GetInstanceUrl
+    END
+    ${base}=              Evaluate    str($base).rstrip('/')
+    RETURN                ${base}/lightning/page/home
+
 
 # Example of custom keyword with robot fw syntax. NOTE: These keywords may need to be adjusted
 # to work in your environment

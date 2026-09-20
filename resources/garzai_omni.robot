@@ -55,6 +55,7 @@ Library           QWeb
 # the same mechanism the source template uses for this exact file.
 Library           ${CURDIR}/garzai_omni/keywords_omni.py    WITH NAME    OmniRaw
 Library           Collections    # Append To List in Gz Omni Verdict below
+Library           ${CURDIR}/garzai_verdicts.py    # F192: the ONE session ledger every verdict line lands in
 Resource          ${CURDIR}/garzai_data.robot    # Gz Sentinel Verdict: a read-back that IS a sentinel is CAUGHT-BUG, never a quiet pass
 
 
@@ -91,6 +92,7 @@ Gz Omni Verdict
     END
     IF    '${status}' == 'PASS'
         Log To Console    VERIFIED-PASS: ${keyword}('${key}'): read back '${result}' -- matches '${asked}'
+        Gz Record Verdict    VERIFIED-PASS    ${keyword}('${key}')    ${result}
         RETURN    ${result}
     END
     ${verdict}=    Set Variable    CAUGHT-BUG
@@ -99,6 +101,10 @@ Gz Omni Verdict
     END
     ${line}=    Set Variable    ${keyword}('${key}'): asked '${asked}' -- ${result}
     Log To Console    ${verdict}: ${line}
+    # F192: the ONE session ledger. The value read back is what the Python's message quotes
+    # (`displays '<v>'` / `read back '<v>'`), blank when it could not read one.
+    ${got}=    Evaluate    (re.search(r"(?:displays|read back|holds) '([^']*)'", str($result)) or [None, ''])[1]    modules=re
+    Gz Record Verdict    ${verdict}    ${keyword}('${key}')    ${got}
     ${mode}=    Get Variable Value    ${GZ_ON_MISMATCH}    warn
     IF    '${mode}' == 'warn'
         Append To List    ${GZ_OMNI_VERDICTS}    ${verdict}: ${line}
@@ -110,13 +116,10 @@ Gz Omni Verdict
     RETURN    ${NONE}
 
 Gz Omni Verdict Tally
-    [Documentation]    Prints every OmniStudio verdict kept while ${GZ_ON_MISMATCH} was warn and
-    ...                returns the count -- run it as the last step of a recording session.
-    ${n}=    Get Length    ${GZ_OMNI_VERDICTS}
-    Log To Console    GarzAI OmniStudio non-pass verdicts this session: ${n}
-    FOR    ${m}    IN    @{GZ_OMNI_VERDICTS}
-        Log To Console    - ${m}
-    END
+    [Documentation]    THE ONE TALLY (F192): the same table `Gz Mismatch Tally` prints -- every
+    ...                verdict class of the session, Omni verdicts included, plus every step
+    ...                Robot saw raise or get stopped -- and the red-step count it returns.
+    ${n}=    Gz Verdict Tally
     RETURN    ${n}
 Omni Type
     [Documentation]    Set any OmniStudio free-text/number/currency/email/phone control by its

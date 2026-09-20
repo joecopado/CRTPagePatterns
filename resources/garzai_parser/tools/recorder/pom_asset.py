@@ -360,7 +360,12 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
         # folded in here, so one control is never two records (store.absorb_stamp_placeholder)
         STORE_MOD.absorb_stamp_placeholder(rec, eid, c['label'])
         stamped_eids.append(eid)
-        id_map[element_id(c['family'], c['label'], c['container'], stable_attrs(c['attrs']))] = eid
+        # D20/F122: the tag rides along here too, matching `pom.scope._control_rows` -- otherwise
+        # two controls that differ only in tag (a page-shell `button` and an in-panel `a` sharing a
+        # label) collide on this RAW key and `id_map` (a plain dict) keeps only the last one's
+        # translation, so the other's scope silently rides along with it.
+        id_map[element_id(c['family'], c['label'], c['container'], stable_attrs(c['attrs']),
+                          tag=c['tag'])] = eid
         pred = predicted_by_norm.get(c['norm'])
         el.update({
             'family': c['family'], 'label': c['label'], 'container': c['container'],

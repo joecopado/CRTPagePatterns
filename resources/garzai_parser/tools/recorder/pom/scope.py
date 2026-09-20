@@ -317,8 +317,17 @@ def _control_rows(html, element_id, stable_attrs):
     The KEY drops the `container` segment, and that is what makes the subtree split work. A
     control's container is read off its surroundings, so the SAME control mints one id when the
     whole page is parsed and another when its subtree is parsed alone
-    (`input_field|Billing City||name=city` vs `...|Billing Address|name=city`). Family, label and
-    stable attributes do not move."""
+    (`input_field|Billing City||name=city` vs `...|Billing Address|name=city`). Family, label,
+    stable attributes and the HTML tag do not move.
+
+    THE TAG RIDES ALONG (D20/F122, 2026-09-19). `pom_asset.build_record`'s `id_map` translates this
+    function's RAW id to the record's FINAL one (`identify_control`'s id, which now carries the
+    tag), so the two must agree on what "raw" means. Leaving tag out here would collide two
+    genuinely different controls that share a label and container but differ in tag -- measured on
+    slockard's Zoo Case CKEditor toolbar: a page-shell `Strikethrough` (`button`) and one inside the
+    `Edit Zoo Phone` panel (`a`) shared one raw key, so `id_map` (a plain dict) kept only the LAST
+    one written and the other's scope silently rode along with it (`test_a_held_out_state_holds_
+    exactly_its_own_controls[slockard-zoo-case-view/Edit Zoo Phone menu]`)."""
     from capture_orchestration import parse_elements_from_html
     import metadata_dom_parity as PARITY
     out = []
@@ -329,10 +338,12 @@ def _control_rows(html, element_id, stable_attrs):
         det = e.get("element_details") or {}
         fam = e.get("element_type")
         at = stable_attrs(det.get("attributes") or {})
+        tag = det.get("tag")
         # the key is the SAME id with an empty container -- canonical, hashable, and identical
         # for a control whether the whole page or only its subtree was parsed
-        out.append((element_id(fam, label, (e.get("context") or {}).get("section") or "", at),
-                    element_id(fam, label, "", at)))
+        out.append((element_id(fam, label, (e.get("context") or {}).get("section") or "", at,
+                               tag=tag),
+                    element_id(fam, label, "", at, tag=tag)))
     return out
 
 
