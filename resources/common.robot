@@ -45,7 +45,9 @@ Setup Browser
     Set Library Search Order                          QForce    QWeb
     # options=: Chrome 142+ asks 'wants to access other apps and services on this device' when a page
     # calls a device-local address (the GarzAI composer on 127.0.0.1:18077); this flag turns that
-    # check off for the session. COULD-NOT-CHECK on Chrome 152 until one session runs with it.
+    # check off for the session. PROVEN on Chrome 152 in the container: the F188 session
+    # (2026-09-20) served 86 composer calls to 127.0.0.1 with no prompt. Every entry resource that
+    # opens a browser carries this now, not only the recorder's (F214).
     Open Browser          about:blank                 ${BROWSER}    options=--disable-features=LocalNetworkAccessChecks
     SetConfig             LineBreak                   ${EMPTY}               #\ue000
     Evaluate              random.seed()               random                 # initialize random generator
