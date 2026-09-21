@@ -35,6 +35,7 @@ Status Before Recording
     VerifyText    Applicant    timeout=30
 
 
+
     ClickText    Browse    anchor=Home
     ClickText    Favorites    anchor=Notifications
     ClickText    Ok, Thanks!
