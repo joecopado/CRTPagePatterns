@@ -240,7 +240,7 @@ class DomElementCompiler:
                 return None
 
             behavioral_metadata = self._get_behavioral_metadata(tag, element_type)
-            validation = self._get_validation(tag)
+            validation = self._fold_rendered_required(self._get_validation(tag), identification)
 
             dropdown_data = None
             if element_type == 'dropdown':
@@ -585,7 +585,39 @@ class DomElementCompiler:
             if rendered:
                 result['rendered_text'] = rendered.strip()
 
+        # F225 (the user, 2026-09-20): the page's REQUIRED MARKER is not part of the label.
+        #   "the asterisk is commonly picked up by the recorder ... it's generally safe for just
+        #    having the textual value. The asterisk mentions that this is a required field, but if
+        #    that field then becomes optional later and we're referring to it with an asterisk, the
+        #    test fails. The signal of knowing it is required is useful, but not a great locator."
+        # So the marker comes OFF the locator and the fact it carried is kept as data. Measured
+        # over the 146 committed captures: 10 labels of 13,782 (0.07%) across 6 captures, from
+        # THREE different rungs -- `label_span` 7, `aria_label` 2, `standard_label` 1 -- which is
+        # why this sits at the end of the one function that finalises a label rather than inside
+        # any single rung. Two of them, `Close Date *` and `Owner Name *`, were silently
+        # unmatchable against the page's own field list for exactly this reason.
+        # Narrow on purpose: a LEADING or TRAILING `*`/bullet only. Never the word "required"
+        # (that would maul a real label like "Required Approvals") and never a mid-string `*`.
+        self._split_required_marker(result)
         return result
+
+    #: a leading or trailing required marker -- the SLDS `*` and the bullet some themes use.
+    _EDGE_REQUIRED_MARK_RE = re.compile(r'^[\s*\u2022]+|[\s*\u2022]+$')
+
+    @classmethod
+    def _split_required_marker(cls, identification: dict) -> None:
+        """Strip the required marker off `label_text` IN PLACE and record what it meant.
+
+        `label_required` is the fact the marker carried, kept because the user asked for it to
+        survive: a reader (or the review table) can still see the page said this field is
+        required, without the locator depending on it staying required tomorrow."""
+        label = identification.get('label_text')
+        if not label:
+            return
+        clean = cls._EDGE_REQUIRED_MARK_RE.sub('', label).strip()
+        if clean and clean != label:
+            identification['label_text'] = clean
+            identification['label_required'] = True
 
     def _find_radio_label_text(self, tag) -> str:
         """Visible short label for a radio/checkbox <input> inside a <label>
@@ -2081,7 +2113,45 @@ class DomElementCompiler:
         input_type = tag.get('type')
         if input_type and input_type != 'text':
             rules['format'] = input_type
+        # F225 (the user, 2026-09-20): "the signal of knowing it is required is useful, but not a
+        # great locator way." The marker comes off the LABEL (see _split_required_marker) and the
+        # fact lands HERE, as data.
+        #
+        # Until this, nothing in the pipeline carried a DOM-side required signal at all. The only
+        # `required` anywhere came from METADATA -- the org map's create-layout list, attached to a
+        # PREDICTION, never to a captured control -- so "the org says this field is required" and
+        # "this page is rendering it required" were two facts that never met. A field required on
+        # the layout but not rendered required in a given state was invisible to both.
+        #
+        # Three signals, strongest first, all framework-agnostic: the ARIA contract, the HTML
+        # boolean attribute, then (in _fold_rendered_required) the page's own rendered marker.
+        aria_required = str(tag.get('aria-required') or '').strip().lower()
+        if aria_required in ('true', 'false'):
+            rules['required'] = aria_required == 'true'
+            rules['required_source'] = 'aria-required'
+        elif tag.get('required') is not None:
+            rules['required'] = True
+            rules['required_source'] = 'required attribute'
         return rules if rules else None
+
+    @staticmethod
+    def _fold_rendered_required(validation, identification):
+        """The page's RENDERED marker as a last-resort required signal, and always the weakest.
+
+        A control can render `*` and declare nothing: measured, `Owner Name` and `Close Date` on
+        slockard__zoo__Zoo_Forms_Advanced carry the marker inside `aria-label` and have no
+        `aria-required` and no `required` attribute. The marker is then the only thing the page
+        said, so it counts -- but it never OVERRIDES an explicit declaration, including an explicit
+        `aria-required="false"`, because a declaration is what the component MEANS and a marker is
+        what a theme DREW. `required_source` says which of the three answered, so a reader can tell
+        a contract from a decoration."""
+        if not (identification or {}).get('label_required'):
+            return validation
+        folded = dict(validation or {})
+        if 'required' not in folded:
+            folded['required'] = True
+            folded['required_source'] = 'rendered marker'
+        return folded or None
 
     def _get_context_info(self, tag) -> dict:
         if not tag:

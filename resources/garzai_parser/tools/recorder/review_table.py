@@ -152,11 +152,18 @@ def _lit(s: str) -> str:
 
 
 def _norm_text(s: str) -> str:
-    return re.sub(r'\s+', ' ', (s or '').replace(' ', ' ')).strip()
+    return PL.norm_text(s)
 
 
 def _clean_label(label: str) -> str:
-    return _norm_text(re.sub(r'^\*\s*|\s*\*$', '', label or ''))
+    """THE label normaliser. The one implementation lives in `pattern_library` so a recipe's
+    `{label}` reaches the same rule without an import cycle (close-out 2026-09-22 §3a).
+
+    It used to strip `^\\*\\s*` BEFORE collapsing whitespace, so a label node rendering the
+    SLDS `<abbr class="slds-required">*</abbr>` on its own line -- `'\\n* Company'` -- came back
+    as `'* Company'` while both offline strippers answered `'Company'` (D-C2's CAUGHT-BUG 1:
+    "the offline replay strips that marker and the live override does not")."""
+    return PL.clean_label(label)
 
 
 class Capture:

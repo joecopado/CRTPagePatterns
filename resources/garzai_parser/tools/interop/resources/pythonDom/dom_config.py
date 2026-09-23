@@ -950,8 +950,52 @@ class DomConfiguration:
             'dynamic': True,
         },
         {
-            'tags': ['div', 'button'],
-            'attributes': {'role': 'combobox', 'aria-haspopup': 'listbox'},
+            # F223b (2026-09-20, the user: "we've lost 97 input fields -- were those actually
+            # valid?").  They were not.  A first cut matched EVERY host tag carrying
+            # role=combobox + aria-haspopup=listbox, and that swept in 96 TYPE-THEN-PICK controls
+            # -- Salesforce lookups, OmniStudio lookups and typeaheads, Address Search, the SLDS
+            # time picker -- routing each to PickList.  Their option lists are FILTERED BY WHAT
+            # YOU TYPE, so at rest there is nothing to pick and PickList resolves nothing: a green
+            # step that did nothing, the exact vacuous result this repo exists to catch.
+            #
+            # Two rules, because two signals are needed and neither is sufficient alone.
+            # THIS ONE is every host that is NOT an <input>: a <button>, a <mat-select>, a
+            # <cds-select-input> is not a text box, so the ARIA contract alone settles it.
+            'tags': lambda name: name != 'input',
+            'attributes': {
+                'role': 'combobox',
+                'aria-haspopup': 'listbox',
+                # ARIA's own discriminator: "list"/"both"/"inline" means the list filters as you
+                # type.  Absent or "none" means the options exist before you touch the control.
+                'aria-autocomplete': lambda v: (v or 'none').strip().lower() in ('none', ''),
+            },
+            'type': 'slds_combobox',
+            'dynamic': True,
+        },
+        {
+            # ...and THIS ONE is the <input> hosts, which need the second signal.  OmniStudio's
+            # own lookup omits aria-autocomplete entirely, so the ARIA contract does not separate
+            # it from a real pick-only combobox.  What does separate them is whether the component
+            # declares the element a text box at all.  Census over the 146 committed captures, all
+            # 103 <input> hosts carrying role=combobox + aria-haspopup=listbox:
+            #
+            #   explicit type="text"  96  ALL type-then-pick   (69 typeahead, 23 Salesforce lookup
+            #                                                   + Address Search, 4 OmniStudio lookup)
+            #   no type attribute      7  ALL pick-only        (OmniStudio combobox: Salutation,
+            #                                                   Phone Type, Nationality, Zoo Select)
+            #
+            # Zero exceptions in either direction.  A component rendering a combobox as a DISPLAY
+            # SURFACE leaves `type` off; one rendering a real text box declares it.  That is a
+            # measured convention rather than a spec guarantee, which is why the census above is
+            # pinned by a test -- if a future capture breaks the split, the test says so rather
+            # than the recorder silently picking nothing.
+            'tags': lambda name: name == 'input',
+            'attributes': {
+                'role': 'combobox',
+                'aria-haspopup': 'listbox',
+                'aria-autocomplete': lambda v: (v or 'none').strip().lower() in ('none', ''),
+                'type': lambda v: v is None,
+            },
             'type': 'slds_combobox',
             'dynamic': True,
         },

@@ -118,7 +118,8 @@ function(root){
 _EXPAND_JS = r"""
 (function () {
   var roots = [document], i, r, out = {details: 0, details_opened: 0, toggles: 0,
-                                        toggles_clicked: 0, skipped_links: 0};
+                                        toggles_clicked: 0, skipped_links: 0,
+                                        toggles_skipped_combobox: 0};
   for (i = 0; i < roots.length; i++) {
     r = roots[i];
     var all = r.querySelectorAll('*');
@@ -136,6 +137,15 @@ _EXPAND_JS = r"""
       out.toggles++;
       if (el.tagName === 'A') { out.skipped_links++; continue; }
       if (el.tagName !== 'BUTTON' || !el.hasAttribute('aria-controls')) { continue; }
+      // A COMBOBOX IS NOT A DISCLOSURE (2026-09-22). A Lightning picklist renders as
+      // <button role=combobox aria-expanded=false aria-controls=...> -- byte-for-byte the
+      // disclosure pattern -- so this pass opened EVERY picklist on every page it captured, and
+      // a keyword driven after the capture found the other lists open (the user: "expanding
+      // picklists, but not doing anything with them"). Same for a menu button. Counted, never silent.
+      var role = el.getAttribute('role') || '', pop = (el.getAttribute('aria-haspopup') || '').toLowerCase();
+      if (role === 'combobox' || pop === 'listbox' || pop === 'menu' || pop === 'true') {
+        out.toggles_skipped_combobox++; continue;
+      }
       try { el.click(); out.toggles_clicked++; } catch (e) {}
     }
   }

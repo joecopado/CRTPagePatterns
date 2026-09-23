@@ -57,6 +57,7 @@ for _p in ('tools/recorder', 'tools/dom-miner'):
 
 import review_table as RT          # noqa: E402  (parser + xpath ladder + identity xpath)
 import descriptor as DESC         # noqa: E402  (the page's own description of the element, and the row rule)
+import disambiguation_args as DA   # noqa: E402  (the ONE place a described `index` becomes QWeb's numeric `anchor`)
 import pattern_library as PL       # noqa: E402  (buckets + the verified recipes)
 from pom import keys as PK         # noqa: E402  (the page key, for provenance)
 
@@ -75,6 +76,26 @@ _PARSE_CACHE: dict = {}
 # ----------------------------------------------------------------------------- small helpers
 def _cells(line: str) -> list[str]:
     return [c for c in re.split(r' {2,}|\t', (line or '').strip()) if c != '']
+
+
+def split_step_body(body: str) -> tuple:
+    """A composed Robot step -> (keyword, positional cells, kwarg cells), UN-ESCAPING NOTHING.
+
+    `RT.parse_robot_line` un-escapes `\\=` for EXECUTION; this one exists to RE-RENDER, so
+    `xpath\\=//a[@b\\="c"]` must come back out of `RT._rf` byte-identical. `# ...` comment cells
+    are dropped: they are the note on the line, never an argument.
+    """
+    cells = [c for c in _cells(body or '') if not c.startswith('#')]
+    if not cells:
+        return None, [], {}
+    kw, args, kwargs = cells[0], [], {}
+    for c in cells[1:]:
+        if _KWARG_CELL.match(c):
+            k, v = c.split('=', 1)
+            kwargs[k] = v
+        else:
+            args.append(c)
+    return kw, args, kwargs
 
 
 def _indent(rendered: str) -> str:
@@ -488,6 +509,96 @@ def _dormant(indent: str, text: str) -> str:
     return '%s#   backup: %s' % (indent, annotate((text or '').strip(), 'stock recorder line, unverified'))
 
 
+# ---------------------------------------------------------------- the backup LADDER (F224)
+# The user, 2026-09-20, on finding a ~1,200-character positional path still standing as a backup:
+#
+#   "Think of the attack formation that we send in, in an RTS like StarCraft. You put your
+#    strongest units in the front, your ultralisks. They take the most hits. Those are keywords.
+#    We take the next strongest as the next line... The second backup should be our next
+#    strongest locator, which should NEVER be an absolute XPath. ... While yes, it should pick up
+#    the individual actions picked up there, those individual actions should be BEST PRACTICE,
+#    not strictly absolute XPath stuff picked up by the recorder."
+#
+# So a dormant backup is not "whatever the stock recorder said". It is the same gesture expressed
+# at the strongest rung that still names the control, and a rung the locator doctrine calls a
+# generated path is dropped whenever ANY better rung survives. Nothing the user did is lost --
+# the ACTION is still there, in a form a person would have written by hand.
+#
+# This does NOT retire F151 ("every stock line the pair absorbed is its own backup"): the set of
+# GESTURES is unchanged, only the FORM each one is written in. The positional line survives alone,
+# annotated, when there is no label and therefore no better handle -- which is the tri-state rule,
+# not an exception to this one.
+LADDER_KEYWORD = 1           #: ClickText / TypeText / PickList -- a person's own words. The ultralisk.
+LADDER_RELATIVE_XPATH = 2    #: //label[...]/following::... -- anchored to something a person sees.
+LADDER_POSITIONAL = 3        #: /html[1]/body[1]/... -- a generated path. Never a locator (CLAUDE.md).
+
+#: rooted at the document element -- the shape Chrome's own "copy full xpath" produces, and what
+#: the CRT recorder writes today.
+_POSITIONAL_ROOT_RE = re.compile(r'(?:xpath\s*=\s*)?/+html(?:\[\d+\])?/', re.I)
+#: one xpath step: a node name, optionally one predicate.
+_STEP_RE = re.compile(r'/([A-Za-z_][\w.:-]*)(\[[^\]]*\])?')
+#: a predicate that carries no information a PERSON could have written -- absent, or a bare index.
+_BARE_PREDICATE_RE = re.compile(r'^\[\d+\]$')
+
+
+def _looks_generated(body: str) -> bool:
+    """A long chain of steps whose predicates are all bare indices is a GENERATED path, whatever
+    it is rooted at.
+
+    Rooting at /html is not the defining property, it is just the common one. An app that mounts
+    its tree elsewhere, or a recorder that trims the root, produces
+    `/div[2]/section[1]/slot[1]/input[1]` -- identically brittle and identically unreadable. This
+    is deliberately framework-agnostic: it asks only whether the locator names anything a person
+    could point at, which is the locator doctrine's own test for a generated value."""
+    steps = _STEP_RE.findall(body)
+    if len(steps) < 4:
+        return False
+    bare = sum(1 for _name, pred in steps if not pred or _BARE_PREDICATE_RE.match(pred))
+    return bare >= max(4, int(0.8 * len(steps)))
+
+
+def locator_rung(line: str) -> int | None:
+    """Which rung of the backup ladder one composed line sits on, or None when it is blank.
+
+    Positional beats relative beats keyword only in VERBOSITY; the ladder is the other way up.
+    A line carrying a generated path is LADDER_POSITIONAL however it is written and wherever it is
+    rooted; anything else naming an xpath is relative; a line with no xpath at all addresses the
+    control the way a person reads it."""
+    body = (line or '').strip()
+    if not body:
+        return None
+    if _POSITIONAL_ROOT_RE.search(body) or _looks_generated(body):
+        return LADDER_POSITIONAL
+    if '//' in body or re.search(r'xpath\s*=', body, re.I):
+        return LADDER_RELATIVE_XPATH
+    return LADDER_KEYWORD
+
+
+#: what a rung IS, said honestly. A composed rung is not a stock recorder line and must not claim
+#: to be one -- `_dormant`'s old fixed note put "stock recorder line" on lines this module wrote
+#: itself, which is a provenance claim the reader would act on.
+STOCK = 'stock recorder line, unverified'
+COMPOSED_KEYWORD = 'keyword form, unverified: composed from the label'
+COMPOSED_XPATH = 'xpath form, unverified: composed from the label'
+
+
+def ladder_dormants(indent: str, rungs) -> list:
+    """The dormant `#   backup:` lines for one absorbed gesture, in RECORDED ORDER, with every
+    positional line dropped WHEN A BETTER RUNG SURVIVES.
+
+    `rungs` is a sequence of (line, note) pairs, or a bare line meaning `STOCK`. The order is the
+    order the person acted in -- that is what makes the block readable and is F151's point. The
+    ladder decides MEMBERSHIP, never order."""
+    pairs = []
+    for item in rungs:
+        line, note = item if isinstance(item, tuple) else (item, STOCK)
+        if (line or '').strip():
+            pairs.append((locator_rung(line), line, note))
+    if any(r is not None and r < LADDER_POSITIONAL for r, _l, _n in pairs):
+        pairs = [(r, l, n) for r, l, n in pairs if r != LADDER_POSITIONAL]
+    return ['%s#   backup: %s' % (indent, annotate((l or '').strip(), n)) for _r, l, n in pairs]
+
+
 def annotate(line: str, note: str) -> str:
     """Append a note to a composed line AS A ROBOT COMMENT CELL, never as a bare cell. F196 (the
     user, 2026-09-20): a dormant backup ending in `   (xpath form, unverified: parser proposal)`
@@ -498,6 +609,23 @@ def annotate(line: str, note: str) -> str:
     if '    #' in line or line.lstrip().startswith('#'):
         return '%s; %s' % (line, note)
     return '%s    # %s' % (line, note)
+
+
+def open_click_keyword_form(label: str | None) -> str:
+    """The KEYWORD-form opener for a combobox or picklist -- the rung above the relative xpath.
+
+    F224, the user: "the two backup steps that you would typically use for this ... would be a
+    type text and a click text. It should not be an absolute XPath." `ClickText <label>` is the
+    line a CRT author writes by hand to open a control, so it is the strongest rung that still
+    names the control, and it goes ABOVE the `//label[...]/following::` form rather than
+    replacing it -- both are dormant, and a person promoting one wants the readable one first.
+
+    The TYPE-then-pick half of that pair is NOT invented here. When the recording shows the person
+    typing to filter the list, that keystroke is already absorbed as `stock_filter` and rides the
+    ladder in recorded order; when they did not type, composing a TypeText would be fabricating a
+    step they never took, and a picklist with no filter box has nothing to type into."""
+    lab = omni_label(label)
+    return RT._rf('ClickText', lab) if lab else ''
 
 
 def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_option: str,
@@ -527,15 +655,12 @@ def omni_pair_lines(label: str | None, option: str, stock_open: str, stock_optio
         return '', []
     open_line, _ = omni_open_click_line(label, stock_open)
     raw_open = (stock_open or '').strip()
-    backups = []
-    if raw_open and open_line.strip() != raw_open:
-        backups.append(_dormant(indent, raw_open))
-    if open_line.strip():
-        backups.append(_dormant(indent, open_line))
-    if (stock_filter or '').strip():
-        backups.append(_dormant(indent, stock_filter))
-    if (stock_option or '').strip():
-        backups.append(_dormant(indent, stock_option))
+    # F224: recorded order -- opener (raw, then its label form), the typed filter, the option --
+    # handed to the ladder, which drops the raw positional opener whenever the label form survives.
+    rungs = [(raw_open if raw_open != open_line.strip() else '', STOCK),
+             (open_click_keyword_form(label), COMPOSED_KEYWORD),
+             (open_line, COMPOSED_XPATH), (stock_filter, STOCK), (stock_option, STOCK)]
+    backups = ladder_dormants(indent, rungs)
     if omni_placeholder_option(opt):
         return '', backups
     line = '%s%s    %s' % (indent, RT._rf('Omni Select', lab, opt).strip(), UNVERIFIED)
@@ -745,13 +870,11 @@ def lbc_pair_lines(label: str | None, option: str, stock_open: str, stock_option
         return '', []
     open_line, _ = lbc_open_click_line(label, stock_open)
     raw_open = (stock_open or '').strip()
-    backups = []
-    if raw_open and open_line.strip() != raw_open:
-        backups.append(_dormant(indent, raw_open))
-    if open_line.strip():
-        backups.append(_dormant(indent, open_line))
-    if (stock_option or '').strip():
-        backups.append(_dormant(indent, stock_option))
+    # F224: same ladder as omni_pair_lines -- see ladder_dormants.
+    rungs = [(raw_open if raw_open != open_line.strip() else '', STOCK),
+             (open_click_keyword_form(label), COMPOSED_KEYWORD),
+             (open_line, COMPOSED_XPATH), (stock_option, STOCK)]
+    backups = ladder_dormants(indent, rungs)
     if omni_placeholder_option(opt):
         return '', backups
     line = '%s%s    %s' % (indent, RT._rf('PickList', lab, opt).strip(), UNVERIFIED)
@@ -2145,6 +2268,205 @@ def _roster_form(form: str, org: str | None, url: str | None) -> str:
     return PL.roster_form_for_platform(platform, default=form)
 
 
+# ------------------------------------------------------- phase 1: consult the store (F227)
+# The parity plan's diagnosis: "Three things resolve a control today and they do not agree. ...
+# the recorder is the only resolver that starts from zero on a known page." interop has consulted
+# the store before driving since 2026-09-15 (phase 0). This is the composer's half.
+#
+# The rule itself lives in `pom/consult.py` and is shared, because the plan said to write it once.
+# Nothing here re-implements the tri-state: this function decides only what a composed PANE does
+# with the answer.
+#
+# WHAT IT DOES NOT DO. It does not change composition. `compose_for_row` still produces exactly the
+# line it produced before, and that line survives as a dormant backup whenever the store speaks --
+# a person reading the pane is owed the alternative the recorder would have proposed, and the
+# store's rung was verified on SOME PAST RUN, on a page that may have changed since. That is the
+# same rule F224 applies to a gesture's absorbed stock lines.
+
+_STORE_CACHE: dict = {}
+
+# ------------------------------------------------------------------ the CONTAINER's store (F247)
+# THE GAP finding 5 named (docs/audit/challenge-opus-2026-09-22, decision 4): phase 1 wired
+# `consult_row` into `compose_from_capture` and `compose_batch`, and BOTH are capture-side. The
+# CRT container calls `compose_live_element` (`build_override.py`'s generated library, its
+# `_propose`), whose composing returns never consulted -- so the one recorder that runs where a
+# customer runs it started from zero on a page the store already knew 116 verified rungs for.
+#
+# And the second half of the finding, which is why this is not a one-line call: the store lives at
+# `~/.claude/state` on THIS machine. A CRT container has no home directory of ours and no store.
+# So the container reads a PACK -- a store-shaped tree shipped beside the library
+# (`page_pack.py export`) -- and the root of it is this env var.
+#
+#   GZ_POM_DIR set        -> `Store(state_root=<that>)`; a dir that does not exist answers
+#                            unknown-page, which is the tri-state's third answer and not a crash.
+#   GZ_POM_DIR unset, and this module is running FROM A BUNDLE (the bundle root carries the
+#                            `MANIFEST.json` `build_parser_bundle.py` writes)
+#                         -> `<bundle>/../garzai_pom`, i.e. the sibling of `garzai_parser` in the
+#                            generated library's own directory. The generated library also sets
+#                            the env var itself from `__file__`; this is the backstop for a bundle
+#                            imported by anything else.
+#   GZ_POM_DIR unset, running from the REPO
+#                         -> None. Not `~/.claude/state`: the container path must never silently
+#                            read the developer's own store, or "byte-identical with no pack dir"
+#                            would be a claim that holds on no machine but this one, and the
+#                            replay goldens (which pass no pack dir) would move for a reason that
+#                            is not in the sources.
+PACK_DIR_ENV = 'GZ_POM_DIR'
+_DEFAULT_STORE = object()          # the sentinel for "the caller wants the machine's own store"
+
+
+def container_pack_dir() -> str | None:
+    """The store root a CONTAINER-side compose reads, or None when there is no pack. Never raises."""
+    try:
+        env = os.environ.get(PACK_DIR_ENV)
+        if env is not None:
+            return env.strip() or None
+        here = os.path.dirname(os.path.abspath(__file__))
+        # <bundle>/tools/recorder/crt_override -> <bundle>; the same three levels
+        # `build_parser_bundle.ROOT` counts, and the MANIFEST.json is what says it IS a bundle.
+        bundle = os.path.abspath(os.path.join(here, '..', '..', '..'))
+        if os.path.isfile(os.path.join(bundle, 'MANIFEST.json')):
+            return os.path.abspath(os.path.join(bundle, '..', 'garzai_pom'))
+    except Exception:
+        return None
+    return None
+
+
+#: the PACK cache is its own dict, keyed on (page_key, org, root). `_STORE_CACHE` keeps the exact
+#: (page_key, org) key it has always had -- a test that seeds it to freeze a record is relying on
+#: that shape (`test_consult_merged_call_2026_09_22._consult_row`), and widening the key silently
+#: turned every one of those into an `unknown-page` while the tests still looked like they were
+#: exercising the store. Two dicts, two contracts, neither guessing.
+_PACK_CACHE: dict = {}
+
+
+def _store_record(page_key: str | None, org: str | None, state_root: str | None = None):
+    """The store record for one page key, loaded at most once per process. Never raises: a
+    recording in progress must not die because the store is missing, stale or unreadable.
+
+    `state_root` None is the machine's own store (`~/.claude/state`), which is what the two
+    capture-side callers have always read. The container passes its pack dir."""
+    if not page_key:
+        return None
+    cache = _STORE_CACHE if state_root is None else _PACK_CACHE
+    ck = (page_key, org) if state_root is None else (page_key, org, state_root)
+    if ck in cache:
+        return cache[ck]
+    rec = None
+    try:
+        import sys as _sys
+        import os as _os
+        _pom = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "pom")
+        if _pom not in _sys.path:
+            _sys.path.insert(0, _pom)
+        from store import Store                      # noqa: F401
+        rec = Store(state_root=state_root).get(page_key, org) if state_root else Store().get(page_key, org)
+    except Exception:
+        rec = None
+    cache[ck] = rec
+    return rec
+
+
+def consult_row(out: dict, row: dict, page_key: str | None, org: str | None,
+                indent: str = '    ', store_root=_DEFAULT_STORE) -> dict:
+    """Fold a store answer into a composed result, IN PLACE, and always say what happened.
+
+    `out['consult']` is written on every call -- verified, known-unverified, unknown-control,
+    unknown-page or a skip reason -- because a pane that silently did not consult is
+    indistinguishable from one whose store had nothing, and the whole point of this phase is to be
+    able to tell those apart.
+
+    `store_root` is the ONE thing the container changes (F247). Left at its sentinel it is the
+    machine's own store, which is what the two capture-side callers have always read. `None` means
+    "there is no pack here": the answer is `unknown-page` and the derived line stands, byte for
+    byte -- never a silent fall back to `~/.claude/state`, which a container does not have and a
+    replay must not read.
+    """
+    out.setdefault('consult', None)
+    if not out.get('line'):
+        out['consult'] = {'verdict': 'skipped', 'why': 'nothing was composed for this row'}
+        return out
+    label = (row or {}).get('label')
+    family = (row or {}).get('element_type')
+    try:
+        import sys as _sys
+        import os as _os
+        _pom = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "pom")
+        if _pom not in _sys.path:
+            _sys.path.insert(0, _pom)
+        import consult as _consult
+        if store_root is _DEFAULT_STORE:
+            record = _store_record(page_key, org)
+        elif store_root:
+            record = _store_record(page_key, org, str(store_root))
+        else:
+            record = None            # no pack dir: consult() answers unknown-page and says why
+        answer = _consult.consult(record, label, family, page_key=page_key)
+        if store_root is not _DEFAULT_STORE and not store_root:
+            answer = dict(answer, why=(
+                'no page-object pack is shipped with this build (%s is unset and no '
+                '<library>/garzai_pom is on disk) -- deriving, exactly as before this build'
+                % PACK_DIR_ENV))
+    except Exception as exc:
+        out['consult'] = {'verdict': 'COULD-NOT-CHECK',
+                          'why': '%s while consulting the store (%s)' % (type(exc).__name__, exc)}
+        return out
+    out['consult'] = {'verdict': answer['verdict'], 'why': answer['why'],
+                      'element_id': answer.get('element_id')}
+    if answer['verdict'] != _consult.VERIFIED or not answer.get('rung'):
+        return out                                   # derive, exactly as before
+    rung = answer['rung']
+    derived = (out.get('line') or '').strip()
+    d_kw, d_args, d_kwargs = split_step_body(derived)
+    n_pass = int(rung.get('n_verified') or 0)
+    # F246 (challenge swarm C1): the rung supplies the LOCATOR, the recorded step supplies the
+    # DATA. Rebuilding the line from `rung['args']` alone dropped the typed value on 5 rows of the
+    # Zoo capture, `tag=` on every ClickItem and `index` on 37 of 73 -- each stamped with the
+    # strongest note the pane can carry. `pom/consult.merged_call` is the ONE rule, shared with
+    # the Dock, because the two recorders had drifted onto different answers for the same control.
+    call = _consult.merged_call(rung, {'kw': d_kw, 'args': d_args, 'kwargs': d_kwargs},
+                                {'tag': (row or {}).get('tag'),
+                                 'index': (out.get('disambiguation') or {}).get('index')})
+    out['consult']['merge'] = call['why']
+    rung_line = RT._rf(rung.get('kw'),
+                       *[str(a) for a in (rung.get('args') or [])],
+                       **DA.to_call_kwargs(dict(rung.get('kwargs') or {}))).strip()
+    if not call['from_store']:
+        # The store knows the CONTROL and not this ACTION (a verified ClickElement under a step
+        # that types). The derived line stays LIVE and the rung becomes a dormant backup -- never
+        # the other way round: a rung that cannot carry the step composes a call that silently
+        # does nothing, which is this codebase's signature failure.
+        if rung_line:
+            backups = list(out.get('backups') or [])
+            backups.insert(0, '%s#   backup: %s' % (
+                indent, annotate(rung_line, 'AI POM store rung, %d live pass(es) -- a different '
+                                            'action on this control' % n_pass)))
+            out['backups'] = backups
+        out['why'] = '%s; %s' % (out.get('why') or 'parser proposal', call['why'])
+        return out
+    body = RT._rf(call['kw'], *call['args'], **DA.to_call_kwargs(call['kwargs'])).strip()
+    if not body:
+        out['consult']['why'] = 'the store rung carried no keyword -- kept the derived line'
+        return out
+    # PROVENANCE. This line did NOT come from the parser, and must not carry the parser's note.
+    # `UNVERIFIED` reads "unverified: parser proposal" -- on a rung a live run resolved and read
+    # back, that is two false claims in one cell. Same error class as F224's composed rungs
+    # claiming to be stock recorder lines: a reader acts on the note. And it does not claim more
+    # than it has either: when a VALUE was folded in, the value is this recording's and was never
+    # verified by anything, so the note says LOCATOR rather than rung (F246).
+    note = ('# verified: AI POM store rung, %d live pass(es)' % n_pass
+            if len(call['args']) < 2 else
+            "# verified: AI POM store locator, %d live pass(es); the value is this recording's"
+            % n_pass)
+    out['line'] = '%s%s    %s' % (indent, body, note)
+    backups = list(out.get('backups') or [])
+    if derived:
+        backups.insert(0, '%s#   backup: %s' % (
+            indent, annotate(derived, 'the line this recorder would have derived')))
+    out['backups'] = backups
+    out['why'] = 'store rung (%s)' % answer['why']
+    return out
+
 def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: str,
                          rendered: str, form: str = 'keyword', descriptor: dict | None = None) -> dict:
     """html in, line out -- no driver, no network, no org contact.
@@ -2166,6 +2488,7 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
             row, why = DESC.find_row(parsed.rows, descriptor, get=DESC.parsed_get)
             if row is not None:
                 out.update(compose_for_row(row, rendered, form))
+                consult_row(out, row, parsed.page_key, org, _indent(rendered))
                 out.update({'row': _row_summary(row), 'matched_by': 'descriptor', 'descriptor_why': why,
                             'compose_ms': round((time.time() - t0) * 1000, 1)})
                 return out
@@ -2194,6 +2517,7 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
         out['compose_ms'] = round((time.time() - t0) * 1000, 1)
         return out
     out.update(compose_for_row(row, rendered, form))
+    consult_row(out, row, parsed.page_key, org, _indent(rendered))
     out['row'] = _row_summary(row)
     out['matched_by'] = 'identity'
     out['compose_ms'] = round((time.time() - t0) * 1000, 1)
@@ -2274,6 +2598,10 @@ def compose_batch(html: str, url: str | None, org: str | None, form: str = 'keyw
             continue
         t1 = time.time()
         out.update(compose_for_row(owner, rendered, form))
+        # F227: the batch pass consults too, or it stops being byte-identical to the per-event
+        # path -- which `test_the_batch_pass_composes_every_control_exactly_as_the_per_event_path`
+        # exists to catch, and did, the moment only one side consulted.
+        consult_row(out, owner, parsed.page_key, org, _indent(rendered))
         out['row'] = _row_summary(owner)
         out['matched_by'] = 'identity'
         out['compose_ms'] = round((time.time() - t1) * 1000, 1)
@@ -2387,8 +2715,14 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
     `===` match above finds nothing (ledger F40, Lightning Setup, 2026-09-18). Label + family
     through the SAME rule `pom/match.py` states then names the row, and the answer says which way
     it got there -- `matched_by: identity | descriptor`.
+
+    IT CONSULTS THE STORE (F247). Every one of the three composing returns below goes through the
+    SAME `consult_row` the two capture-side entry points use -- there is no third copy of the rule
+    -- against a store rooted at `container_pack_dir()`. No pack dir is `unknown-page`: the derived
+    line stands byte for byte, which is what the committed replay goldens (which ship no pack) pin.
     """
     cache = cache if cache is not None else {}
+    pack_dir = container_pack_dir()
     url = url or (drv.current_url or '')
     fp = _fingerprint(drv)
     out_extra = {'recaptured': False, 'capture_ms': cache.get('capture_ms', 0.0)}
@@ -2433,6 +2767,8 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
         match_ms = round((time.time() - t0) * 1000, 1)
         if i >= 0:
             res = compose_for_row_live(drv, target_element, parsed.rows[i], rendered, form)
+            consult_row(res, parsed.rows[i], parsed.page_key, org, _indent(rendered),
+                        store_root=pack_dir)
             res.update({'row': _row_summary(parsed.rows[i]), 'page_key': parsed.page_key,
                         'match_ms': match_ms, 'rows': len(parsed.rows), 'matched_by': 'identity',
                         **out_extra})
@@ -2442,6 +2778,8 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
             row, why = DESC.find_row(parsed.rows, descriptor, get=DESC.parsed_get)
             if row is not None:
                 res = compose_for_row_live(drv, target_element, row, rendered, form)
+                consult_row(res, row, parsed.page_key, org, _indent(rendered),
+                            store_root=pack_dir)
                 res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
                             'match_ms': match_ms, 'rows': len(parsed.rows),
                             'matched_by': 'descriptor', 'descriptor_why': why, **out_extra})
@@ -2471,10 +2809,14 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                 j = -1
             if j >= 0:
                 row, step = owners[j]
-                return {'line': '%s%s    %s' % (_indent(rendered), step, UNVERIFIED),
-                        'xpath_line': None, 'row': _row_summary(row), 'page_key': parsed.page_key,
-                        'why': 'recipe step of row %s (%s)' % (row.get('n'), row.get('pattern')),
-                        'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra}
+                res = {'line': '%s%s    %s' % (_indent(rendered), step, UNVERIFIED),
+                       'xpath_line': None,
+                       'why': 'recipe step of row %s (%s)' % (row.get('n'), row.get('pattern'))}
+                consult_row(res, row, parsed.page_key, org, _indent(rendered),
+                            store_root=pack_dir)
+                res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
+                            'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra})
+                return res
         if attempt == 1 and _fingerprint(drv) != cache.get('fingerprint'):
             # the page moved under us: ONE recapture, and only when the DOM actually changed -- a
             # second walk of the same DOM yields the same rows and was the Setup stall (2026-09-18)

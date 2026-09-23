@@ -39,6 +39,32 @@ import disambiguation_args as DA   # noqa: E402  (index -> QWeb's numeric anchor
 
 _GENERATED = re.compile(r'\d{3,}|^(ng-|is-|_ng|slds-is-|cdk-)')
 
+# ------------------------------------------------------------- the ONE label normaliser (§3a)
+# The rendered label with its whitespace collapsed and the required-field marker off the edge.
+# It lives HERE, the lowest module of the composer stack, because `review_table` (which owns
+# `_clean_label`) imports this one and a recipe must reach the same rule without a cycle.
+#
+# ORDER MATTERS, and the order is the bug this replaced (close-out 2026-09-22 §3a, D-C2's
+# CAUGHT-BUG 1): `_clean_label` used to strip `^\*\s*` BEFORE collapsing whitespace, so a label
+# node that renders `<abbr class="slds-required">*</abbr>` on its own line -- `'\n* Company'` --
+# never matched `^\*` and came out as `'* Company'`. Both offline strippers normalise whitespace
+# first (`replay.stock_locator`: `.strip()` then `.lstrip('*')`; the page-side `descriptor.norm`:
+# `.replace(/\s+/g,' ').trim().replace(/^\*|\*$/g,'')`), so the live line disagreed with the
+# ladder that scores it. A marker in a locator is a locator that changes the day the field
+# stops being required.
+_NBSP = ' '
+_EDGE_REQUIRED_MARK = re.compile(r'^\*\s*|\s*\*$')
+
+
+def norm_text(s) -> str:
+    """Whitespace collapsed, non-breaking spaces folded in, ends trimmed."""
+    return re.sub(r'\s+', ' ', (s or '').replace(_NBSP, ' ')).strip()
+
+
+def clean_label(label) -> str:
+    """A rendered label as a LOCATOR: normalised, then the edge required marker removed."""
+    return norm_text(_EDGE_REQUIRED_MARK.sub('', norm_text(label)))
+
 
 def _stable_classes(attrs: dict) -> str:
     return ' '.join(sorted(c for c in (attrs.get('class') or '').split() if not _GENERATED.search(c)))[:80]
@@ -134,9 +160,21 @@ def _matches(rule: dict, row: dict) -> bool:
     return True
 
 
-def match(row: dict, library: list[dict] | None = None) -> dict | None:
-    """The first library entry whose match rule the row satisfies (entries are ordered specific -> general)."""
+def match(row: dict, library: list[dict] | None = None, org: str | None = None) -> dict | None:
+    """The first library entry whose match rule the row satisfies (entries are ordered specific ->
+    general). `org_bound` (2026-09-22, Stream PL): an entry keyed by a label list that names one
+    org's demo fields rather than a real DOM/component shape (no shape distinguished them --
+    see 'reactive-input-clear-then-verify's own `shape_investigation`) carries `org_bound: "<free
+    text naming the org>"`. Passing `org` here is opt-in and backward-compatible: omitted (the
+    default, every existing caller), an org_bound entry still matches exactly as before -- it is
+    never silently disabled underneath a caller that has not been taught about org scoping. Given
+    an `org`, an entry whose `org_bound` text does not mention it is skipped (falls through to the
+    next, more general entry) so a recipe keyed to slockard's Zoo demo fields cannot fire a
+    same-named field on another org's page."""
     for entry in (library if library is not None else load_library()):
+        bound = entry.get('org_bound')
+        if bound and org is not None and org.lower() not in bound.lower():
+            continue
         if _matches(entry.get('match') or {}, row):
             return entry
     return None
@@ -161,7 +199,13 @@ def recipe(entry: dict, row: dict, value: str) -> tuple[list[str], list[str]]:
     args = dict(row.get('pattern_args') or {})
     args.update({'attr_%s' % k.replace('-', '_'): v for k, v in (row.get('attrs') or {}).items() if isinstance(v, str)})
     idx = row.get('index_corrected') if 'index_corrected' in row else row.get('index')
-    args.update({'label': row.get('label_corrected') or (row.get('label') or ''), 'value': value,
+    # `{label}` is a LOCATOR cell, so it goes through the one normaliser -- the same rule
+    # `compose_live._label_of` and `review_table.robot_call` already apply. Until 2026-09-22 this
+    # was the only label consumer in the composer that read the row RAW, so a recipe-stamped fill
+    # emitted the required marker (`TypeText    *Company    ...`) where the generic rung stripped
+    # it: two rungs of one composer answering two different locators for one control.
+    args.update({'label': clean_label(row.get('label_corrected') or (row.get('label') or '')),
+                 'value': value,
                  'index': idx if idx else 1,
                  'xpath': row.get('xpath_corrected') or (row.get('xpath') or {}).get('value') or ''})
     anchor = DA.to_call_kwargs({'index': idx}).get('anchor') if idx and (row.get('group_size') or 1) > 1 else None

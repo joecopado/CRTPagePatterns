@@ -20,22 +20,28 @@ Library                   FakerLibrary
 *** Variables ***
 # IMPORTANT: Please read the readme.txt to understand needed variables and how to handle them!!
 ${BROWSER}                chrome
-# `${login_url}` is a CRT PROJECT variable (the UI-login path). A suite that authenticates by JWT
-# (`Gz Login`: JwtAuthenticate + JwtLogin) never defines it, and this table used to derive
-# `${home_url}` from it -- so EVERY run of the fsc7f suite printed
-# `Setting variable '${home_url}' failed: Variable '${login_url}' not found` on its line 19
-# (F188, 2026-09-20). The empty defaults below are what a Variables table may hold; a CRT /
-# `--variable` value overrides them whenever one is given. The home page URL is derived AT CALL
-# TIME by `Home Url` (below): `${login_url}` when it is set, else the live instance's own URL
-# (`GetInstanceUrl`, QForce) -- the JWT path has no login URL at all and needs none.
-# The standard template gives this a real default and a specific meaning: it is the JWT TOKEN
-# ENDPOINT, not a page to visit -- https://login.salesforce.com for production and Developer
-# Edition, https://test.salesforce.com for a sandbox. The separate ${loginUrl} (camelCase) is
-# the already-authenticated frontdoor URL Copado CI/CD injects for the TARGET org. Keeping
-# this empty, as this file used to, is what made `${home_url}` fail on every run.
+# TWO VARIABLES, TWO MEANINGS, NOT INTERCHANGEABLE. Both are kept; neither is legacy.
+#
+#   ${login_url}   the JWT TOKEN ENDPOINT -- what `JwtAuthenticate` authenticates AGAINST, never a
+#                  page to visit. The standard template gives it this real default:
+#                  https://login.salesforce.com for production and Developer Edition,
+#                  https://test.salesforce.com for a sandbox. (The lint flags this literal as a
+#                  hard-coded instance URL; here it is the template's own documented default, so
+#                  that finding is a false positive on this line and is left visible rather than
+#                  silenced.)
+#   ${loginUrl}    the already-authenticated FRONTDOOR URL Copado CI/CD injects for the target org.
+#                  Empty today and UNUSED -- the user, 2026-09-20: "always include the cicd option
+#                  in common.robot. but, we're not using it. We don't have a need for it right now.
+#                  Just if we take it in pipelines we will."
+#
+# `${home_url}` is GONE with the legacy `Home` / `Home Url` keywords it existed for (see the
+# removal note below). It was derived in this table from `${login_url}`, which a JWT suite never
+# defines, so EVERY run of the fsc7f suite printed `Setting variable '${home_url}' failed:
+# Variable '${login_url}' not found` on its line 19 (F188, 2026-09-20). Nothing derives a home URL
+# in a Variables table any more: `Open Lightning Path    /lightning/page/home` takes its base from
+# `GetInstanceUrl` at call time, after JwtLogin.
 ${login_url}              https://login.salesforce.com
 ${loginUrl}               ${EMPTY}
-${home_url}               ${EMPTY}
 
 
 *** Keywords ***
@@ -65,97 +71,82 @@ End suite
     Close All Browsers
 
 
-Login
-    [Documentation]       Login to Salesforce instance. Takes instance_url, username and password as
-    ...                   arguments. Uses values given in Copado Robotic Testing's variables section by default.
-    [Arguments]           ${sf_instance_url}=${login_url}    ${sf_username}=${username}   ${sf_password}=${password}
-    IF    not $sf_instance_url
-        Fail              Login: no login URL -- the project variable `login_url` is not set (a JWT suite authenticates with `Gz Login` / `JwtLogin` instead and never calls this keyword).
-    END
-    GoTo                  ${sf_instance_url}
-    TypeText              Username                    ${sf_username}             delay=1
-    
-    # Some envs will not show password field directly
-    ${password_field}=   Run Keyword And Return Status    Verify Input Element   Password   partial_match=False   timeout=1                     
-    # Added this to handle different types logins in different environments.
-    IF  not ${password_field}
-        Log    Password field not found, trying to click Log In button first.    console=True
-        ClickText            Log In
-    END                  
-    
-    TypeSecret           Password                    ${sf_password}
-    ClickText            Log In
-    # We'll check if variable ${secret} is given. If yes, fill the MFA dialog.
-    # If not, MFA is not expected.
-    # ${secret} is ${None} unless specifically given.
-    ${MFA_needed}=       Run Keyword And Return Status          Should Not Be Equal    ${None}       ${secret}
-    Run Keyword If       ${MFA_needed}               Fill MFA   ${sf_username}         ${secret}    ${sf_instance_url}                                            
-
-
-Login As
-    [Documentation]       Login As different persona. User needs to be logged into Salesforce with Admin rights
-    ...                   before calling this keyword to change persona.
-    ...                   Example:
-    ...                   LoginAs    Chatter Expert
-    [Arguments]           ${persona}
-    ClickText             Setup
-    ClickItem             Setup      delay=1
-    SwitchWindow          NEW
-    TypeText              Search Setup                ${persona}             delay=2
-    ClickElement          //*[@title\="${persona}"]   delay=2    # wait for list to populate, then click
-    VerifyText            Freeze                      timeout=45                        # this is slow, needs longer timeout          
-    ClickText             Login                       anchor=Freeze          partial_match=False    delay=1 
-
-
-Fill MFA
-    [Documentation]      Gets the MFA OTP code and fills the verification dialog (if needed)
-    [Arguments]          ${sf_username}=${username}    ${mfa_secret}=${secret}  ${sf_instance_url}=${login_url}
-    ${mfa_code}=         GetOTP    ${sf_username}   ${mfa_secret}   ${login_url}  
-    TypeSecret           Verification Code       ${mfa_code}      
-    ClickText            Verify 
-
-
-Home
-    [Documentation]       Example appstate: Navigate to homepage, login if needed
-    # private key given -> Use JWT Authentication to login, otherwise use UI login
-    ${jwt_enabled}=    Get Variable Value    $private_key    ${NONE}
-    IF    $jwt_enabled
-          JWT Authenticate            ${jwt_client_id}                ${username}    ${private_key}   sandbox=True
-          JWT Login
+JwtImpersonate
+    # A LOCAL DRY-RUN OF THIS FILE IS COULD-NOT-CHECK, and it is our tooling, not this resource.
+    # `robot --dryrun` here reports `Multiple keywords with name 'GoTo' found -- QForce.Go To /
+    # QWeb.Go To`. That is an artefact of `tools/qforce-lite/QForce/`, OUR OWN license-free shim
+    # standing in for the real QForce (the licensed library is permanently out of local scope, user
+    # 2026-08-30). The shim deliberately re-exports the common ~20-keyword set under QWeb's own
+    # names, so locally 19 keywords exist twice and every bare call collides. Whether the REAL
+    # QForce collides with QWeb cannot be checked from here.
+    # A first pass on 2026-09-20 qualified three calls to `QWeb.GoTo` and reported 29 more as a
+    # defect in this resource. That was WRONG -- it would have changed a shipped file to suit a
+    # local stand-in. Reverted. Bare `GoTo` is what this file, the proven copado-trial resource and
+    # CRT's own samples all use.
+    [Documentation]       Native Salesforce "Login As" via JWT -- verbatim from
+    ...                   crt-samples/standard.robot (user, 2026-08-31), the same body the
+    ...                   copado-trial suite and the exported-project fixture already carry.
+    ...                   Resolves `${user}` (an Id, a Username or a Name) by query, then lands as
+    ...                   that user in ONE navigation.
+    ...
+    ...                   WHY IT IS HERE (Loop 5 item E.16, lint rule L9): this resource shipped
+    ...                   without it, so the only run-as path it offered was the password `Login`
+    ...                   keyword below. CLAUDE.md is explicit -- to act as another user, use
+    ...                   `JwtImpersonate`, never a password or passkey login form. The JWT trio
+    ...                   (`JWTAuthenticate` / `JWTLogin` / `JwtImpersonate`) is org-agnostic by
+    ...                   construction: nothing here names an instance, and the target org comes
+    ...                   from the session the trio established.
+    [Arguments]           ${user}                     ${logged_in}=${False}    ${landing}=%2Flightning%2Fpage%2Fhome
+    IF                    '${user}'.startswith('005')
+        ${userId}=        Set Variable                ${user}
     ELSE
-        ${home}=             Home Url
-        GoTo                 ${home}
-        ${login_status} =    IsText                      To access this page, you have to log in to Salesforce.    5
-        Run Keyword If       ${login_status}             Login
+        ${q}=             QueryRecords                SELECT Id FROM User WHERE (Username='${user}' OR Name='${user}') AND IsActive=true LIMIT 1
+        IF                ${q}[totalSize] == 0
+            Fail          JwtImpersonate: no active user matching '${user}'
+        END
+        ${userId}=        Set Variable                ${q}[records][0][Id]
     END
-    ClickText            Home
-    VerifyTitle          Home | Salesforce
-
-
-Home Url
-    [Documentation]       The Lightning home page URL, derived when it is asked for (F192): `${login_url}/lightning/page/home`
-    ...                   when the project gives a login URL, else the live instance's own URL from `GetInstanceUrl`
-    ...                   (QForce; valid once `Gz Login` / `JwtLogin` has established the session). Never a
-    ...                   Variables-table derivation: `${login_url}` is undefined on the JWT path and the table
-    ...                   line errored on every run (F188).
-    # F216 (the challenge swarm): this used ${login_url} as its base, and F211 then filled that
-    # with the template's JWT TOKEN ENDPOINT -- so this keyword returned
-    # https://login.salesforce.com/lightning/page/home, the login host, never the org's home page,
-    # and the GetInstanceUrl fallback below became dead code because ${login_url} is never empty
-    # now. Each change was right alone; nobody owned the composite. The base is the TARGET ORG:
-    # ${loginUrl} (the already-authenticated frontdoor Copado CI/CD injects) when it is set, else
-    # the live instance the session is actually on. ${login_url} is a token endpoint and is never
-    # a page to visit -- the comment six lines above the Variables table says exactly that.
-    ${base}=              Set Variable    ${loginUrl}
-    IF    not $base
-        ${base}=          GetInstanceUrl
+    ${o}=                 QueryRecords                SELECT Id FROM Organization LIMIT 1
+    ${orgId}=             Set Variable                ${o}[records][0][Id]
+    ${su}=                Set Variable                /servlet/servlet.su?oid=${orgId}&suorgadminid=${userId}&retURL=${landing}&targetURL=${landing}
+    IF                    ${logged_in}
+        ${inst}=          GetInstanceUrl
+        GoTo              ${inst}${su}
+    ELSE
+        JWTLogin          ${su}
     END
-    ${base}=              Evaluate    str($base).rstrip('/')
-    RETURN                ${base}/lightning/page/home
 
 
-# Example of custom keyword with robot fw syntax. NOTE: These keywords may need to be adjusted
-# to work in your environment
+# ---------------------------------------------------------------------------------------------
+# REMOVED 2026-09-20 (Loop 5 item E.16, the user: "Home, Login, Login As are all legacy and do not
+# use JWT at all. Those are garbage."): `Login`, `Login As`, `Fill MFA`, `Home`, `Home Url`.
+#
+# They were the stock CRT sample's password-login path: a username/password form, an MFA OTP, a
+# "Login" button click, and a home URL derived from a login host. CLAUDE.md is explicit that to act
+# as another user you use `JwtImpersonate`, never a password or passkey login form, and the lint's
+# L10 rule flagged six of these lines for exactly that.
+#
+# NOTHING IS LOST -- every one has a JWT-native replacement that is already proven in 35 suites:
+#
+#   Login / Login As / Fill MFA  ->  the JWT trio: `JWTAuthenticate`, `JWTLogin`, and
+#                                    `JwtImpersonate` (defined above). Org-agnostic by
+#                                    construction: nothing names an instance, and the target org
+#                                    comes from the session the trio established.
+#   Home / Home Url              ->  `Open Lightning Path    /lightning/page/home`
+#                                    (crt/resources/garzai_navigation.robot), which takes its base
+#                                    from `GetInstanceUrl` after JwtLogin. That file also carries
+#                                    `Open Record Page`, `Open Object Page` and `Open Nav Tab`.
+#
+# Callers checked before removal: ZERO in any suite of ours. The only two `Login` callers are
+# `crt-parity/tests/cpq_test.robot` and `docs/crt-train/crt-samples/cpq_test.robot` -- CRT's own
+# stock SAMPLE, kept verbatim as a reference copy of what the platform ships, and deliberately
+# untouched.
+#
+# `${loginUrl}` (camelCase) STAYS DECLARED and is now unused (the user, 2026-09-20: "always include
+# the cicd option in common.robot. but, we're not using it. We don't have a need for it right now.
+# Just if we take it in pipelines we will."). It is the already-authenticated frontdoor Copado
+# CI/CD injects for a target org -- the option is kept for the day a pipeline supplies it.
+# ---------------------------------------------------------------------------------------------
 VerifyStage
     [Documentation]       Verifies that stage given in ${text} is at ${selected} state; either selected (true) or not selected (false)
     [Arguments]           ${text}                     ${selected}=true

@@ -190,6 +190,13 @@ def controls(path: str) -> list[dict]:
         out.append({
             'label': label, 'norm': n,
             'family': e.get('element_type'),
+            # F225 (the user, 2026-09-20, asking whether the patterns and transitions track a
+            # field's REQUIRED behaviour): they did not, and neither did this store. The only
+            # `required` anywhere was metadata-side, on a PREDICTION -- what the org's layout
+            # says -- so "the org requires this" and "this page is rendering it required" could
+            # never be compared. The DOM answer travels with the control from here.
+            'required': (e.get('validation') or {}).get('required'),
+            'required_source': (e.get('validation') or {}).get('required_source'),
             'tag': det.get('tag'),
             'attrs': det.get('attributes') or {},
             'container': (e.get('context') or {}).get('section') or '',
@@ -370,6 +377,13 @@ def build_record(store: Store, pk: dict, cs: list[dict], meta: dict, tmpl: dict,
         el.update({
             'family': c['family'], 'label': c['label'], 'container': c['container'],
             'attrs': stable_attrs(c['attrs']), 'tag': c['tag'], 'shape': c['shape'],
+            # F225: the DOM's own required signal, beside the metadata one on `metadata` below.
+            # Two independent answers to the same question, kept apart on purpose -- a field the
+            # layout requires but a given STATE does not render required is a real difference and
+            # a merged field would hide it. `required_source` says whether the page declared it
+            # (aria-required / the required attribute) or merely drew a marker.
+            'required': c.get('required'),
+            'required_source': c.get('required_source'),
             'source': el.get('source') if el.get('source') in ('recorded', 'live') else SOURCE_CAPTURE,
             'evidence': sorted(set((el.get('evidence') or []) + [capture_rel])),
             'verdict': el.get('verdict') or 'COULD-NOT-CHECK',

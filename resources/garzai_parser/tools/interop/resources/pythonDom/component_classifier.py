@@ -148,6 +148,20 @@ class ComponentClassifier:
             return match.group(1)
         return raw_name
 
+    #: SLDS BEM: `slds-listbox__option` is the option element; `slds-listbox__option_plain` /
+    #: `_entity` are its modifiers. `slds-listbox__option-text` (and `-text_entity`) is a
+    #: DIFFERENT element class -- the option's inner text node -- and is not an option. F223.
+    PICKLIST_OPTION_CLASS = 'slds-listbox__option'
+
+    def _has_picklist_option_class(self, tag) -> bool:
+        """True only when a class TOKEN is the option block or one of its `_modifier` forms."""
+        base = self.PICKLIST_OPTION_CLASS
+        for token in (tag.get('class') or []):
+            token = (token or '').strip().lower()
+            if token == base or token.startswith(base + '_'):
+                return True
+        return False
+
     def _classify_element_type(self, tag) -> str:
         if not tag or not hasattr(tag, 'name') or not tag.name:
             return 'unknown'
@@ -170,7 +184,23 @@ class ComponentClassifier:
         # options; a bare role="option" now also requires NOT being a Path
         # element (its own distinct `slds-path__` class family) before it's
         # treated as a picklist option.
-        if 'slds-listbox__option' in classes:
+        # F223 (2026-09-20): the rule above was a SUBSTRING test, and SLDS has a second,
+        # unrelated class that starts with the same 21 characters -- `slds-listbox__option-text`,
+        # which styles the TEXT ELEMENT INSIDE an option, not the option. OmniStudio stamps its
+        # `_entity` variant on the combobox INPUT ITSELF:
+        #     <input class="slds-input slds-listbox__option-text_entity" role="combobox"
+        #            aria-haspopup="listbox" aria-label="Salutation">
+        # so all four comboboxes on a real OmniScript step (Salutation, Phone Type, Nationality,
+        # Taxpayer Identification Type) classified as `picklist_option`, which is in
+        # SKIP_ELEMENT_TYPES, and were dropped before any signature could see them: 47 rows,
+        # 0 dropdowns, no error anywhere. The recorder's own injected bundle already carries
+        # `slds-listbox__option-text_entity` as an OmniStudio combobox HOST signal
+        # (tools/recorder/inject/dist/families.generated.js), so the two resolvers disagreed.
+        # The class is now matched as a CLASS TOKEN in its BEM forms -- the block itself
+        # (`slds-listbox__option`) or one of its `_modifier` variants -- never as a prefix of a
+        # different class; and a node carrying `role="combobox"` is the control, never an option
+        # inside one, whatever it is styled with.
+        if role != 'combobox' and self._has_picklist_option_class(tag):
             return 'picklist_option'
         if role == 'option' and 'slds-path__' not in classes:
             return 'picklist_option'

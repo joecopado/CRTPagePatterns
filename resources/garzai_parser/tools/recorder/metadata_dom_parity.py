@@ -465,6 +465,124 @@ def shape_of(el: dict) -> str:
 
 
 # ---------------------------------------------------------------- one page
+# ---------------------------------------------------------------- denominators (2026-09-22)
+# The 21% figure (`metadata_coverage_of_predictions`) was quoted for three weeks as a ceiling on
+# what metadata can predict. Measured 2026-09-22 (docs/audit/metadata-layer-value-2026-09-22.md):
+# every rendered-not-predicted control was a button, a link or chrome, and on the one page with a
+# verified denominator the UI API named 25/25 FIELD controls. The rate was a statement about how
+# much of a page is fields. So the instrument now reports BOTH denominators side by side, and the
+# contribution of each map LAYER (`source`), so a layer with no readers and no hits is visible as
+# such rather than folded into one number.
+FIELD_FAMILIES = frozenset({
+    'input_field', 'textarea', 'date', 'datetime', 'lookup', 'combobox', 'picklist', 'dropdown',
+    'checkbox', 'radio', 'email', 'number', 'search', 'output_field', 'toggle', 'currency',
+    'phone', 'url', 'rich_text', 'richtext', 'time', 'address', 'name', 'geolocation',
+})
+
+
+def family_class(element_type) -> str:
+    """'field' for a control a field layer could describe, else 'non-field' (buttons, links,
+    tabs, headers, chrome, tables)."""
+    return 'field' if (element_type or '') in FIELD_FAMILIES else 'non-field'
+
+
+def breakdowns(preds: list, rendered: list, hit: list, miss: list, extra: list) -> dict:
+    """The two denominators and the per-layer contribution for ONE page. Pure: no map, no DOM.
+
+    by_family[class]  = {rendered, predicted_and_rendered, rendered_not_predicted}
+                        over the RENDERED side, keyed by family_class(element_type).
+    by_source[layer]  = {predicted, rendered, not_rendered, behind_closed_tab, unique}
+                        over the PREDICTED side; `unique` counts hits that NO other layer also
+                        predicted (the layer's irreplaceable contribution).
+    """
+    hit_norms = {p['norm'] for p in hit}
+    by_family = {}
+    for r in rendered:
+        if not r.get('norm'):
+            continue
+        fc = family_class(r.get('element_type'))
+        d = by_family.setdefault(fc, {'rendered': 0, 'predicted_and_rendered': 0,
+                                      'rendered_not_predicted': 0})
+        d['rendered'] += 1
+        if r['norm'] in hit_norms:
+            d['predicted_and_rendered'] += 1
+        else:
+            d['rendered_not_predicted'] += 1
+    for fc, d in by_family.items():
+        d['coverage'] = (d['predicted_and_rendered'] / d['rendered']) if d['rendered'] else None
+    sources_per_norm = {}
+    for p in preds:
+        sources_per_norm.setdefault(p['norm'], set()).add(p.get('source'))
+    by_source = {}
+    for p in preds:
+        d = by_source.setdefault(p.get('source') or 'unknown',
+                                 {'predicted': 0, 'rendered': 0, 'not_rendered': 0,
+                                  'behind_closed_tab': 0, 'unique': 0})
+        d['predicted'] += 1
+    for p in hit:
+        d = by_source[p.get('source') or 'unknown']
+        d['rendered'] += 1
+        if len(sources_per_norm.get(p['norm'], ())) == 1:
+            d['unique'] += 1
+    for p in miss:
+        d = by_source[p.get('source') or 'unknown']
+        d['not_rendered'] += 1
+        if p.get('behind_closed_tab'):
+            d['behind_closed_tab'] += 1
+    return {'by_family': by_family, 'by_source': by_source}
+
+
+def family_basis_disclosure(rendered_total: int, by_family: dict) -> dict:
+    """C1, 2026-09-22 (docs/audit/challenge-2026-09-22-prior-work/C1-f229-numbers.md): pure,
+    no map, no DOM. `dom_explained_by_metadata` (computed by the caller from the corpus-wide
+    `rendered_total` and `rendered_not_predicted`) silently counts every rendered control with
+    no `norm` as EXPLAINED, because those controls never reach `rendered_not_predicted` (they
+    are excluded from `extra` in `assess()`) -- yet `breakdowns()`'s own `by_family` denominator
+    excludes those same controls from `rendered` entirely (`if not r.get('norm'): continue`).
+    Neither number is changed here; this only names the gap and recomputes the same
+    numerator/denominator SHAPE on `by_family`'s smaller, norm-only basis, so a reader can see
+    both and understand why they differ.
+
+    Returns {'rendered_without_norm': <n>, 'by_family_basis': {k, n, rate, wilson95}} -- `n` is
+    always `by_family`'s own summed `rendered`, never `rendered_total` itself, so a page with
+    zero norm-less controls degenerates exactly to `rendered_without_norm == 0` and the two
+    rates coincide."""
+    fam_rendered_total = sum(d['rendered'] for d in by_family.values())
+    fam_hits_total = sum(d['predicted_and_rendered'] for d in by_family.values())
+    return {
+        'rendered_without_norm': rendered_total - fam_rendered_total,
+        'by_family_basis': {
+            'k': fam_hits_total, 'n': fam_rendered_total,
+            'rate': (fam_hits_total / fam_rendered_total if fam_rendered_total else None),
+            'wilson95': (wilson(fam_hits_total, fam_rendered_total)
+                         if fam_rendered_total >= 10 else None),
+        },
+    }
+
+
+def merge_breakdowns(rows: list) -> dict:
+    """Sum per-page breakdowns into one; rates recomputed from the sums, never averaged."""
+    fam, src = {}, {}
+    for r in rows:
+        for fc, d in (r.get('by_family') or {}).items():
+            t = fam.setdefault(fc, {'rendered': 0, 'predicted_and_rendered': 0,
+                                    'rendered_not_predicted': 0})
+            for k in ('rendered', 'predicted_and_rendered', 'rendered_not_predicted'):
+                t[k] += d.get(k, 0)
+        for sname, d in (r.get('by_source') or {}).items():
+            t = src.setdefault(sname, {'predicted': 0, 'rendered': 0, 'not_rendered': 0,
+                                       'behind_closed_tab': 0, 'unique': 0})
+            for k in t:
+                t[k] += d.get(k, 0)
+    for fc, t in fam.items():
+        t['coverage'] = (t['predicted_and_rendered'] / t['rendered']) if t['rendered'] else None
+        t['wilson95'] = wilson(t['predicted_and_rendered'], t['rendered']) if t['rendered'] >= 10 else None
+    for sname, t in src.items():
+        t['rate'] = (t['rendered'] / t['predicted']) if t['predicted'] else None
+    return {'by_family': fam, 'by_source': src}
+
+
+
 def assess(capture: str, org, obj_override=None) -> dict:
     with open(capture, errors='replace') as fh:
         html = fh.read()
@@ -573,6 +691,7 @@ def assess(capture: str, org, obj_override=None) -> dict:
         'coverage_excl_closed_tabs': (
             len(hit) / (len(hit) + sum(1 for p in miss if not p.get('behind_closed_tab')))
             if (len(hit) + sum(1 for p in miss if not p.get('behind_closed_tab'))) else None),
+        **breakdowns(preds, rendered, hit, miss, extra),
         'missed_labels': [p['label'] for p in miss][:40],
         'keyword_disagreements': dis_rows[:15],
         'notes': notes,
@@ -673,12 +792,30 @@ def main(argv=None):
         for k, v in r['unpredicted_shapes'].items():
             shapes[k] = shapes.get(k, 0) + v
 
+    # C1, 2026-09-22 (docs/audit/challenge-2026-09-22-prior-work/C1-f229-numbers.md):
+    # `breakdowns()` drops every rendered control with no `norm` from `by_family`'s own
+    # denominator (unlabelled, matched to nothing), while `dom_explained_by_metadata` above
+    # keeps `rendered_total` as-is and silently counts every one of those dropped controls as
+    # EXPLAINED by metadata. Neither number is changed here -- both are disclosed side by side,
+    # with the gap between their denominators named.
+    bd = merge_breakdowns(tied)
+    disclosure = family_basis_disclosure(R, bd['by_family'])
+
     summary = {
         'captures_total': len(rows), 'tied': len(tied),
         'could_not_tie': len(rows) - len(tied),
         'predicted_total': P, 'predicted_and_rendered': H,
         'predicted_not_rendered': P - H,
         'rendered_total': R, 'rendered_not_predicted': E,
+        'rendered_without_norm': disclosure['rendered_without_norm'],
+        'rendered_without_norm_note': (
+            "rendered controls with no norm (unlabelled, matched to nothing) are excluded from "
+            "by_family's own denominator but are still counted as EXPLAINED inside "
+            "dom_explained_by_metadata (whose denominator is the unfiltered rendered_total); "
+            "dom_explained_by_metadata_by_family_basis below is the same numerator/denominator "
+            "shape recomputed on by_family's basis instead, and the two rates differ by exactly "
+            "this gap."
+        ),
         'rates': {
             'metadata_coverage_of_predictions': {
                 'k': H, 'n': P, 'rate': (H / P if P else None),
@@ -686,6 +823,7 @@ def main(argv=None):
             'dom_explained_by_metadata': {
                 'k': R - E, 'n': R, 'rate': ((R - E) / R if R else None),
                 'wilson95': wilson(R - E, R) if R >= 10 else None},
+            'dom_explained_by_metadata_by_family_basis': disclosure['by_family_basis'],
             'keyword_agreement': {
                 'k': KA, 'n': KA + KD, 'rate': (KA / (KA + KD) if (KA + KD) else None),
                 'wilson95': wilson(KA, KA + KD) if (KA + KD) >= 10 else None},
@@ -698,6 +836,7 @@ def main(argv=None):
         },
         'keyword_read_mode_could_not_compare': KRM,
         'unpredicted_shapes': dict(sorted(shapes.items(), key=lambda kv: -kv[1])),
+        **bd,
     }
     out = {'summary': summary, 'pages': rows}
     if a.out:
@@ -710,6 +849,8 @@ def main(argv=None):
         print(json.dumps(out, indent=1))
         return 0
     print('captures %(captures_total)d | tied %(tied)d | COULD-NOT-TIE %(could_not_tie)d' % summary)
+    print('rendered_without_norm: %d  (%s)'
+          % (summary['rendered_without_norm'], summary['rendered_without_norm_note']))
     for name, d in summary['rates'].items():
         w = d['wilson95']
         if w:
@@ -719,6 +860,17 @@ def main(argv=None):
         else:
             detail = 'COULD-NOT-CHECK'
         print('  %-34s %4s/%-5s %s' % (name, d['k'], d['n'], detail))
+    print('\nDOM explained, by family class (the denominator that answers "can metadata name it"):')
+    for fc, d in sorted(summary['by_family'].items()):
+        w = d.get('wilson95')
+        ci = ('  95%% CI [%.3f, %.3f]' % (w[0], w[1])) if w else ''
+        print('  %-10s rendered %5d  predicted-and-rendered %5d  coverage %s%s'
+              % (fc, d['rendered'], d['predicted_and_rendered'],
+                 ('%.3f' % d['coverage']) if d['coverage'] is not None else 'COULD-NOT-CHECK', ci))
+    print('\npredictions by map layer (rendered / predicted; unique = no other layer named it):')
+    for sname, d in sorted(summary['by_source'].items(), key=lambda kv: -kv[1]['predicted']):
+        print('  %-24s %5d / %-5d  unique %4d  behind closed tab %4d'
+              % (sname, d['rendered'], d['predicted'], d['unique'], d['behind_closed_tab']))
     print('\nunpredicted DOM controls by shape:')
     for k, v in summary['unpredicted_shapes'].items():
         print('  %-32s %d' % (k, v))

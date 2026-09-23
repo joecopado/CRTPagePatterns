@@ -48,11 +48,25 @@ Documentation     OmniStudio (OmniScript + FlexCard) keywords CRT/QForce does no
 Library           QWeb
 # Library-importing keywords_omni.py directly (rather than an unrelated file) gets the same
 # sys.path side effect the source template relies on (Library-importing keywords_recordtype.py /
-# keywords_upload.py there) -- WITH NAME keeps the auto-generated per-function keywords
-# (OmniRaw.Omni Type, etc.) out of the unqualified namespace so they cannot collide with the
-# hand-written keywords below sharing the same un-prefixed name. Every keyword body here still
-# calls in via `Evaluate __import__('keywords_omni').<fn>(...)` -- mechanism 2 in the inventory,
-# the same mechanism the source template uses for this exact file.
+# keywords_upload.py there) -- WITH NAME keeps the auto-generated per-function keywords out of the
+# unqualified namespace so they cannot collide with the hand-written keywords below sharing the
+# same un-prefixed name.
+#
+# READABILITY (the user, 2026-09-20): "`Run Keyword And Ignore Error` makes more sense than
+# `Evaluate __import__` does. That's much more human-readable and puts it more in line."
+# Every body below now calls `OmniRaw.<Keyword>` directly. Robot's static library API already
+# exposes each module-level function under its spaced name (`omni_type` -> `Omni Type`), so the
+# `Evaluate __import__('keywords_omni').<fn>(...)` indirection the source template used was
+# doing nothing this import does not already do -- it just hid the call from the reader.
+# Argument types are unchanged: a bare `${var}` cell passes the VALUE, so `${TRUE}`, `${NONE}`
+# and a list variable all arrive as the Python objects they were, exactly as `$var` did inside
+# `Evaluate`. Proven by `robot --dryrun` over every keyword in this file, before and after.
+#
+# LIBRARIES: nothing else belongs here. The canonical six (QWeb, QForce, Collections, String,
+# DateTime, FakerLibrary) are declared on the ENTRY resource, `common.robot`, and a keyword file
+# imported by one INHERITS them -- re-declaring them here is the "applied too bluntly" mistake
+# the rule itself names. `Library QWeb` below is the one exception and is a WORKAROUND, not a
+# pattern: see its own comment.
 Library           ${CURDIR}/garzai_omni/keywords_omni.py    WITH NAME    OmniRaw
 Library           Collections    # Append To List in Gz Omni Verdict below
 Library           ${CURDIR}/garzai_verdicts.py    # F192: the ONE session ledger every verdict line lands in
@@ -147,7 +161,7 @@ Omni Type
     ...                self-referential check `omni_date`'s own docstring names.
     [Arguments]    ${key}    ${value}    ${family}=omni-text
     ${status}    ${v}=    Run Keyword And Ignore Error
-    ...    Evaluate    __import__('keywords_omni').omni_type($key, $value, $family)
+    ...    OmniRaw.Omni Type    ${key}    ${value}    ${family}
     ${v}=    Gz Omni Verdict    Omni Type    ${key}    ${value}    ${status}    ${v}
     RETURN    ${v}
 
@@ -172,7 +186,7 @@ Omni Select
     ...                own round trip after the commit, so the line reports a real second read.
     [Arguments]    ${key}    ${value}
     ${status}    ${v}=    Run Keyword And Ignore Error
-    ...    Evaluate    __import__('keywords_omni').omni_select($key, $value)
+    ...    OmniRaw.Omni Select    ${key}    ${value}
     ${v}=    Gz Omni Verdict    Omni Select    ${key}    ${value}    ${status}    ${v}
     RETURN    ${v}
 
@@ -191,7 +205,7 @@ Omni Radio
     ...                `data-element-label` the ONLY anchor reaching this group (no aria-label, no
     ...                legend text).
     [Arguments]    ${key}    ${value}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_radio($key, $value)
+    ${v}=    OmniRaw.Omni Radio    ${key}    ${value}
     RETURN    ${v}
 
 Omni Checkbox
@@ -205,7 +219,7 @@ Omni Checkbox
     ...                (asked ${TRUE}) and `FSC_DL_v1_Does_Lien_Exist` (asked ${FALSE}) -- both
     ...                VERIFIED-PASS.
     [Arguments]    ${key}    ${checked}=${TRUE}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_checkbox($key, $checked)
+    ${v}=    OmniRaw.Omni Checkbox    ${key}    ${checked}
     RETURN    ${v}
 
 Omni Date
@@ -238,7 +252,7 @@ Omni Date
     ...                the independent path that caught its original vacuous green.
     [Arguments]    ${key}    ${value}
     ${status}    ${v}=    Run Keyword And Ignore Error
-    ...    Evaluate    __import__('keywords_omni').omni_date($key, $value)
+    ...    OmniRaw.Omni Date    ${key}    ${value}
     ${v}=    Gz Omni Verdict    Omni Date    ${key}    ${value}    ${status}    ${v}
     RETURN    ${v}
 
@@ -254,7 +268,7 @@ Omni Multiselect
     ...                (docs/recorder/sessions/fsc7f/omni-elements-additional-2026-09-07.json,
     ...                catalogue_note) -- not driven live on the example org this repo ships.
     [Arguments]    ${key}    ${values}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_multiselect($key, $values)
+    ${v}=    OmniRaw.Omni Multiselect    ${key}    ${values}
     RETURN    ${v}
 
 Omni Lookup
@@ -273,7 +287,7 @@ Omni Lookup
     ...                defect (the shared commit half is separately proven by `Omni Select`/
     ...                `Omni Typeahead` on the same script and FlexCard).
     [Arguments]    ${key}    ${search}    ${choose}=${NONE}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_lookup($key, $search, $choose)
+    ${v}=    OmniRaw.Omni Lookup    ${key}    ${search}    ${choose}
     RETURN    ${v}
 
 Omni Typeahead
@@ -291,7 +305,7 @@ Omni Typeahead
     ...                reach it) -- the shared commit half IS proven live on fsc7f through
     ...                `Omni Select`, above.
     [Arguments]    ${key}    ${search}    ${choose}=${NONE}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_typeahead($key, $search, $choose)
+    ${v}=    OmniRaw.Omni Typeahead    ${key}    ${search}    ${choose}
     RETURN    ${v}
 
 Omni Edit Block Add Row
@@ -311,7 +325,7 @@ Omni Edit Block Add Row
     ...                omni-elements-additional-2026-09-07.json): CAUGHT-BUG then VERIFIED-PASS
     ...                same session, block count 5 -> 6 after one Add click.
     [Arguments]    ${key}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_edit_block_add_row($key)
+    ${v}=    OmniRaw.Omni Edit Block Add Row    ${key}
     RETURN    ${v}
 
 Omni Next Step
@@ -336,7 +350,7 @@ Omni Next Step
     ...                64.29 (%), every call via the progress-percent fallback (this script's
     ...                chart index never resolves). VERIFIED-PASS.
     [Arguments]    ${label}=Next
-    ${v}=    Evaluate    __import__('keywords_omni').omni_next_step($label)
+    ${v}=    OmniRaw.Omni Next Step    ${label}
     RETURN    ${v}
 
 Omni Verify Output Legacy
@@ -357,7 +371,7 @@ Omni Verify Output Legacy
     ...                PROOF: dev1/fsc7f, shared by every `Omni Type`/`Omni Select`/`Omni Radio`/
     ...                etc. read-back above (module docstring).
     [Arguments]    ${key}    ${expected}    ${family}=omni-text
-    ${v}=    Evaluate    __import__('keywords_omni').verify_omni_value($key, $expected, $family)
+    ${v}=    OmniRaw.Verify Omni Value    ${key}    ${expected}    ${family}
     RETURN    ${v}
 
 Get Omni Value
@@ -374,7 +388,7 @@ Get Omni Value
     ...                (`get_omni_value`) is the same one every `Omni Verify *` proof above
     ...                already exercises; this wrapper adds no new behaviour.
     [Arguments]    ${key}    ${family}=omni-text
-    ${v}=    Evaluate    __import__('keywords_omni').get_omni_value($key, $family)
+    ${v}=    OmniRaw.Get Omni Value    ${key}    ${family}
     RETURN    ${v}
 
 Omni Read Output
@@ -399,7 +413,7 @@ Omni Read Output
     ...                host ("Application Form") and a nonexistent label both correctly raised
     ...                `OmniElementNotFound` rather than returning a caption's own text.
     [Arguments]    ${label}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_read_output($label)
+    ${v}=    OmniRaw.Omni Read Output    ${label}
     RETURN    ${v}
 
 Omni Verify Output Field
@@ -419,7 +433,7 @@ Omni Verify Output Field
     ...                `SilentWrongValue: typed 'Wrong' into First Name (omni-output) -- field
     ...                holds 'Jane'.` -- the guard SEEN FIRING, not merely claimed.
     [Arguments]    ${label}    ${expected}
-    ${v}=    Evaluate    __import__('keywords_omni').verify_omni_output($label, $expected)
+    ${v}=    OmniRaw.Verify Omni Output    ${label}    ${expected}
     RETURN    ${v}
 
 Omni Click Action
@@ -450,5 +464,5 @@ Omni Click Action
     ...                the keyword correctly refused to report a pass rather than guess whether the
     ...                action is a genuine no-op on this card.
     [Arguments]    ${key}
-    ${v}=    Evaluate    __import__('keywords_omni').omni_click_action($key)
+    ${v}=    OmniRaw.Omni Click Action    ${key}
     RETURN    ${v}
