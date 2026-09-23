@@ -254,12 +254,87 @@ def _recipe_first_action(entry: dict, row: dict, value: str | None) -> str | Non
     return None
 
 
-def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
+def _recipe_note(entry: dict | None) -> str:
+    """The provenance note for a line the pattern library rendered (CH-B B1.d,
+    docs/audit/challenge-wave-one-2026-09-23/CH-B-d22-followthrough.md): a recipe-led line is a
+    MEASURED pattern, never `UNVERIFIED` ('# unverified: parser proposal') -- that stamp is a false
+    claim on a recipe, the same error class F246 was raised for. Carries the entry's own `status`
+    verbatim when it is not the default 'verified' (so 'verified-on-one-page' travels, per
+    `review_table._pattern_entry`'s own admission list), and the pages it was measured on when the
+    library entry carries that count (most do not yet -- omitted, never fabricated)."""
+    if not entry:
+        return UNVERIFIED
+    name = entry.get('id') or entry.get('name')   # the id names the recipe; the name is a sentence
+    status = entry.get('status') or 'verified'
+    note = '# recipe: %s' % name
+    if status != 'verified':
+        note += ' (%s)' % status
+    pages = entry.get('measured_pages')
+    if isinstance(pages, int) and pages > 0:
+        note += ', measured on %d page%s' % (pages, '' if pages == 1 else 's')
+    return note
+
+
+def _stamp(line: str, note: str) -> str:
+    """Join a provenance note onto a composed line as ONE comment cell (F196/F203, the fifth call
+    site, 2026-09-23): `annotate` folds it into an existing `#` note with `; `, so a disclosure the
+    line already carries (`# COULD-NOT-CHECK: ...`) stays FIRST and the recipe stamp follows it;
+    a line with no note gets `    # <note>`, byte-identical to the old plain join."""
+    body = note[2:] if note.startswith('# ') else note.lstrip('#').strip()
+    return annotate(line.rstrip(), body)
+
+
+def _insert_before_note(cells: list, mark: str) -> list:
+    """A kwarg cell goes BEFORE the first `#` cell, never after it: Robot reads nothing past a
+    comment marker, so `gz_family=combobox` appended last (7 lines of the n12 goldens) never
+    reached the shipped TypeText override."""
+    out = list(cells)
+    for i, c in enumerate(out):
+        if c.strip().startswith('#'):
+            out.insert(i, mark); return out
+    out.append(mark); return out
+
+
+def _recipe_step_value(rendered: str) -> str | None:
+    """The event's OWN recorded value, when the rendered line carries one (>=3 cells, the same
+    read `_body` rule 5 uses) -- never the synthetic probe D19/F246 exists to keep out of a
+    composed line."""
+    cells = _cells(rendered)
+    return cells[-1] if len(cells) >= 3 else None
+
+
+def _recipe_live_step(step: str, probe, real_value: str | None) -> tuple[str | None, str | None]:
+    """(live, dormant) for ONE recipe STEP already matched by its own xpath against a
+    PROBE-rendered form (`RT.probe_value(row)`, CH-B B1.c): the match is found by rendering with a
+    SYNTHETIC review literal purely to see whose xpath resolves to the target element, and that
+    literal must never become a LIVE line on its own (D19/F246 -- the same rule the fill branch
+    already obeys at :316-326). A step that never embedded the probe at all (most STEPS -- e.g. the
+    dual-listbox move arrow's own ClickElement, which carries no {value} slot) stands live
+    unchanged. One that did gets the event's own recorded value substituted verbatim; with no
+    recorded value (e.g. the event was a click) it goes DORMANT instead of shipping the probe."""
+    probe_s = str(probe)
+    if probe_s not in step:
+        return step, None
+    if real_value is None:
+        return None, step
+    return step.replace(probe_s, real_value), None
+
+
+def _recipe_dormant(indent: str, step: str, why: str) -> str:
+    return '%s#   backup: %s' % (indent, annotate(step.strip(), why))
+
+
+def _body(row: dict, rendered: str, entry: dict | None, _used: list | None = None) -> str | None:
     """Our proposed line for this row and this recorded action, or '' to record nothing, or None
     to let the recorder's own line stand. The shape mirrors `build_override._our_line_body`, with
     one difference that is the whole point: there are no live verdicts here, so the LABEL form is
     what the parser proposes and the xpath is the backstop -- never a silent downgrade to xpath
-    because a keyword was measured bad (that knowledge only exists in a review)."""
+    because a keyword was measured bad (that knowledge only exists in a review).
+
+    `_used` is an optional out-param (CH-B B1.d): when the returned body actually came from
+    `entry`'s recipe (rules 2/5/11), `entry` is appended to it, so a caller (`_compose_body`) can
+    stamp the line `# recipe: <name>` instead of the parser's `UNVERIFIED` note. Every existing
+    caller omits it and is unaffected -- this is purely additive."""
     cells = _cells(rendered)
     action = cells[0] if cells else ''
     value = cells[-1] if len(cells) >= 3 else None
@@ -296,6 +371,8 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
         if entry:
             line = _recipe_first_action(entry, row, cells[1])
             if line:
+                if _used is not None:
+                    _used.append(entry)
                 return line
         return RT._rf('ClickText', cells[1], partial_match='False')
 
@@ -323,6 +400,8 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
     if fam in FILL_FAMILIES and action in ('TypeText', 'TypeSecret') and value is not None and entry:
         line = _recipe_first_action(entry, row, value)
         if line:
+            if _used is not None:
+                _used.append(entry)
             return line
 
     # 6. typing into a field: the generic rung, and the fallback for a row with no recipe
@@ -363,7 +442,10 @@ def _body(row: dict, rendered: str, entry: dict | None) -> str | None:
     # 11. nothing of ours fits the recorded action: a verified library recipe for this control, if
     #     the library has one; otherwise the recorder's line stands.
     if entry:
-        return _recipe_first_action(entry, row, value)
+        line = _recipe_first_action(entry, row, value)
+        if line and _used is not None:
+            _used.append(entry)
+        return line
     return None
 
 
@@ -841,7 +923,11 @@ def lbc_open_click_line(label: str | None, stock_open: str) -> tuple[str, str]:
 
 
 def _dormant_note(indent: str, text: str, note: str) -> str:
-    return '%s#   backup: %s   (%s)' % (indent, (text or '').strip(), note)
+    """F256 (2026-09-23): the note is a ROBOT COMMENT CELL through `annotate`, never a bare
+    parenthesised tail -- the fourth call site of the F196/F203 shape; 7 of 30 dormant lines in
+    the user's Session B pane carried `   (opened, no pick recorded -- not a step)` and would have
+    become the keyword's next argument the moment `Comment    backup: ` was stripped."""
+    return '%s#   backup: %s' % (indent, annotate((text or '').strip(), note))
 
 
 def pick_open_dormant(label: str | None, stock_open: str, indent: str = '    ',
@@ -1217,7 +1303,7 @@ def combobox_fill_line(composed: str, desc, indent: str = '    ') -> tuple[str, 
     if not is_combo:
         return '', '', why
     ind = composed[: len(composed) - len(composed.lstrip())] or indent
-    line = ind + '    '.join(list(cells) + [COMBOBOX_MARK])
+    line = ind + '    '.join(_insert_before_note(list(cells), COMBOBOX_MARK))
     verify = '%s#   verify: %s' % (ind, RT._rf('Verify Combobox Selection', cells[1], cells[2]).strip())
     return line, verify, 'typeable combobox: %s -- the read-back is the selected option after blur' % why
 
@@ -1953,16 +2039,20 @@ def xpath_form(row: dict, body: str) -> str | None:
 
 
 def _compose_body(row: dict, rendered: str) -> tuple:
-    """(body, xp_body, disambiguation) for ONE matched row -- the pure half shared by the offline
-    and the driver layers. `body` is None (let the recorder's line stand), '' (record nothing) or
-    the proposed keyword-form step; `xp_body` its xpath form; `disambiguation` the parser's
-    DESCRIPTION of the control's repeats, with no call argument derived from it."""
+    """(body, xp_body, disambiguation, entry_used) for ONE matched row -- the pure half shared by
+    the offline and the driver layers. `body` is None (let the recorder's line stand), '' (record
+    nothing) or the proposed keyword-form step; `xp_body` its xpath form; `disambiguation` the
+    parser's DESCRIPTION of the control's repeats, with no call argument derived from it.
+    `entry_used` (CH-B B1.d) is the library entry `body` actually came through, or None when it is
+    a plain parser proposal -- the caller's cue to stamp `# recipe: <name>` instead of
+    `# unverified: parser proposal`."""
     entry = None
     try:
         entry = RT._pattern_entry(row)     # a library entry whose recipe is one to RUN
     except Exception:
         entry = None
-    body = _body(row, rendered, entry)
+    used: list = []
+    body = _body(row, rendered, entry, used)
     n_stripped = None
     if body:
         body, n_stripped = strip_numeric_anchor(body)
@@ -1971,11 +2061,11 @@ def _compose_body(row: dict, rendered: str) -> tuple:
            'anchor_candidates': list(row.get('anchor_candidates') or []),
            'decision': 'described-only', 'anchor': None, 'live_count': None, 'scope': None,
            'why': 'the parser index is a capture count; no anchor is derived from it (F189)'}
-    return body, xp_body, dis
+    return body, xp_body, dis, (used[0] if used else None)
 
 
 def _render_row(row: dict, rendered: str, form: str, body, xp_body, dis: dict,
-                dormant_label: str | None = None) -> dict:
+                dormant_label: str | None = None, entry_used: dict | None = None) -> dict:
     if body is None:
         return {'line': None, 'xpath_line': xp_body, 'why': 'no proposal for this action on this control',
                 'disambiguation': dis}
@@ -1988,12 +2078,14 @@ def _render_row(row: dict, rendered: str, form: str, body, xp_body, dis: dict,
         chosen = xp_body
     elif form == 'both' and xp_body and xp_body != body:
         chosen = body + '    # xpath form: ' + xp_body
-    why = 'parser proposal for row %s' % row.get('n')
+    note = _recipe_note(entry_used)
+    why = ('recipe %s for row %s' % (entry_used.get('id'), row.get('n')) if entry_used
+           else 'parser proposal for row %s' % row.get('n'))
     decision = dis.get('decision')
     if decision in ('text-anchor', 'xpath-live') or 'COULD-NOT' in (dis.get('why') or ''):
         why += '; live disambiguation: %s' % dis.get('why')
-    return {'line': '%s%s    %s' % (ind, chosen.strip(), UNVERIFIED),
-            'xpath_line': ('%s%s    %s' % (ind, xp_body.strip(), UNVERIFIED)) if xp_body else None,
+    return {'line': _stamp(ind + chosen.strip(), note),
+            'xpath_line': _stamp(ind + xp_body.strip(), note) if xp_body else None,
             'dormant_label_line': ('%s%s' % (ind, dormant_label.strip())) if dormant_label else None,
             'why': why, 'disambiguation': dis}
 
@@ -2001,8 +2093,8 @@ def _render_row(row: dict, rendered: str, form: str, body, xp_body, dis: dict,
 def compose_for_row(row: dict, rendered: str, form: str = 'keyword') -> dict:
     """The line for ONE matched row, offline: no driver, so no live census -- the label form is
     bare and `disambiguation` says what the capture counted."""
-    body, xp_body, dis = _compose_body(row, rendered)
-    return _render_row(row, rendered, form, body, xp_body, dis)
+    body, xp_body, dis, entry_used = _compose_body(row, rendered)
+    return _render_row(row, rendered, form, body, xp_body, dis, entry_used=entry_used)
 
 
 # ----------------------------------------------------------------------------- live disambiguation (F189)
@@ -2207,7 +2299,7 @@ def apply_live_disambiguation(body: str, xp_body: str | None, census: dict | Non
 def compose_for_row_live(drv, target_element, row: dict, rendered: str, form: str = 'keyword') -> dict:
     """The line for ONE matched row with the element in hand: the pure composition, then the live
     census on a label-form line, then the F189 policy."""
-    body, xp_body, dis = _compose_body(row, rendered)
+    body, xp_body, dis, entry_used = _compose_body(row, rendered)
     dormant = None
     if body:
         lf = _label_form(body)
@@ -2216,7 +2308,7 @@ def compose_for_row_live(drv, target_element, row: dict, rendered: str, form: st
             body, dormant, dis = apply_live_disambiguation(body, xp_body, census, row)
         else:
             dis.update({'decision': 'not-applicable', 'why': 'the line does not locate by a label'})
-    return _render_row(row, rendered, form, body, xp_body, dis, dormant_label=dormant)
+    return _render_row(row, rendered, form, body, xp_body, dis, dormant_label=dormant, entry_used=entry_used)
 
 
 def _row_summary(row: dict) -> dict:
@@ -2229,10 +2321,20 @@ def _row_summary(row: dict) -> dict:
             'confidence': row.get('confidence')}
 
 
-def _recipe_step_for(parsed: Parsed, target_path: str) -> tuple[dict | None, str | None]:
-    """A verified recipe's own ClickElement step whose xpath resolves, in this capture, to exactly
-    this element. The dual-listbox move arrow is a STEP of the dual-listbox row's recipe, never a
-    row of its own -- the same fallback `build_override._recipe_step_for` runs live."""
+def _recipe_step_for(parsed: Parsed, target_path: str,
+                     rendered: str = '') -> tuple[dict | None, str | None, str | None]:
+    """(row, live_step, dormant_step) -- a verified recipe's own step (ClickElement or otherwise)
+    whose xpath resolves, in this capture, to exactly this element. The dual-listbox move arrow is
+    a STEP of the dual-listbox row's recipe, never a row of its own -- the same fallback
+    `build_override._recipe_step_for` runs live. Exactly one of `live_step`/`dormant_step` is set
+    when a match is found; both None when nothing resolves.
+
+    D19/F246 (CH-B B1.c): the match is found by rendering every candidate with
+    `RT.probe_value(row)` -- a SYNTHETIC review literal, never a real one -- purely to see which
+    line's own xpath resolves to `target_path`. The WINNING line then has that literal swapped for
+    the event's own recorded value (an extra cell on `rendered`) when it carries one, and goes
+    DORMANT instead of live when it does not: a probe literal is never shipped as a recorded step."""
+    real_value = _recipe_step_value(rendered)
     for row in parsed.rows:
         try:
             entry = RT._pattern_entry(row)
@@ -2240,8 +2342,9 @@ def _recipe_step_for(parsed: Parsed, target_path: str) -> tuple[dict | None, str
             entry = None
         if not entry:
             continue
+        probe = RT.probe_value(row)
         try:
-            kw_lines, xp_lines = PL.recipe(entry, row, RT.probe_value(row))
+            kw_lines, xp_lines = PL.recipe(entry, row, probe)
         except Exception:
             continue
         for step in list(kw_lines) + list(xp_lines):
@@ -2250,8 +2353,9 @@ def _recipe_step_for(parsed: Parsed, target_path: str) -> tuple[dict | None, str
                 continue
             els = parsed.resolve(xp)
             if len(els) == 1 and parsed.path_of(els[0]) == target_path:
-                return row, step.strip()
-    return None, None
+                live, dormant = _recipe_live_step(step.strip(), probe, real_value)
+                return row, live, dormant
+    return None, None, None
 
 
 def _roster_form(form: str, org: str | None, url: str | None) -> str:
@@ -2508,10 +2612,39 @@ def compose_from_capture(html: str, url: str, org: str, target_identity_xpath: s
             row = r
             break
     if row is None:
-        row, step = _recipe_step_for(parsed, target_path)
+        row, step, dormant = _recipe_step_for(parsed, target_path, rendered)
         if step:
-            out.update({'line': '%s%s    %s' % (_indent(rendered), step, UNVERIFIED),
+            entry = None
+            try:
+                entry = RT._pattern_entry(row)
+            except Exception:
+                entry = None
+            out.update({'line': _stamp(_indent(rendered) + step, _recipe_note(entry)),
                         'row': _row_summary(row), 'why': 'recipe step of row %s (%s)' % (row.get('n'), row.get('pattern'))})
+            # F258 (2026-09-23): this branch never called consult_row at all, while
+            # compose_live_element's OWN recipe branch (below, CH-B B1.a) does -- with the SAME
+            # neutered target row (label/element_type stripped to None, only `tag` kept), because
+            # `row` here is the recipe's OWNER (e.g. the dual-listbox row), not the element this
+            # STEP resolves to, and a target identity with no label never resolves past
+            # unknown-control in pom/consult.consult -- the same reason `compose_live_element`
+            # gives at its call site. Both branches produce the same LINE either way (a target
+            # with no label cannot land `# verified`), but before this fix the offline decision
+            # record carried no `consult` key at all while the live one carried
+            # {'verdict': 'unknown-control', ...} -- CLAUDE.md's standing rule for this pair
+            # ("the per-event AND the batch path -- they must stay byte-identical") held for the
+            # rendered pane and not for the decision record behind it (V-B section 3c).
+            target_row = {'label': None, 'element_type': None, 'tag': row.get('tag')}
+            consult_row(out, target_row, parsed.page_key, org, _indent(rendered))
+        elif dormant:
+            # D19/F246 (CH-B B1.c): the winning step needed a value this event did not record
+            # (e.g. a probe-only match on a fill line, never the dual-listbox arrow's own click,
+            # which carries no {value} slot) -- kept dormant, never shipped as a live literal.
+            out.update({'line': None, 'row': _row_summary(row),
+                        'backups': [_recipe_dormant(_indent(rendered), dormant,
+                                    'recipe step of row %s (%s), needs a value this event did '
+                                    'not record' % (row.get('n'), row.get('pattern')))],
+                        'why': ('recipe step of row %s (%s) needed a value this event did not '
+                                'record -- kept dormant (D19)' % (row.get('n'), row.get('pattern')))})
         else:
             out['why'] = 'no parsed row resolves to this element'
         out['compose_ms'] = round((time.time() - t0) * 1000, 1)
@@ -2787,33 +2920,58 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                     res['why'] = '%s (by descriptor: %s)' % (res['why'], why)
                 return res
             out_extra['descriptor_why'] = why
-        # no row: a recipe STEP may name it (the dual-listbox move arrow)
+        # no row: a recipe STEP may name it (the dual-listbox move arrow). Each candidate is
+        # rendered with a PROBE value purely to find which one's xpath resolves live -- the same
+        # D19/F246 rule `_recipe_step_for` applies offline (CH-B B1.c).
+        real_value = _recipe_step_value(rendered)
         steps, owners = [], []
         for row in parsed.rows:
             try:
                 entry = RT._pattern_entry(row)
                 if not entry:
                     continue
-                kw_lines, xp_lines = PL.recipe(entry, row, RT.probe_value(row))
+                probe = RT.probe_value(row)
+                kw_lines, xp_lines = PL.recipe(entry, row, probe)
             except Exception:
                 continue
             for step in list(kw_lines) + list(xp_lines):
                 xp = _unescape_xpath_step(step)
                 if xp:
                     steps.append(xp)
-                    owners.append((row, step.strip()))
+                    owners.append((row, step.strip(), entry, probe))
         if steps:
             try:
                 j = int(drv.execute_script(_MATCH_JS, steps, target_element))
             except Exception:
                 j = -1
             if j >= 0:
-                row, step = owners[j]
-                res = {'line': '%s%s    %s' % (_indent(rendered), step, UNVERIFIED),
-                       'xpath_line': None,
-                       'why': 'recipe step of row %s (%s)' % (row.get('n'), row.get('pattern'))}
-                consult_row(res, row, parsed.page_key, org, _indent(rendered),
-                            store_root=pack_dir)
+                row, step, entry, probe = owners[j]
+                live, dormant = _recipe_live_step(step, probe, real_value)
+                if live:
+                    res = {'line': _stamp(_indent(rendered) + live, _recipe_note(entry)),
+                           'xpath_line': None,
+                           'why': 'recipe step of row %s (%s)' % (row.get('n'), row.get('pattern'))}
+                    # CH-B B1.a: this STEP is a different element than `row` itself -- `row` is
+                    # merely the recipe's OWNER (e.g. the dual-listbox row; the arrow the person
+                    # actually acted on has no row of its own). Consulting with the OWNER's
+                    # identity let its verified rung (arity-0 against a ClickElement derived call,
+                    # same as this step) silently replace the arrow's step with the LISTBOX's own
+                    # call -- the store-led call's own arity check cannot tell "same control" from
+                    # "different control", only "compatible action shape". A target identity with
+                    # no label never resolves past `unknown-control` in `pom/consult.consult`, so
+                    # `# verified` can only land here when the store genuinely answers for THIS
+                    # step, never for the row that happens to carry its recipe.
+                    target_row = {'label': None, 'element_type': None, 'tag': row.get('tag')}
+                    consult_row(res, target_row, parsed.page_key, org, _indent(rendered),
+                                store_root=pack_dir)
+                else:
+                    res = {'line': None, 'xpath_line': None,
+                           'backups': [_recipe_dormant(_indent(rendered), dormant,
+                                       'recipe step of row %s (%s), needs a value this event did '
+                                       'not record' % (row.get('n'), row.get('pattern')))],
+                           'why': ('recipe step of row %s (%s) needed a value this event did not '
+                                   'record -- kept dormant (D19)' % (row.get('n'), row.get('pattern'))),
+                           'consult': {'verdict': 'skipped', 'why': 'nothing was composed for this row'}}
                 res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
                             'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra})
                 return res

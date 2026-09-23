@@ -37,7 +37,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(_ROOT, 'tools', 'interop', 'reso
 sys.path.insert(0, os.path.abspath(os.path.join(_ROOT, 'tools', 'benchmark')))
 sys.path.insert(0, os.path.abspath(os.path.join(_ROOT, 'tools', 'qforce-lite')))
 
-from capture_orchestration import parse_elements_from_html  # noqa: E402
+from parser_gateway import parse_elements_from_html  # noqa: E402  (F250: LATE-BOUND -- a
+# module-level `from capture_orchestration import ...` is stranded by the harness's two
+# deliberate sys.modules purges; see tools/recorder/parser_gateway.py)
 from metrics import wilson  # noqa: E402
 # Stream B6 fix (2026-09-07): this file's own quick-action prediction used to route the LITERAL
 # `render.keyword_family` TEXT ("aura-picklist / aura-date / aura-lookup (NOT QForce PickList...")

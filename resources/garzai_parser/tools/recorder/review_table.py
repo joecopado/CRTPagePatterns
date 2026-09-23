@@ -53,7 +53,9 @@ for _p in ('tools/interop/resources/pythonDom', 'tools/benchmark', 'tools/qforce
 
 from bs4 import BeautifulSoup, Comment, NavigableString  # noqa: E402  (the vendored 3.10+ bs4)
 import lxml.html                                        # noqa: E402
-from capture_orchestration import parse_elements_from_html  # noqa: E402
+from parser_gateway import parse_elements_from_html  # noqa: E402  (F250: LATE-BOUND -- a
+# module-level `from capture_orchestration import ...` is stranded by the harness's two
+# deliberate sys.modules purges; see tools/recorder/parser_gateway.py)
 import metadata_dom_parity as PARITY                    # noqa: E402
 import pom_asset as PA                                  # noqa: E402
 import disambiguation_args as DA                         # noqa: E402
@@ -817,7 +819,11 @@ def build_rows(cap: Capture, org: str | None) -> tuple[list[dict], dict]:
             row['raw'], row['raw_context'] = raw_neighbourhood(node)
             row['identity_xpath'], row['identity_kind'] = identity_of(cap, node)
             row['xpath'] = xpath_ladder(cap, node, e)
-        entry = PL.match(row, _library)
+        # CH-B B1.e (2026-09-23): `org` is in hand here (build_rows(cap, org)) and MUST reach
+        # `match` -- this is the ONE `PL.match` call on the review/compose path, so an org_bound
+        # recipe (docs/recorder/patterns/library.json) was inert with no `org=` passed: it matched
+        # any org's page exactly as an unbound entry would, which is what org_bound exists to stop.
+        entry = PL.match(row, _library, org=org)
         if entry:
             row['pattern'] = entry['id']
             row['pattern_args'] = PL.find_pattern_args(entry, node)

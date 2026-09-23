@@ -1278,6 +1278,22 @@ class Store:
             lines.append("")
             lines.append(f"key `{pg['key']}` · visits {r.get('visits', 0)} · first seen {r.get('first_seen')} · L0 {((r.get('l0') or {}).get('source') or 'none')}")
             lines.append("")
+            # CH-B B3 (ledger F249): a one-page Markdown CARD, rendered from `page_pack.export_record`'s
+            # own trimmed pack -- never this table's raw store fields -- for a person who wants the
+            # verified/known-unverified split, its rung form, pass count and last-pass date without
+            # opening a JSON. `render()` never GENERATES the card (page_pack.py card does, offline,
+            # against the pack) -- it only links to one that already exists on disk, keyed by the
+            # SAME slug the store's own JSON file uses, so the link never lies about a card that was
+            # never rendered and never needs its own regeneration step here.
+            if sf:
+                slug = os.path.splitext(os.path.basename(r.get("_path") or ""))[0]
+                card_path = (os.path.join(self.docs_root, "docs", "org-map", f"{partition}-pom-cards",
+                                          f"{slug}.md") if slug else None)
+                if card_path and os.path.exists(card_path):
+                    rel = os.path.relpath(card_path, os.path.dirname(out_path))
+                    lines.append(f"[card]({rel}) -- verified/known-unverified controls, from the "
+                                 "exported pack")
+                    lines.append("")
             els = r.get("elements") or {}
             if els:
                 lines.append("| element | family | primary | verified/failed | backups | leads to / opens | effects |")

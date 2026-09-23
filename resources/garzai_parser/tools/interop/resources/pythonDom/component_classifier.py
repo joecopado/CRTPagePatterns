@@ -284,6 +284,45 @@ class ComponentClassifier:
             # same commit).
             if tag_type in ('submit', 'button', 'reset'):
                 return 'button'
+            # F258 (2026-09-23), the second half of F251. Restoring lightning-lookup/
+            # lightning-datepicker to their own 'lookup'/'date' family (below, and see
+            # the two `_why_..._is_not_a_shadow_wrapper` template notes) re-opened the
+            # OUTER wrapper's own row, but the raw `<input>` these compound controls
+            # compose internally (three shadow layers down for a lookup: lookup-desktop
+            # -> grouped-combobox -> base-combobox -> input) is a literal HTML `<input>`
+            # tag, caught by this same branch, and it carried no ancestor check of its
+            # own -- so the SAME control emitted TWICE: once here as 'input_field', once
+            # at the wrapper as 'lookup'/'date'. Measured 2026-09-23: 22 of 22 rows F251
+            # restored duplicate a pre-existing 'input_field' row this way
+            # (docs/audit/validate-wave-one-2026-09-23/V-B-parser-recipes-pack.md
+            # section 1b).
+            #
+            # Scoped to exactly the rows F251 restored, not every wrapper this shape
+            # could apply to:
+            #  - lightning-lookup always owns its own row (no further ancestor to check).
+            #  - lightning-datepicker owns 'date' only when standalone -- nested inside a
+            #    lightning-datetimepicker it is already 'internal' (the outer 'datetime'
+            #    owns the family) and its raw input was ALREADY folding into nothing
+            #    beforehand -- there was never a competing family row for it, so it is
+            #    left alone here.
+            #  - NOT the broader internal_ancestor_tags list the lightning-base-combobox
+            #    branch above uses: that list also folds lightning-timepicker and every
+            #    lightning-datepicker (standalone or not). Measured 2026-09-23: that
+            #    broader list moves input_field by 36 (not 22) -- 4 of the extra 14 are
+            #    lightning-timepicker's OWN pre-existing 'time'/input_field duplicates
+            #    (e.g. Zoo_Base_Inputs.html 'Time', 'Time (secondary)'), a real but
+            #    SEPARATE, undiscovered bug never gated by shadowWrapperTags at all
+            #    (lightning-timepicker was never in that list); the other extra rows are
+            #    the two lightning-datepicker sub-inputs INSIDE each lightning-
+            #    datetimepicker on the same fixture -- also pre-existing, also untouched
+            #    by F251. Fixing either here would touch captures and counts beyond what
+            #    F251/F258 own. Named, not fixed: a follow-up ledger row for the time/
+            #    datetime raw-input duplication (docs/audit/validate-wave-one-2026-09-23).
+            if tag.find_parent('lightning-lookup'):
+                return 'internal'
+            datepicker_ancestor = tag.find_parent('lightning-datepicker')
+            if datepicker_ancestor and not datepicker_ancestor.find_parent('lightning-datetimepicker'):
+                return 'internal'
             return 'input_field'
 
         if 'button' in tag_name or role == 'button' or 'slds-button' in classes:

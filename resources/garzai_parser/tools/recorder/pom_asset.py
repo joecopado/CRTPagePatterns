@@ -54,7 +54,9 @@ for _p in ('tools/interop/resources/pythonDom', 'tools/benchmark', 'tools/qforce
     if _abs not in sys.path:
         sys.path.insert(0, _abs)
 
-from capture_orchestration import parse_elements_from_html  # noqa: E402
+from parser_gateway import parse_elements_from_html  # noqa: E402  (F250: LATE-BOUND -- a
+# module-level `from capture_orchestration import ...` is stranded by the harness's two
+# deliberate sys.modules purges; see tools/recorder/parser_gateway.py)
 import metadata_dom_parity as PARITY                        # noqa: E402
 from pom import keys as K                                   # noqa: E402
 from pom.store import Store, element_id, stable_attrs       # noqa: E402

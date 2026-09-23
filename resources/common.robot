@@ -66,6 +66,33 @@ Setup Browser
     SetConfig             DefaultTimeout              5s                    #sometimes salesforce is slow
     # adds a delay of 0.3 between keywords. This is helpful in cloud with limited resources.
     SetConfig             Delay                       0.3
+    Gz Log Override Status
+
+
+Gz Log Override Status
+    [Documentation]       WHICH RECORDER IS THIS SESSION ACTUALLY RUNNING? (F259, validator V-A
+    ...                   sec 4.) `_patch_bundle` can REFUSE -- a stock bundle whose `enable`,
+    ...                   `disable` or `pushStep` site has moved is left alone rather than written
+    ...                   half-patched -- and until this build that refusal reached nobody: the
+    ...                   library imported normally, the composer started, the keywords
+    ...                   registered, and the editor session recorded with the plain Copado
+    ...                   recorder looking entirely normal. `Gz Override Status` carried the
+    ...                   answer and NO .robot file in this repo called it (grep: zero hits,
+    ...                   this file included).
+    ...
+    ...                   So the suite setup logs `patched` and `anchor_counts` once. It is a
+    ...                   REPORT, never a gate: a suite that does not import the override library
+    ...                   is not broken by it, and says COULD-NOT-CHECK rather than passing
+    ...                   quietly.
+    ${ok}    ${raw}=      Run Keyword And Ignore Error                      Gz Override Status
+    IF                    '${ok}' != 'PASS'
+        Log               GZ OVERRIDE: COULD-NOT-CHECK -- the override library is not imported in this suite, so which recorder is running cannot be read from here    level=WARN
+        RETURN
+    ${st}=                Evaluate                    json.loads(r'''${raw}''')    json
+    Log                   GZ OVERRIDE: patched=${st}[patched] anchors=${st}[anchor_counts] build=${st}[version]
+    IF                    'REFUSED' in str($st.get('patched'))
+        Log               GZ OVERRIDE REFUSED: ${st}[patched] -- anchors ${st}[anchor_counts]; this session is recording with the STOCK recorder    level=WARN
+    END
 
 End suite
     Close All Browsers

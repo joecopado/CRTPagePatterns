@@ -428,13 +428,13 @@
     "slds-drag-handle",
     "slds-th__action-icon"
   ],
+  "_why_lightning_datepicker_is_not_a_shadow_wrapper": "2026-09-23 (F251), the SAME defect as the lookup note below, one tag over. d9ca8f5a added lightning-datepicker to shadowWrapperTags; component_classifier returns 'date' for it and 'internal' only when it sits inside a lightning-datetimepicker -- that nested case IS the dedup, and it needs no wrapper entry. With the wrapper entry the 'date' family was emitted 0 times by BOTH entry points. Measured 2026-09-23 on 02b-user-story-new-recordtype.html (3 <lightning-datepicker>, 2 of them inside <lightning-datetimepicker>): removing it emits date 1 -- the one standalone picker -- total +1, datetime still 2, unknown still 0.",
+  "_why_lightning_lookup_is_not_a_shadow_wrapper": "2026-09-23 (F251): lightning-lookup was added to shadowWrapperTags by d9ca8f5a alongside lightning-lookup-desktop and lightning-lookup-address, and is removed again here. component_classifier._classify_element_type says in its own comment that lightning-lookup is the OUTER control and WINS the classification, while lightning-lookup-desktop and the grouped-/base-combobox it composes are its shadow duplicates (-> 'internal', already in SKIP_ELEMENT_TYPES). Listing the OUTER control as a shadow wrapper made that branch unreachable from every entry point: lightning-lookup is not in TARGET_TAGS either, so the lightning-* wildcard pass was its only door and _is_shadow_wrapper closed it. Measured 2026-09-23: 02b-user-story-new-recordtype.html holds 12 <lightning-lookup> and emitted family 'lookup' 0 times, and 04-account-new-record-modal.html holds 1 and lost 'Account Owner' from capture-completeness entirely. Removing it restores lookup 12 and 1, totals +12 and +1 -- exactly one row per lookup, no duplicates, 'unknown' still 0 -- so d9ca8f5a's dedup intent is kept by the 'internal' classification alone.",
   "shadowWrapperTags": [
-    "lightning-lookup",
     "lightning-lookup-desktop",
     "lightning-lookup-address",
     "lightning-grouped-combobox",
     "lightning-base-combobox",
-    "lightning-datepicker",
     "lightning-input",
     "lightning-textarea",
     "lightning-combobox",
