@@ -88,6 +88,7 @@ Gz Log Override Status
     IF                    '${ok}' != 'PASS'
         Log               GZ OVERRIDE: COULD-NOT-CHECK -- the override library is not imported in this suite, so which recorder is running cannot be read from here    level=WARN
         RETURN
+    END
     ${st}=                Evaluate                    json.loads(r'''${raw}''')    json
     Log                   GZ OVERRIDE: patched=${st}[patched] anchors=${st}[anchor_counts] build=${st}[version]
     IF                    'REFUSED' in str($st.get('patched'))
