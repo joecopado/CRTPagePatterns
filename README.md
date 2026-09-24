@@ -20,6 +20,7 @@ LIVE-PROBED Salesforce pages, then dropped into this project's own conventions. 
     ${client_idCICD}   ${usernameCICD}   ${private_keyCICD}     SECICD
     ${client_idFSC}    ${usernameFSC}    ${private_keyFSC}      FSC (fsc7f)      -- values: ~/crt-jwt-credentials/fsc7f/credentials.txt
     ${client_idHC}     ${usernameHC}     ${private_keyHC}       Health Cloud (health90) -- values: ~/crt-jwt-credentials/health90/credentials.txt
+    ${client_idPC}     ${usernamePC}     ${private_keyPC}       Partner Central community (jwt-jgarzaaf-copado-com-; the PARTNER user, Paul Partner) -- values: ~/crt-jwt-credentials/jwt-jgarzaaf-copado-com-/credentials.txt; suite tests/community-login/community-login.robot, library resources/GzCommunity.py (needs PyJWT, which QForce already ships)
 
 Each page suite authenticates with the triple of ITS org (the mapping is `crt/orgs.json` in the GarzAI repo). No
 `${login_url}` is needed: navigation starts from `GetInstanceUrl` after `JwtLogin`.
