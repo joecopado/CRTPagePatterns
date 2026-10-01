@@ -1264,27 +1264,28 @@ COULD-NOT-CHECK until one does.
 # 10. QWeb shadow DOM: a switch inside a native shadow root — `tests/qweb-shadow-dom/`
 
 **Org:** none. The suite opens `cr_toggle_mock.html` beside it (`file://${CURDIR}/...`), a page whose
-open shadow root holds `<cr-toggle id="enableToggle" role="switch" aria-checked="true">` and a decoy
-toggle that is `aria-checked="false"`, mirroring chrome://extensions. Written for Graham's question
-(2026-10-01): how to click a `cr-toggle` conditionally on its `aria-checked` value with ClickItem.
-**Prerequisites:** none. Locally: `robot -v HEADLESS:True tests/qweb-shadow-dom/cr-toggle-shadow-dom.robot`.
-Measured 2026-10-01 under QWeb 3.7.1: dry-run 6/6, real run 6/6.
+open shadow root holds `<cr-toggle id="enableToggle" role="switch" aria-checked="true">`, mirroring
+chrome://extensions. Written for Graham's question (2026-10-01): click a `cr-toggle` only when its
+`aria-checked` is `true`. **Prerequisites:** none. Only `Library QWeb` is imported, so every keyword is
+called by its plain name (no `QWeb.` prefix, no search-order line). Locally:
+`robot -v HEADLESS:True tests/qweb-shadow-dom/cr-toggle-shadow-dom.robot`. Measured 2026-10-01 under
+QWeb 3.7.1: dry-run 1/1, real run 1/1.
 
-## `cr-toggle-shadow-dom.robot`
+## `cr-toggle-shadow-dom.robot` — one inline test case
 
-**Purpose:** the three facts about item keywords in shadow DOM, each proven by a read-back of the
-toggle's own `aria-checked` through `GetAttribute ... element_type=item tag=cr-toggle`.
-
-| Case | Keyword line | Pattern | Verification |
+| Step | Keyword line | Pattern | Verification |
 |---|---|---|---|
-| 1 | `ClickItem    enableToggle    tag=cr-toggle` with `ShadowDOM False` | QForce native | `Run Keyword And Expect Error QWebElementNotFoundError*` — invisible without the config |
-| 2 | `QWeb.SetConfig    ShadowDOM    True` then `ClickItem    enableToggle    tag=cr-toggle` | QForce native | read-back: `aria-checked` true -> false, and `VerifyText state: false` |
-| 3 | `${state}= GetAttribute enableToggle aria-checked element_type=item tag=cr-toggle` + `IF '${state}' == 'true'` -> `ClickItem` | QForce native | read-back: `aria-checked` false after the conditional click |
-| 4 | `ClickItem    otherToggle    tag=cr-toggle    aria-checked=true` | QForce native | read-back: the decoy (aria-checked false) was clicked anyway — the kwarg is NOT a filter |
-| 5 | `ClickItem    aria-checked\=true    tag=cr-toggle` | QForce native | `Run Keyword And Expect Error QWebElementNotFoundError*` — no attribute has that literal value |
-| 6 | `ClickItem    true    tag=cr-toggle` | QForce native | read-back: matched by the bare attribute VALUE; works, ambiguous by design |
+| 1 | `SetConfig    ShadowDOM    True` | config | none — without it the toggle is not found at all |
+| 2 | `${state}=    GetAttribute    enableToggle    aria-checked    element_type=item    tag=cr-toggle` | QWeb native | the value read from the element inside the shadow root |
+| 3 | `IF    '${state}' == 'true'` → `ClickItem    enableToggle    tag=cr-toggle` | QWeb native | read-back on the next line |
+| 4 | `${after}=    GetAttribute ...` + `Should Be Equal    ${after}    false` | assertion | the click flipped the switch |
 
-Why: with `ShadowDOM True`, `ClickItem` walks every open shadow root, keeps elements whose tag equals
-`tag=`, and matches the text against the full value of any attribute (QWeb `internal/text.py`
-`get_items_including_shadow_dom`, `internal/javascript.py` `get_by_attributes`). Both libraries define
-`SetConfig`, so the suite sets the repo's search order (QForce, QWeb) and names `QWeb.SetConfig` in full.
+Why it works: with `ShadowDOM True`, `ClickItem` and `GetAttribute element_type=item` walk every open
+shadow root, keep elements whose tag equals `tag=`, and match the text against the full value of any
+attribute (QWeb `internal/text.py` `get_items_including_shadow_dom`, `internal/javascript.py`
+`get_by_attributes`), so `enableToggle` matches by the id's value.
+
+What does not work, measured on the same page and left as comments in the suite:
+`ClickItem enableToggle tag=cr-toggle aria-checked=true` (the kwarg is ignored, a false toggle is
+clicked and PASS is reported); `ClickItem aria-checked\=true tag=cr-toggle` (not found, no attribute
+has that literal value); `ClickItem true tag=cr-toggle` (works by bare attribute value, fragile).
