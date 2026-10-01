@@ -1289,3 +1289,25 @@ What does not work, measured on the same page and left as comments in the suite:
 `ClickItem enableToggle tag=cr-toggle aria-checked=true` (the kwarg is ignored, a false toggle is
 clicked and PASS is reported); `ClickItem aria-checked\=true tag=cr-toggle` (not found, no attribute
 has that literal value); `ClickItem true tag=cr-toggle` (works by bare attribute value, fragile).
+
+---
+
+# 11. Pre- and post-deployment steps — `tests/pre-post-deployment/`
+
+**Org:** slockard (`${client_idSlock}` / `${usernameSlock}` / `${private_keySlock}`). Three tests, one
+shape: the UI shows the BEFORE, one keyword does the work through the API, the UI refreshes and shows
+the AFTER. Every id is looked up by API name at run time (`GzDeploySteps.py`, beside the suite), so the
+file runs unchanged in every environment of a pipeline. Each test puts the org back inline, so it runs
+on repeat; no teardown. Measured 2026-10-01: API keywords 8/8 live, full suite 3/3 twice in a row locally
+(frontdoor login; in CRT the suite logs in with JwtAuthenticate/JwtLogin).
+
+| Test | Before (UI) | The work (API keyword) | After (UI) | Reset |
+|---|---|---|---|---|
+| Pre-deployment gate | Setup > Installed Packages shows `Copado Deployer` | `Installed Package Version    Copado Deployer` -> 19.16, `Should Be True >= 19.0` | the number on screen matches the gate | none, read-only |
+| Activate the flow | Setup > Flows lists `Action Callback Flow` (Inactive) | `Activate Flow    Action_Callback_Flow` (Tooling: latest version on) | `Flow Status` reads Active after `RefreshPage` | `Deactivate Flow` inline |
+| Grant the access | Misc tab (LWC Recipes) card reads "The permission set is not assigned" | `Assign Permission Set    Access_Restricted_UI    ${usernameSlock}` | after `RefreshPage` the card reads "The permission set is assigned" | `Remove Permission Set` inline, card reads "not assigned" again |
+
+Trap found while building: a Setup detail page (`/lightning/setup/ManageUsers/page?address=...`) renders
+classic Setup in a cross-origin `salesforce-setup.com` iframe that no keyword can see into, so the
+permission-set proof uses a page in the app, not Setup. A `=` inside a GoTo URL must be escaped (`\=`) or
+Robot reads it as a named argument.
