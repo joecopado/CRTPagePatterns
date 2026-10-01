@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>cr-toggle mock</title></head>
+<body>
+<h1>Extension toggle mock</h1>
+<p id="status">state: unknown</p>
+<extensions-detail-view id="host"></extensions-detail-view>
+<script>
+// A custom element whose shadow root (open) holds a cr-toggle-shaped switch,
+// mirroring chrome://extensions: <cr-toggle id=enableToggle role=switch aria-checked=...>
+class CrToggle extends HTMLElement {
+  connectedCallback() {
+    this.setAttribute('role', 'switch');
+    this.setAttribute('tabindex', '0');
+    if (!this.hasAttribute('aria-checked')) this.setAttribute('aria-checked', 'true');
+    this.setAttribute('aria-disabled', 'false');
+    this.style.cssText = 'display:inline-block;width:40px;height:20px;border-radius:10px;background:' + (this.getAttribute('aria-checked')==='true' ? '#1a73e8' : '#999');
+    this.addEventListener('click', () => {
+      const now = this.getAttribute('aria-checked') === 'true';
+      this.setAttribute('aria-checked', now ? 'false' : 'true');
+      if (now) { this.removeAttribute('checked'); } else { this.setAttribute('checked', ''); }
+      this.setAttribute('aria-label', (now ? 'Off' : 'On') + ', extension ' + (now ? 'disabled' : 'enabled'));
+      this.style.background = now ? '#999' : '#1a73e8';
+      document.getElementById('status').textContent = 'state: ' + this.getAttribute('aria-checked');
+    });
+  }
+}
+customElements.define('cr-toggle', CrToggle);
+class DetailView extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({mode: 'open'});
+    root.innerHTML = `
+      <div id="enable-section" style="padding:12px;border:1px solid #ccc">
+        <span id="a11yAssociation">Enable extension</span>
+        <cr-toggle id="enableToggle" aria-describedby="a11yAssociation" aria-label="On, extension enabled" aria-checked="true" checked=""></cr-toggle>
+        <span style="margin-left:24px">Decoy</span>
+        <cr-toggle id="otherToggle" aria-label="Off, incognito disabled" aria-checked="false"></cr-toggle>
+      </div>`;
+    document.getElementById('status').textContent = 'state: true';
+  }
+}
+customElements.define('extensions-detail-view', DetailView);
+</script>
+</body></html>

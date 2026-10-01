@@ -1258,3 +1258,33 @@ in the orchestrator repo: 84 assertions plus a `robot --dryrun` and a real `robo
 `tools/recorder/tests/fixtures/gz_data_suite/gz_data_smoke.robot`, which calls every keyword above.
 No browser, no org. **This resource has never run in a CRT Live Testing session** — that is
 COULD-NOT-CHECK until one does.
+
+---
+
+# 10. QWeb shadow DOM: a switch inside a native shadow root — `tests/qweb-shadow-dom/`
+
+**Org:** none. The suite opens `cr_toggle_mock.html` beside it (`file://${CURDIR}/...`), a page whose
+open shadow root holds `<cr-toggle id="enableToggle" role="switch" aria-checked="true">` and a decoy
+toggle that is `aria-checked="false"`, mirroring chrome://extensions. Written for Graham's question
+(2026-10-01): how to click a `cr-toggle` conditionally on its `aria-checked` value with ClickItem.
+**Prerequisites:** none. Locally: `robot -v HEADLESS:True tests/qweb-shadow-dom/cr-toggle-shadow-dom.robot`.
+Measured 2026-10-01 under QWeb 3.7.1: dry-run 6/6, real run 6/6.
+
+## `cr-toggle-shadow-dom.robot`
+
+**Purpose:** the three facts about item keywords in shadow DOM, each proven by a read-back of the
+toggle's own `aria-checked` through `GetAttribute ... element_type=item tag=cr-toggle`.
+
+| Case | Keyword line | Pattern | Verification |
+|---|---|---|---|
+| 1 | `ClickItem    enableToggle    tag=cr-toggle` with `ShadowDOM False` | QForce native | `Run Keyword And Expect Error QWebElementNotFoundError*` — invisible without the config |
+| 2 | `QWeb.SetConfig    ShadowDOM    True` then `ClickItem    enableToggle    tag=cr-toggle` | QForce native | read-back: `aria-checked` true -> false, and `VerifyText state: false` |
+| 3 | `${state}= GetAttribute enableToggle aria-checked element_type=item tag=cr-toggle` + `IF '${state}' == 'true'` -> `ClickItem` | QForce native | read-back: `aria-checked` false after the conditional click |
+| 4 | `ClickItem    otherToggle    tag=cr-toggle    aria-checked=true` | QForce native | read-back: the decoy (aria-checked false) was clicked anyway — the kwarg is NOT a filter |
+| 5 | `ClickItem    aria-checked\=true    tag=cr-toggle` | QForce native | `Run Keyword And Expect Error QWebElementNotFoundError*` — no attribute has that literal value |
+| 6 | `ClickItem    true    tag=cr-toggle` | QForce native | read-back: matched by the bare attribute VALUE; works, ambiguous by design |
+
+Why: with `ShadowDOM True`, `ClickItem` walks every open shadow root, keeps elements whose tag equals
+`tag=`, and matches the text against the full value of any attribute (QWeb `internal/text.py`
+`get_items_including_shadow_dom`, `internal/javascript.py` `get_by_attributes`). Both libraries define
+`SetConfig`, so the suite sets the repo's search order (QForce, QWeb) and names `QWeb.SetConfig` in full.
