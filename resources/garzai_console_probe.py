@@ -32,7 +32,10 @@ def gz_console_probe(size_kb="2", channel="console"):
     block = "\n".join(lines)
     sha = hashlib.sha256(block.encode()).hexdigest()[:12]
     start = "GZPROBE START size_kb=%s lines=%d bytes=%d sha=%s" % (size_kb, n, len(block), sha)
-    end = "GZPROBE END lines=%d bytes=%d sha=%s -- if you can read this line, nothing was cut" % (n, len(block), sha)
+    # `tail` appears ONLY on the END line (a different slice of the hash, which no model computes in its
+    # head): a correct `tail` proves the reader saw the last line, not a guess from the START line.
+    tail = hashlib.sha256(block.encode()).hexdigest()[12:24]
+    end = "GZPROBE END lines=%d bytes=%d sha=%s tail=%s -- if you can read this line, nothing was cut" % (n, len(block), sha, tail)
     full = "\n".join([start, block, end])
     if channel in ("console", "both"):
         logger.console(full)
