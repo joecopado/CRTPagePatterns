@@ -14,7 +14,6 @@ Suite Teardown      End suite
 Create A Batch Of Leads And Find Them In A List View
     [Teardown]    Delete Created Records    ${created}
     ${created}=    Create List
-    Set Test Variable    ${created}
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
     ${batch_size}=    Set Variable    5
