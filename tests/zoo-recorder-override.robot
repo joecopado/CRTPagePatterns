@@ -8,7 +8,7 @@ Documentation                   EXPERIMENT (2026-09-18): record on the Zoo Night
 Resource                        ../resources/common.robot
 Resource                        ../resources/garzai_typetext_override.robot    # comment out to record/run with stock QWeb TypeText
 Library                         ../resources/garzai_recorder_override.py
-Suite Setup                     Setup Browser
+Suite Setup                     Run Keywords    Setup Browser    AND    Gz Log Override Status    # the recorder override reports which recorder this session runs
 Suite Teardown                  Run Keywords    Gz Override Restore    AND    End suite    # put the stock recorder bundle back: the patch outlives the session on a reused container (measured 2026-09-18)
 
 *** Test Cases ***

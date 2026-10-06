@@ -66,7 +66,9 @@ Setup Browser
     SetConfig             DefaultTimeout              5s                    #sometimes salesforce is slow
     # adds a delay of 0.3 between keywords. This is helpful in cloud with limited resources.
     SetConfig             Delay                       0.3
-    Gz Log Override Status
+    # The recorder's own report (Gz Log Override Status) is no longer called here: only a suite that imports
+    # resources/garzai_recorder_override.py has anything to report, so those suites call it in their own
+    # Suite Setup. Every other suite opens the browser without a warning about a recorder it never uses.
 
 
 Gz Log Override Status
