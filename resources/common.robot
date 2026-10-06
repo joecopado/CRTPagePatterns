@@ -16,6 +16,10 @@ Library                   DateTime
 # declares no generator is exactly how this recorder came to invent run-stamped strings
 # instead of using Faker (the user, 2026-09-20).
 Library                   FakerLibrary
+# The CRT Test Agent's page reader (W2.14): Gz Read Page / Gz Show / Gz Verify. Imported HERE, in
+# the entry resource every suite imports, so the three keywords are in the agent's auto-loaded
+# test-keywords list. The import touches nothing until a keyword runs (no browser exists yet).
+Library                   ${CURDIR}/garzai_page_reader.py
 
 *** Variables ***
 # IMPORTANT: Please read the readme.txt to understand needed variables and how to handle them!!

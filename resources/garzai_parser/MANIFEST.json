@@ -1,8 +1,9 @@
 {
+ "amended": "W2.14 docs/audit/test-agent-pack-2026-10/stage.py: + tools/qforce-lite/confirm.py + tools/recorder/pom/export_flow.py over the 2026-09-23T11:16:49 bundle (option A); `build_parser_bundle.py --out` regenerates the whole bundle (option B)",
  "bundle": "resources/garzai_parser",
- "bytes": 1981671,
+ "bytes": 2014719,
  "entry": "tools/recorder/crt_override/compose_live.py",
- "files": 59,
+ "files": 61,
  "generated": "2026-09-23T11:16:49",
  "generator": "tools/recorder/crt_override/build_parser_bundle.py",
  "sha256": {
@@ -46,6 +47,7 @@
   "tools/interop/resources/pythonDom/vendor/soupsieve/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tools/interop/resources/pythonDom/vendor/soupsieve/util.py": "4343151fbedc5015ccb4a5740f67fc4b27fdd2b7a63ded047cba9eebe9ac01e2",
   "tools/qforce-lite/chains.py": "369c265b03ebc97de2e6a6fb0c2b4542320748c82e5577e3760da383df1ff565",
+  "tools/qforce-lite/confirm.py": "9b0c4f77e664b8c74c3ee5b3fc5b10a37be5f289878e4a018cda8f970e2ead1f",
   "tools/qforce-lite/discovery/mapio.py": "4761e646c8ae43581e645bb7d43634b362a3ad27ea8c40cd1c074d819c0ab375",
   "tools/qforce-lite/discovery/maplib.py": "deaf1aec643eb466f015ec206a05eb18c35f4bd387c0d4b6c0e5a13bfd58f34c",
   "tools/qforce-lite/discovery/page_chrome.py": "95b4a0f27bb2ee282491dcfd127b156aa726d4a803d876023d25396f1c954aec",
@@ -59,6 +61,7 @@
   "tools/recorder/pattern_library.py": "27831d96b726c6281d66d694bfbc066a790442f8655190d4a74aee0051cd7737",
   "tools/recorder/pom/__init__.py": "1d3e859413cba4f1cce129b7498adcc4d29f377a14ea2b4489213bd7f2a673aa",
   "tools/recorder/pom/consult.py": "4c112616c26860ce20a7406fc270c4039d3ccea017649041858b48d43ed1e634",
+  "tools/recorder/pom/export_flow.py": "bfc0c4af8e708ec59381a9361549f9043713a471ac0f1cc078869cda6405e5e3",
   "tools/recorder/pom/keys.py": "286c3379751d4d992d0e908f5a5cf2266c63326525666665deab8f176fc42e77",
   "tools/recorder/pom/match.py": "dff1931feeeaf1cf17fc95a21702ae766d86e211612850b04bb1c8f6975e5df9",
   "tools/recorder/pom/scope.py": "25216cf52508dae79483e383d151aff7eafff29c644c1e70508a8faa7df646e6",

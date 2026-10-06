@@ -1,4 +1,10 @@
 *** Settings ***
+Documentation                 AGENT GUIDE -- read this before acting on the page.
+...                           1. Use a keyword from your test-keywords list; confirm it with lookup_keyword by its EXACT name before calling it (never from memory; never drop the Gz prefix).
+...                           2. To see the page call Gz Read Page (then page=2, page=3 ...): one line per control with the exact call to use; "# verified" = that call passed live before.
+...                           3. After you type or pick, check it with Gz Verify    <label>    <value>: only VERIFIED-PASS is a pass; a try_keyword PASS on TypeText is not.
+...                           4. Answers print to the CONSOLE and end on their last line: fetch more console lines; never re-run a step to find its output.
+...                           5. The full guide: docs/TEST-AGENT-GUIDE.md (read_job_file).
 Resource                      ../resources/common.robot
 Resource                      ../resources/garzai_console.robot
 Resource                      ../resources/garzai_navigation.robot
