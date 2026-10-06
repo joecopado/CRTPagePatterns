@@ -12,7 +12,7 @@ Suite Teardown      End suite
 
 *** Test Cases ***
 Create A Batch Of Leads And Find Them In A List View
-    [Teardown]    Delete Created Records    ${created}
+    [Teardown]    
     ${created}=    Create List
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
@@ -44,3 +44,4 @@ Create A Batch Of Leads And Find Them In A List View
     FOR    ${last}    IN    @{last_names}
         VerifyText    ${last}    timeout=15
     END
+    Delete Created Records    ${created}
