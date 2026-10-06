@@ -16,7 +16,6 @@ Suite Teardown      End suite
 Build A Related Data Set By API And Prove It
     [Teardown]    Delete Created Records    ${created}
     ${created}=    Create List
-    Set Test Variable    ${created}
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
 
