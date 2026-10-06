@@ -17,7 +17,6 @@ Suite Teardown      End suite
 Create Update And Delete An Account In The UI
     [Teardown]    Delete Created Records    ${created}
     ${created}=    Create List
-    Set Test Variable    ${created}
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
     ${instance}=    GetInstanceUrl
