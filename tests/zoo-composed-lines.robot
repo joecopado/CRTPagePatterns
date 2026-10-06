@@ -6,7 +6,7 @@ Documentation                   2026-09-18: the 29 lines the CRT recorder's pane
 ...                              page is the Zoo demo LWC; Save is the page's own button.
 Resource                        ../resources/common.robot
 Library                         ../resources/garzai_recorder_override.py
-Suite Setup                     Run Keywords    Setup Browser    AND    Gz Log Override Status    # the recorder override reports which recorder this session runs
+Suite Setup                     Setup Browser With Override
 Suite Teardown                  Run Keywords    Gz Override Restore    AND    End suite    # put the stock recorder bundle back: the patch outlives the session on a reused container (measured 2026-09-18)
 
 *** Test Cases ***
