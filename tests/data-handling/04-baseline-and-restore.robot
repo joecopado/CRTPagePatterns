@@ -18,25 +18,21 @@ Change A Shared Record And Restore Its Baseline
     [Teardown]    Run Keywords    Restore Field Baseline    Account    ${shared_id}    &{baseline}
     ...    AND    Delete Created Records    ${created}
     ${created}=    Create List
-    Set Test Variable    ${created}
     &{baseline}=    Create Dictionary
-    Set Test Variable    &{baseline}
-    Set Test Variable    ${shared_id}    ${EMPTY}
+    ${shared_id}=    Set Variable    ${EMPTY}
     ${token}=    JwtAuthenticate    ${client_idSlock}    ${usernameSlock}    ${private_keySlock}
     JwtLogin
 
     # 0. THE STAND-IN for a record the test does not own -- in a real org, delete the four lines below and set
-    #    ${shared_id} to the existing record's Id instead (Set Test Variable    ${shared_id}    <its Id>)
+    #    ${shared_id} to the existing record's Id instead (${shared_id}=    Set Variable    <its Id>)
     ${shared_name}=    FakerLibrary.Company
     ${shared_id}=    Create Record    Account    Name=${shared_name}    Industry=Banking    Rating=Warm    Phone=(415) 555-0100
     Append To List    ${created}    Account:${shared_id}
-    Set Test Variable    ${shared_id}
 
     # 1. BASELINE -- read the fields this test will change, before changing them
     ${before}=    QueryRecords    SELECT Industry, Rating, Phone FROM Account WHERE Id = '${shared_id}'
     &{baseline}=    Create Dictionary    Industry=${before}[records][0][Industry]    Rating=${before}[records][0][Rating]
     ...    Phone=${before}[records][0][Phone]
-    Set Test Variable    &{baseline}
 
     # 2. THE TEST'S OWN CHANGE -- through the UI, as a person would make it
     ${instance}=    GetInstanceUrl
