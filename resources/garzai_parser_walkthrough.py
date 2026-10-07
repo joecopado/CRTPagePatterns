@@ -21,6 +21,12 @@ The stage that goes to the AI (`Gz Read Page`) is the page reader's own keyword,
 suite; this file only measures what it returned. This file reads the page and never acts on it: no
 click, no type, no save. Every keyword prints to the console AND the Robot log.
 
+ONE ENVIRONMENT FACT THIS SUITE SURFACED (first CRT build of it, 2026-10-07, build 6195617): the parser
+bundle imports `lxml`, a compiled extension that cannot be vendored, and the CRT BUILD container did not
+have it (`ModuleNotFoundError: No module named 'lxml'`) -- the same import Gz Read Page makes. Gz Walk
+Capture therefore installs lxml for the run only (pip --target a temp folder) when it is missing, says so
+on the console, and reports COULD-NOT-CHECK with pip's reason if that fails too.
+
 Shipped beside garzai_page_reader.py; imported by tests/parser-walkthrough.robot only (not by
 common.robot, so the Test Agent's keyword list is unchanged). The parser bundle is untouched.
 """
@@ -30,7 +36,10 @@ import collections
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
+import traceback
 
 try:
     from robot.api import logger as _logger
@@ -76,6 +85,62 @@ def _nbytes(text):
     return len(str(text).encode("utf-8"))
 
 
+def _ensure_lxml():
+    """The parser bundle (review_table.py) imports `lxml.html` at module level, and lxml is a compiled
+    extension that cannot be vendored into the bundle. Whether a CRT BUILD container has it was
+    COULD-NOT-CHECK until the first run of this suite (2026-10-07, build 6195617: `No module named
+    'lxml'`). If it is missing, install it for THIS RUN ONLY into a temp folder and say so on the
+    console, so the walkthrough can show the stages; if that fails too, the reason is the answer
+    (COULD-NOT-CHECK), never a pass. Returns a sentence for the log."""
+    try:
+        import lxml.etree as _etree
+        return "lxml %s was already installed in this container" % ".".join(str(x) for x in _etree.LXML_VERSION)
+    except ImportError:
+        pass
+    target = os.path.join(tempfile.gettempdir(), "gz_walk_lxml")
+    cmd = [sys.executable, "-m", "pip", "install", "--quiet", "--disable-pip-version-check",
+           "--target", target, "lxml"]
+    try:
+        done = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+    except Exception as exc:
+        raise AssertionError("GZ WALK: COULD-NOT-CHECK -- lxml is not installed in this container and "
+                             "pip could not be run: %s: %s" % (type(exc).__name__, exc))
+    if done.returncode != 0:
+        tail = " | ".join((done.stderr or done.stdout or "").strip().splitlines()[-4:])
+        raise AssertionError("GZ WALK: COULD-NOT-CHECK -- lxml is not installed in this container and "
+                             "`pip install lxml` failed (exit %d): %s" % (done.returncode, tail))
+    if target not in sys.path:
+        sys.path.insert(0, target)
+    import importlib
+    importlib.invalidate_caches()
+    try:
+        import lxml.etree as _etree
+    except ImportError as exc:
+        raise AssertionError("GZ WALK: COULD-NOT-CHECK -- pip reported success but lxml still does not "
+                             "import: %s" % exc)
+    return ("lxml was NOT installed in this container; installed %s for this run only (pip --target %s)"
+            % (".".join(str(x) for x in _etree.LXML_VERSION), target))
+
+
+def _bundle():
+    """The page reader module and its parser bundle, loaded once. A failure prints the traceback tail
+    to the console (the build log shows only the exception's last line) and raises COULD-NOT-CHECK."""
+    GPR = _gpr()
+    try:
+        return GPR, GPR.mods()
+    except ImportError:
+        pass
+    note = _ensure_lxml()
+    _say(["GZ WALK: %s" % note])
+    try:
+        return GPR, GPR.mods()
+    except Exception as exc:
+        tail = "".join(traceback.format_exc().splitlines(True)[-12:])
+        _say(["GZ WALK: the parser bundle did not load (last 12 lines of the traceback):", tail])
+        raise AssertionError("GZ WALK: COULD-NOT-CHECK -- the parser bundle did not load: %s: %s" % (
+            type(exc).__name__, exc))
+
+
 class garzai_parser_walkthrough:
     """Gz Walk Capture / Parse / Calls / Pages Total / Plan Size / Summary -- see the module docstring."""
 
@@ -106,8 +171,8 @@ class garzai_parser_walkthrough:
     def gz_walk_capture(self, org=None):
         """STAGE 2. Serialize the page open in the browser exactly as the parser receives it, and print
         its size, how many shadow roots were opened, and how much was left out. Never acts on the page."""
-        GPR = _gpr()
-        m = GPR.mods()
+        GPR, m = _bundle()
+        runtime = "Python %s.%s.%s" % tuple(sys.version_info[:3])
         drv = self._driver()
         if drv is None:
             msg = "GZ WALK CAPTURE: COULD-NOT-CHECK -- no browser is open in this session"
@@ -141,6 +206,7 @@ class garzai_parser_walkthrough:
                 len(s.get("depthCapped") or [])),
             "  took         %s ms in the page (one round trip); org for the store lookup: %s" % (
                 cap.get("capture_ms"), alias or "(none: the host is not in the shipped store)"),
+            "  parser from  %s; %s" % (m.where, runtime),
         ]
         return _say(lines)
 
@@ -150,8 +216,7 @@ class garzai_parser_walkthrough:
         """STAGE 3. Parse the captured page and print how many elements the parser found, split into
         the app's chrome and the page's own, by family, and the first few as label / family / tag."""
         self._need("cap")
-        GPR = _gpr()
-        m = GPR.mods()
+        GPR, m = _bundle()
         c = self.cap
         parsed = m.CL.parse_capture(c["html"], c["url"], c["org"])
         self.parsed = parsed
@@ -183,7 +248,7 @@ class garzai_parser_walkthrough:
         its backup, and whether the page reader keeps it, takes a verified one from the job's store, or
         leaves the control out of the AI's list."""
         self._need("parsed")
-        GPR = _gpr()
+        GPR, _m = _bundle()
         c = self.cap
         plan = GPR.build_plan(c["html"], c["url"], None, c["pack"], include_chrome=False)
         self.plan = plan
