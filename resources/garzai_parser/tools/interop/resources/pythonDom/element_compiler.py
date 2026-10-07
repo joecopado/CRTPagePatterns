@@ -1068,20 +1068,62 @@ class DomElementCompiler:
         hints = []
 
         if in_grid:
-            locator = "row/col coordinates (r{N}/c{M})"
-            hints.append({
-                'keyword': 'Click Table Cell',
-                'locator': locator,
-                'call_example': _call_example('Click Table Cell', locator),
-                'confidence': TIER_UNVERIFIED,
-                'why': "Inside a table/grid -- real Salesforce list/related-list rows routinely repeat "
-                       "identical text across rows (same title, same owner name), so a text-based locator "
-                       "can be genuinely ambiguous even when this element's own label looks unique in "
-                       "isolation. Row/column position is the only address guaranteed unique by "
-                       "construction. Confirmed live 2026-07-29 against Salesforce Files' own list view.",
-                'caveats': ["Run UseTable first, on this table's own header label, to get the real "
-                            "row/col coordinates -- this hint can't resolve them statically."],
-            })
+            address = (context or {}).get('table_address') or {}
+            clickable = element_type in ('button', 'link')
+            if clickable and address.get('where') and address.get('column'):
+                # a runnable call: the row's unique value and the column (garzai_tables.robot's own shape)
+                where, column = address['where'], address['column']
+                hints.append({
+                    'keyword': 'Click Table Cell',
+                    'locator': where,
+                    # CLI-FIX-2 B1: the keyword's OWN signature, click_table_cell(table, where, column) and
+                    # garzai_tables.robot `[Arguments] ${table} ${where} ${column}`; [where, column] raised
+                    # TypeError when the card's call was run as written. The table is "" (the only table:
+                    # keywords_table reads `table or None`, the export writes ${EMPTY}), never None, which
+                    # _prune_empty_values drops from a list -- and "" is what `step` can be typed with.
+                    'args': ['', where, column],
+                    'column': column,
+                    'call_example': 'click_table_cell("", "%s", "%s")  # "" = the only table; name it when the page has several' % (where, column),
+                    'confidence': TIER_UNVERIFIED,
+                    'why': "Inside a table row whose value %r is unique in the capture; the control is addressed "
+                           "by that row and its column, which is how Click Table Cell resolves a cell. Unique in "
+                           "the CAPTURE only -- a live read-back is what verifies it." % where,
+                    'caveats': ['table is "" (the only table): pass the table label when the page has more than one table.'],
+                })
+            elif clickable and (address.get('header_row') or address.get('row_text')) and label_text:
+                # a header-row control is not a data cell; a data row with no unique value is addressed by the
+                # control's own label -- the row text rides as an anchor CANDIDATE (D14), never baked in
+                hints.append({
+                    'keyword': 'ClickText',
+                    'locator': label_text,
+                    'call_example': _call_example('ClickText', label_text),
+                    'confidence': TIER_UNVERIFIED,
+                    'why': ("A control in the table header row, not a data cell: addressed by its own label."
+                            if address.get('header_row') else
+                            "Inside a table row with no value unique among the rows; addressed by the control's "
+                            "own label, and the row text is the anchor candidate when the label repeats."),
+                    'anchor_candidates': ([{'kind': 'row_cell', 'text': address['row_text'], 'scope': 'row'}]
+                                         if address.get('row_text') else []),
+                })
+            else:
+                locator = "row/col coordinates (r{N}/c{M})"
+                hint = {
+                    'keyword': 'Click Table Cell',
+                    'locator': locator,
+                    'call_example': _call_example('Click Table Cell', locator),
+                    'confidence': TIER_UNVERIFIED,
+                    'why': "Inside a table/grid -- real Salesforce list/related-list rows routinely repeat "
+                           "identical text across rows (same title, same owner name), so a text-based locator "
+                           "can be genuinely ambiguous even when this element's own label looks unique in "
+                           "isolation. Row/column position is the only address guaranteed unique by "
+                           "construction. Confirmed live 2026-07-29 against Salesforce Files' own list view.",
+                    'caveats': ["Run UseTable first, on this table's own header label, to get the real "
+                                "row/col coordinates -- this hint can't resolve them statically."],
+                }
+                if clickable:
+                    hint['disambiguation_status'] = 'COULD-NOT-DISAMBIGUATE: table row without a unique value'
+                    hint['placeholder'] = True
+                hints.append(hint)
 
         reliable_label_sources = (
             'standard_label', 'aria_labelledby', 'form_element_label', 'wrapped_label', 'label_span', 'sibling_label_text',
@@ -1493,6 +1535,15 @@ class DomElementCompiler:
             hints = self._fill_hint_first(
                 self._family_variant(element_type, identification, context, real_tag, attributes),
                 hints, label_text, label_source)
+
+        # CLI-FIX-2 W2 (2026-10-01): EVERY Click Table Cell hint with no row/column address is a placeholder,
+        # whatever the control's family -- the button/link branch above, a checkbox in a row, the datatable
+        # family's `row=<N>` template. It says so; a template is never presented as a call with a null status.
+        for h in hints:
+            if h.get('keyword') == 'Click Table Cell' and not h.get('args'):
+                h.setdefault('disambiguation_status',
+                             'COULD-NOT-DISAMBIGUATE: no row/column address in the capture')
+                h['placeholder'] = True
 
         return {'locator_options': hints} if hints else None
 
@@ -2153,6 +2204,118 @@ class DomElementCompiler:
             folded['required_source'] = 'rendered marker'
         return folded or None
 
+    # 2026-10-01 (parser-table-button): a clickable control inside a table used to get the TEMPLATE
+    # `Click Table Cell  row/col coordinates (r{N}/c{M})` -- 168 of the 321 controls the from-zero path
+    # got wrong against a store-verified rung (docs/audit/cli-2026-10-01/MEASURE-HINTS-PARITY.md).
+    # The address below mirrors garzai_tables.robot's own row model so the call it proposes is one
+    # `Click Table Cell` can resolve: a column is `data-label`, else the header row's cell at the same
+    # position, else `#<position>`; the row is named by the first column whose value is unique among the
+    # table's data rows (else the first unique pair of columns), as `<column>:<value>`.
+    _CLICKABLE_TAGS = ('a', 'button', 'lightning-button', 'lightning-button-icon', 'lightning-button-menu')
+    _CLICKABLE_ROLES = ('button', 'link', 'menuitem')
+    _SKIP_KEY_COLUMNS = re.compile(r'^(row number|choose a row|select\b)', re.I)
+
+    @staticmethod
+    def _cell_text(cell) -> str:
+        parts = []
+        for node in cell.find_all(string=True):
+            if type(node).__name__ not in ('NavigableString', 'TemplateString'):
+                continue
+            if node.find_parent(['style', 'script', 'svg']):
+                continue
+            if node.find_parent(lambda t: t.name and 'slds-assistive-text' in (t.get('class') or [])):
+                continue
+            parts.append(str(node))
+        return re.sub(r'\s+', ' ', ' '.join(parts)).strip()
+
+    @staticmethod
+    def _row_cells(tr):
+        return [c for c in tr.find_all(['td', 'th'], recursive=False)] or \
+            [c for c in tr.find_all(True, recursive=False) if (c.get('role') or '') in ('gridcell', 'cell', 'rowheader', 'columnheader')]
+
+    def _is_header_row(self, tr) -> bool:
+        if (tr.get('data-row-key-value') or '') == 'HEADER' or tr.find_parent('thead') is not None:
+            return True
+        cells = self._row_cells(tr)
+        return bool(cells) and all(c.name == 'th' and (c.get('role') or '') == 'columnheader' for c in cells)
+
+    def _table_model(self, table):
+        """headers + data rows of one table, built once per parse (kept beside the tag so a recycled
+        id() of a collected soup can never serve a stale model)."""
+        cache = self.__dict__.setdefault('_table_model_cache', {})
+        hit = cache.get(id(table))
+        if hit and hit[0] is table:
+            return hit[1]
+        headers, body = [], []
+        for tr in table.find_all(lambda t: t.name == 'tr' or (t.get('role') or '') == 'row'):
+            cells = self._row_cells(tr)
+            if not cells:
+                continue
+            if not headers and self._is_header_row(tr):
+                headers = [(c.get('aria-label') or c.get('data-label') or '').strip() or self._cell_text(c) for c in cells]
+            elif not self._is_header_row(tr):
+                body.append((tr, cells))
+        cols = None
+        rows = []
+        for tr, cells in body:
+            names = [((c.get('data-label') or c.get('field-label') or '').strip()
+                      or (headers[i] if i < len(headers) else '') or '#%d' % (i + 1)) for i, c in enumerate(cells)]
+            rows.append((tr, names, [self._cell_text(c) for c in cells]))
+        model = {'headers': headers, 'rows': rows}
+        cache[id(table)] = (table, model)
+        return model
+
+    def _unique_where(self, model, row_index):
+        """`<column>:<value>` naming ONLY this data row, or None. First one column, then one pair."""
+        _tr, names, vals = model['rows'][row_index]
+        others = [r for i, r in enumerate(model['rows']) if i != row_index]
+        usable = [i for i, n in enumerate(names)
+                  if vals[i] and not self._SKIP_KEY_COLUMNS.match(n) and not n.startswith('#')]
+
+        def clash(cols):
+            for _t, o_names, o_vals in others:
+                lookup = {n: v for n, v in zip(o_names, o_vals)}
+                if all(lookup.get(names[i], '').lower() == vals[i].lower() for i in cols):
+                    return True
+            return False
+        for i in usable:
+            if not clash([i]):
+                return '%s:%s' % (names[i], vals[i])
+        for a in range(len(usable)):
+            for b in range(a + 1, len(usable)):
+                if not clash([usable[a], usable[b]]):
+                    return '%s:%s;%s:%s' % (names[usable[a]], vals[usable[a]], names[usable[b]], vals[usable[b]])
+        return None
+
+    def _table_address(self, tag):
+        """Where a clickable control sits in its table, or None (not clickable / no row)."""
+        role = (tag.get('role') or '').lower()
+        if not ((tag.name or '').lower() in self._CLICKABLE_TAGS or role in self._CLICKABLE_ROLES):
+            return None
+        tr = tag.find_parent(lambda t: t.name == 'tr' or (t.get('role') or '') == 'row')
+        if tr is None:
+            return None
+        if self._is_header_row(tr):
+            return {'header_row': True}
+        table = tr.find_parent(self.config._is_any_table)
+        if table is None:
+            return None
+        model = self._table_model(table)
+        idx = next((i for i, r in enumerate(model['rows']) if r[0] is tr), None)
+        if idx is None:
+            return None
+        cells = self._row_cells(tr)
+        cpos = next((i for i, c in enumerate(cells) if c is tag or tag in c.descendants), None)
+        if cpos is None:
+            return None
+        column = model['rows'][idx][1][cpos]
+        where = self._unique_where(model, idx)
+        row_text = next((v for v in model['rows'][idx][2] if v), '')
+        out = {'column': column, 'row_text': row_text}
+        if where:
+            out['where'] = where
+        return out
+
     def _get_context_info(self, tag) -> dict:
         if not tag:
             return None
@@ -2217,6 +2380,11 @@ class DomElementCompiler:
             # _get_qforce_hints can recommend row/col addressing for ANY
             # table shape, not only lightning-datatable.
             context['in_grid'] = True
+
+        if context.get('is_in_datatable') or context.get('in_grid'):
+            address = self._table_address(tag)
+            if address:
+                context['table_address'] = address
 
         quick_action = tag.find_parent(lambda t: t.name and t.name in (
             'force-quick-action-panel', 'forceActionBody',
@@ -2881,6 +3049,12 @@ class DomElementCompiler:
             gs = dis.get('group_size') or 1
             if gs <= 1:
                 continue
+            lead = ((el.get('qforce_hints') or {}).get('locator_options') or [{}])[0]
+            if lead.get('args'):
+                # 2026-10-01: a Click Table Cell addressed by its row's unique value + column is not a
+                # member of a same-label group to be counted through -- it carries its own address, and a
+                # label-less run of them shares one position (index 1 for all) that means nothing
+                continue
             anchor = dis.get('anchor')
             scope = dis.get('anchor_scope')
             # D14 2026-09-09: this used to `continue` here whenever the text
@@ -2973,6 +3147,10 @@ class DomElementCompiler:
         cands = dis.get('anchor_candidates') or []
         for hint in hints:
             if hint.get('keyword') not in anchored:
+                continue
+            if hint.get('args'):
+                # a Click Table Cell already addressed by its row's unique value and its column
+                # (2026-10-01): a positional index on top of that would be wrong, not extra
                 continue
             if cands:
                 hint['anchor_candidates'] = [dict(c) for c in cands]
@@ -3339,6 +3517,10 @@ class DomElementCompiler:
         repeated = (dis.get('group_size') or 1) > 1
         for hint in hints.get('locator_options', []) or []:
             if hint.get('keyword') not in anchored:
+                continue
+            if hint.get('args'):
+                # a Click Table Cell already addressed by its row's unique value and its column
+                # (2026-10-01): a positional index on top of that would be wrong, not extra
                 continue
             if cands:
                 hint['anchor_candidates'] = [dict(c) for c in cands]

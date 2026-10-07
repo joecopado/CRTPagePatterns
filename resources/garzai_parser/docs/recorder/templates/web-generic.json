@@ -283,6 +283,14 @@
   "grid",
   "treegrid"
  ],
+ "recordLayoutFieldRules": {
+  "_why_cds_table_cell": "2026-10-06 (CRAWLER-REVIEW-2026-10-06 section 10 row 10; the crawl-fix-2 stream). Copado's Angular app (na.devops.copado.com, Data Template list) renders each template name as <cds-table-cell role=\"link\"><span class=\"ctcell__value\">GarzAI API Template 17:40</span></cds-table-cell>. The inner_text rung is CODE-gated to button/a/role=button (element_compiler._label_candidate), so a non-native role=link control got NO label from any rung: 64 of 64 on each Data Template list capture (docs/recorder/review/cicd-demo-data-template-new/capture.html, .../capture-main-object-list-open.html). This key is a dict MERGED over the class default (dom_config._cast_template_value), so containerTags/readModeMarkerClassFragments/family keep their defaults; only the per-tag label class is added, read by the label_span rung for THIS tag alone -- the cell's visible value is the link's name. A role=button cell whose value span holds only an icon (commit experience) still has no label, measured unchanged.",
+  "labelClassFragmentsByTag": {
+   "cds-table-cell": [
+    "ctcell__value"
+   ]
+  }
+ },
  "gridDescendantEmission": {
   "_why": "No generic-web equivalent of lightning-tree-grid exists, so nothing is exploded. A real <table> is already reached through targetTags/interactiveRoles and _in_grid_container.",
   "containerTags": [],

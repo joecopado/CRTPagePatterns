@@ -128,15 +128,29 @@ def state_stamp(head: str) -> dict:
 
 def template_provenance(path: str) -> dict:
     """T18: a record says which template rendered it -- name AND content hash. The name alone
-    cannot tell two revisions of the same template apart."""
+    cannot tell two revisions of the same template apart.
+
+    CORRECTED 2026-10-06 (crawl fix 9; CRAWLER-REVIEW-2026-10-06 section 6.1, 7.6). This used to run
+    v3's scorecard only to read v3's template NAME (`salesforce-lightning.v3`) while every control in
+    the record came from v1 (`controls()` -> `parse_elements_from_html`), and it hashed the CAPTURE
+    as the "template hash" -- so the store's invalidation rule ("STALE when the template hash
+    changes") could never fire on a template change. Now it is the provenance of the template v1
+    WOULD select for this capture (`dom_config.provenance_for_html`: env, then frameworkMarkers, then
+    web-generic -- the same selection `parse_elements_from_html` makes), named, and hashed by the
+    TEMPLATE file's sha256. The capture's own hash is kept beside it under its own name."""
     body = open(path, 'rb').read()
-    name = None
+    out = {'name': None, 'hash': None, 'parser': 'v1',
+           'capture_sha1': hashlib.sha1(body).hexdigest()[:12]}
     try:
-        import parser_scorecard as SC
-        name = (SC.score_capture_v3(path) or {}).get('template')
-    except Exception:
-        name = None
-    return {'name': name, 'hash': hashlib.sha1(body).hexdigest()[:12]}
+        import dom_config as DC
+        prov = DC.provenance_for_html(body.decode('utf-8', errors='replace'))
+        out.update({'name': prov.get('name'), 'hash': prov.get('sha256'),
+                    'path': prov.get('path'), 'selected_by': prov.get('selected_by'),
+                    'markers_seen': prov.get('markers_seen')})
+    except Exception as exc:                                        # noqa: BLE001
+        out['error'] = 'COULD-NOT-CHECK: v1 template provenance did not resolve: %s: %s' % (
+            type(exc).__name__, str(exc)[:200])
+    return out
 
 
 _CTRL_CACHE: dict[str, list[dict]] = {}

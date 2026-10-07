@@ -47,6 +47,7 @@ Everything is merged, never overwritten: a second visit adds counts.
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import os
 import re
@@ -860,6 +861,45 @@ def rung_key(c: dict) -> str:
                       sort_keys=True, default=str)
 
 
+# ---------------------------------------------------------------- the ONE slug rule (V-n14b 6a)
+# CAUGHT-BUG 1: `_path_for_key` used to sanitise a key and plain-truncate to 180 chars with no
+# further check. A state name is a modal TITLE (`cdp_capture.dialog_state_name`), i.e. arbitrary
+# heading text of arbitrary length, so two DIFFERENT compound keys
+# `<page_key>::state=<state>` -- two modal titles on the same long page key -- sanitised to the
+# SAME 180-char prefix and silently shared one file; at a page key >= 182 chars the state file IS
+# the base file, because the compound suffix falls entirely past the truncation point.
+#
+# THE FIX: past 180 chars the tail becomes a content hash, not a truncation -- two keys differing
+# only past character 180 now differ in their hash too. `_SLUG_HEAD` (140) keeps the front of the
+# slug human-legible; `sha1(key)[:12]` is enough entropy that two real keys colliding on it is not
+# a live concern here (this is a filename, not a security boundary).
+#
+# BACK-COMPAT: a record already on disk was written under the OLD plain-truncated name -- measured
+# at least once for real (`org-map/slockard/pom/slockard_lightning_app_id_n_Zoo_Base_Inputs_
+# ...Zoo_F.json`, 180 chars). `_path_for_key` probes that LEGACY name first and returns it when it
+# exists, so the fix does not orphan a record already on disk; only a lookup for a key with no
+# file under either name computes the NEW (hashed) path.
+_SLUG_CAP = 180
+_SLUG_HEAD = 140
+
+
+def slug_for_key(key: str) -> str:
+    """The canonical, collision-safe filename slug for ANY store key -- a plain page key or a
+    compound `<page_key>::state=<state>` one, of any length. The ONE place this repo turns a key
+    into a slug; `page_pack.slug_for` calls this rather than keeping its own copy, so the export
+    writer and `Store.get`'s reader can never drift apart (its own docstring's promise)."""
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")
+    if len(slug) <= _SLUG_CAP:
+        return slug
+    return slug[:_SLUG_HEAD] + "~" + hashlib.sha1(key.encode("utf-8", "replace")).hexdigest()[:12]
+
+
+def legacy_slug_for_key(key: str) -> str:
+    """The OLD naming rule -- sanitise, then plain-truncate to 180 chars, no hash. Kept only so a
+    LOOKUP can still find a record a pre-fix writer already put on disk under this name."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")[:_SLUG_CAP]
+
+
 class Store:
     def __init__(self, state_root: str | None = None, docs_root: str | None = None):
         self.state_root = state_root or K.STATE
@@ -912,9 +952,22 @@ class Store:
             return json.load(f)
 
     def _path_for_key(self, key: str) -> str | None:
+        """The on-disk path for ANY store key (a plain page key or a compound
+        `<page_key>::state=<state>` one). See `slug_for_key`/`legacy_slug_for_key` above for why
+        there are two names and which one a LOOKUP tries first."""
         partition = key.split("|", 1)[0]
-        slug = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")[:180]
-        for base in (os.path.join(self.org_map_dir, partition, "pom"), os.path.join(self.apps_dir, partition, "pom")):
+        slug = slug_for_key(key)
+        legacy = legacy_slug_for_key(key)
+        bases = (os.path.join(self.org_map_dir, partition, "pom"), os.path.join(self.apps_dir, partition, "pom"))
+        if legacy != slug:
+            # a record on disk from before this fix -- or one a still-unfixed writer (`key_for`'s
+            # own `keys.page_key` slug) put there today -- was named the OLD way. Probed FIRST so
+            # the fix never orphans it (V-n14b 6a CAUGHT-BUG 1, the real Zoo record at the cap).
+            for base in bases:
+                p = os.path.join(base, legacy + ".json")
+                if os.path.exists(p):
+                    return p
+        for base in bases:
             p = os.path.join(base, slug + ".json")
             if os.path.exists(p):
                 return p
@@ -957,7 +1010,8 @@ class Store:
         a rung with history. Returns {pages: n, elements: n, rungs: n, skipped: [...]}."""
         org = session.get("org")
         stats = {"pages": set(), "elements": 0, "rungs": 0, "skipped": [], "dropped_hostless": 0,
-                 "links": 0, "opens": 0, "states": 0, "twins_attached": 0}
+                 "links": 0, "opens": 0, "states": 0, "twins_attached": 0,
+                 "failed_effects_skipped": 0}
         flow_name = flow_name or session.get("name")
         open_recs: dict[str, dict] = {}
         steps = [normalise_step(s) for s in session.get("steps", [])]
@@ -1040,6 +1094,20 @@ class Store:
             kind, target = step_effect(
                 step, pk["key"],
                 nxt if ev.get("kind") in LEADS_TO_KINDS else None, landed_key)
+            # NO PHANTOM STATES (crawl fix 7, 2026-10-06; CRAWLER-REVIEW-2026-10-06 section 7.1). A
+            # step whose OWN verdict says it did not act -- the keyword raised, or it acted on the
+            # wrong thing (COULD-NOT-CHECK / CAUGHT-BUG) -- proves nothing about where the control
+            # leads, what it opens or which state the page was in: up.py keeps a raised click as a
+            # step, and its provisional `effect` used to become an `opens`, a link and a state.
+            # Measured: the slockard Zoo Case record carried 14 empty `Edit Zoo <Field>` states from
+            # clicks that raised AmbiguousClickTarget. Such a step still records its element and its
+            # rung (the ladder learns the failure below); it writes no effect and no membership. A
+            # step with NO verdict at all (older writers) is unchanged.
+            failed = bool(step.get("verdict")) and step.get("verdict") not in VERIFIED
+            if failed:
+                if kind:
+                    stats["failed_effects_skipped"] = stats.get("failed_effects_skipped", 0) + 1
+                kind, target = None, None
             if kind == "nav" and target and str(target).startswith("http"):
                 # an explicit nav target given as a URL is stored as the PAGE KEY it resolves to,
                 # never the raw URL (a record id in a link is a link nothing can look up)
@@ -1080,7 +1148,7 @@ class Store:
                 ps["last_seen"] = rec["last_seen"]
             # ------------------------------------------------- which STATE the page was in
             state = step.get("state")
-            if state and state != DEFAULT_STATE:
+            if state and state != DEFAULT_STATE and not failed:
                 ps = page_state(rec, state)
                 if not replayed:
                     ps["n_seen"] += 1

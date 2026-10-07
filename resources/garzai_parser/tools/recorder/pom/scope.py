@@ -106,7 +106,48 @@ _DIALOG_LADDER = (
     ("[role=dialog].slds-docked-composer", None),
     ("[role=dialog]", _COACHMARK),
     ("[role=menu]", None),
+    # An Angular Material CDK overlay (crawl fix 6, 2026-10-06; review section 4): a portal panel is
+    # serialized at the END of the document under `div.cdk-overlay-container > .cdk-overlay-pane`, far
+    # from its trigger. Measured: `docs/dom-captures/web-material-angular/2-select-open.html` resolved
+    # to NO subtree, and with kind=None to the page's TAB panel (fails open). The container persists
+    # when nothing is open; a pane exists only while something is.
+    (".cdk-overlay-pane", None),
 )
+
+# AN OPEN LISTBOX POPUP (crawl fix 6). NOT a plain `[role=listbox]` rung: measured 2026-10-06 over
+# 464 captures, a bare `[role=listbox]` rung changed the answer on 32 BASE captures -- dual listboxes,
+# OmniScript and CPQ pages, the Zoo inputs pages all carry always-present listboxes that ARE the page
+# -- and on 13 inline-edit states, where it pre-empted the form rung. A listbox is a POPUP when it is
+# open by the ARIA pattern: the `aria-controls`/`aria-owns` target of an `aria-expanded="true"`
+# control, or a descendant of an `aria-expanded="true"` control that has a listbox popup (Copado's
+# `cds-select-input` keeps its options inside its own host:
+# `docs/recorder/review/cicd-demo-data-template-new/capture-main-object-list-open.html`). It is tried
+# AFTER the dialog ladder and the inline-edit form rung (`find_state_subtree`).
+_POPUP_LISTBOX = "[role=listbox] opened by an aria-expanded=true control"
+
+
+def find_popup_subtree(soup):
+    """(node, selector, note) for an OPEN listbox popup, or (None, ..., why). Two outermost open
+    listboxes is AMBIGUOUS -- COULD-NOT-CHECK, never a guess."""
+    lbs = soup.select("[role=listbox]")
+    if not lbs:
+        return None, _POPUP_LISTBOX, "no listbox in this capture"
+    opened = soup.select("[aria-expanded=true]")
+    ids = set()
+    for o in opened:
+        for k in ("aria-controls", "aria-owns"):
+            ids.update(str(o.get(k) or "").split())
+    hosts = [o for o in opened
+             if str(o.get("aria-haspopup") or "").lower() in ("listbox", "true")]
+    open_lbs = [lb for lb in lbs
+                if lb.get("id") in ids or any(h in lb.parents for h in hosts)]
+    outer = _outermost(open_lbs)
+    if len(outer) > 1:
+        return None, _POPUP_LISTBOX, "AMBIGUOUS: %d outermost open listboxes" % len(outer)
+    if len(outer) == 1:
+        return outer[0], _POPUP_LISTBOX, "ok"
+    return None, _POPUP_LISTBOX, ("%d listbox(es), none opened by an aria-expanded=true control"
+                                  % len(lbs))
 
 _INTERACTIVE = ["button", "a", "input", "select", "textarea", "th", "td"]
 
@@ -275,7 +316,14 @@ def find_state_subtree(soup, kind=None, driven_tab=None, base_soup=None):
         if note.startswith("AMBIGUOUS"):
             return None, sel, note
         nodes, fsel, fnote = find_form_subtrees(soup, base_soup)
-        return (nodes, fsel, fnote) if nodes else (None, sel, note)
+        if nodes:
+            return nodes, fsel, fnote
+        # crawl fix 6: an open listbox popup, AFTER the form rung (an inline-edit form with one
+        # combobox left open is still the form)
+        pnode, psel, pnote = find_popup_subtree(soup)
+        if pnode is not None or pnote.startswith("AMBIGUOUS"):
+            return ([pnode] if pnode is not None else None), psel, pnote
+        return None, sel, note
     if kind == "tab":
         node, sel, note = find_tab_subtree(soup, driven_tab)
         return ([node] if node is not None else None), sel, note
@@ -287,8 +335,140 @@ def find_state_subtree(soup, kind=None, driven_tab=None, base_soup=None):
     nodes, fsel, fnote = find_form_subtrees(soup, base_soup)
     if nodes:
         return nodes, fsel, fnote
+    pnode, psel, pnote = find_popup_subtree(soup)
+    if pnode is not None or pnote.startswith("AMBIGUOUS"):
+        return ([pnode] if pnode is not None else None), psel, pnote
+    # NEVER THE TAB PANEL WHILE A POPUP IS OPEN (crawl fix 6, review section 4: the CDK capture
+    # with kind=None resolved to the page's tab panel and failed OPEN). A control that says its
+    # menu/listbox popup is expanded, whose popup this capture could not isolate, makes the state
+    # COULD-NOT-CHECK rather than the unrelated tab body.
+    claim = _open_popup_claim(soup)
+    if claim:
+        return None, "popup guard", ("a menu or listbox popup is open (%s) but its subtree could "
+                                     "not be isolated -- never the tab panel" % claim)
     node, tsel, tnote = find_tab_subtree(soup, driven_tab)
     return ([node] if node is not None else None), tsel, tnote
+
+
+def _open_popup_claim(soup) -> str:
+    """A short description of the first control whose OWN markup says a menu/listbox popup is open
+    (`aria-expanded="true"` with `aria-haspopup` listbox/menu/true), or ''."""
+    for o in soup.select("[aria-expanded=true]"):
+        pop = str(o.get("aria-haspopup") or "").lower()
+        if pop in ("listbox", "menu", "true") or str(o.get("role") or "") == "combobox":
+            return "<%s role=%s aria-haspopup=%s>" % (o.name, o.get("role"), pop or None)
+    return ""
+
+
+# ------------------------------------------------------------------ THE SAME LADDER, LIVE
+# Crawl fix 5 (2026-10-06): a screenshot per state with the state's region BOXED. The region is the
+# subtree this module's ladder resolves -- so the box is built FROM `_DIALOG_LADDER` (and the tab
+# rung), never from a second list that could drift. It runs in the live page (shadow-piercing,
+# visible boxes only -- the capture drops display:none subtrees, the live page has to filter them),
+# outlines the ONE outermost match, and marks it BOX_MARK holding its previous `style` ("\u0000" for
+# none). `tools/interop/up.py`'s `_UNBOX_JS` restores every marked element after the shot, always.
+# Two outermost matches on a rung box nothing and say AMBIGUOUS, as `find_dialog_subtree` does.
+BOX_MARK = "data-garzai-box"
+
+_BOX_JS = r"""(function () {
+  var LADDER = __LADDER__, KIND = __KIND__, TAB = __TAB__, MARK = '__MARK__', POPUP = __POPUP__;
+  function roots() {
+    var out = [document];
+    for (var i = 0; i < out.length; i++) {
+      var all = out[i].querySelectorAll('*');
+      for (var j = 0; j < all.length; j++) { if (all[j].shadowRoot) out.push(all[j].shadowRoot); }
+    }
+    return out;
+  }
+  var R = roots();
+  function select(sel) {
+    var out = [];
+    for (var i = 0; i < R.length; i++) {
+      var hits; try { hits = R[i].querySelectorAll(sel); } catch (e) { hits = []; }
+      for (var k = 0; k < hits.length; k++) out.push(hits[k]);
+    }
+    return out;
+  }
+  function visible(el) { var rc = el.getBoundingClientRect(); return rc.width > 0 && rc.height > 0; }
+  function within(a, b) {            // a contains b, across shadow boundaries
+    for (var n = b; n; n = n.parentNode || n.host) { if (n === a) return true; }
+    return false;
+  }
+  function outermost(list) {
+    return list.filter(function (n) {
+      return !list.some(function (o) { return o !== n && within(o, n); });
+    });
+  }
+  function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+  var node = null, rung = null, note = 'no dialog, menu or listbox subtree on the page';
+  if (KIND !== 'tab') {
+    for (var i = 0; i < LADDER.length; i++) {
+      var sel = LADDER[i][0], ex = LADDER[i][1];
+      var hits = select(sel).filter(function (n) {
+        return (!ex || n.getAttribute('data-testid') !== ex) && visible(n);
+      });
+      var outer = outermost(hits);
+      if (outer.length > 1) { node = null; rung = sel; note = 'AMBIGUOUS: ' + outer.length + ' outermost matches'; break; }
+      if (outer.length === 1) { node = outer[0]; rung = sel; note = 'ok'; break; }
+    }
+  }
+  if (!node && KIND !== 'tab' && note.indexOf('AMBIGUOUS') !== 0) {
+    // the open-popup listbox rung (crawl fix 6), the same definition as find_popup_subtree
+    var ids = {}, hosts = [];
+    select('[aria-expanded=true]').forEach(function (o) {
+      ['aria-controls', 'aria-owns'].forEach(function (k) {
+        String(o.getAttribute(k) || '').split(/\s+/).forEach(function (i) { if (i) ids[i] = 1; });
+      });
+      var pop = String(o.getAttribute('aria-haspopup') || '').toLowerCase();
+      if (pop === 'listbox' || pop === 'true') hosts.push(o);
+    });
+    var lbs = select('[role=listbox]').filter(function (lb) {
+      return visible(lb) && (ids[lb.id] || hosts.some(function (h) { return h !== lb && within(h, lb); }));
+    });
+    var outerLb = outermost(lbs);
+    if (outerLb.length > 1) { rung = POPUP; note = 'AMBIGUOUS: ' + outerLb.length + ' outermost open listboxes'; }
+    else if (outerLb.length === 1) { node = outerLb[0]; rung = POPUP; note = 'ok'; }
+  }
+  if (!node && KIND === 'tab') {
+    var tabs = select('[role=tab][aria-selected=true]').filter(visible);
+    if (tabs.length > 1 && TAB) {
+      tabs = tabs.filter(function (t) {
+        return norm(t.getAttribute('data-label') || t.textContent || t.getAttribute('aria-label')
+                    || t.getAttribute('title')) === norm(TAB);
+      });
+    }
+    rung = '[role=tab][aria-selected=true] -> aria-controls';
+    if (tabs.length !== 1) { note = tabs.length + ' selected tab(s) match'; }
+    else {
+      var ctl = tabs[0].getAttribute('aria-controls');
+      var root = tabs[0].getRootNode ? tabs[0].getRootNode() : document;
+      var panel = ctl && ((root.getElementById && root.getElementById(ctl)) || document.getElementById(ctl));
+      if (panel) { node = panel; note = 'ok'; } else { note = 'no tabpanel for aria-controls ' + ctl; }
+    }
+  }
+  if (!node) return JSON.stringify({boxed: false, rung: rung, note: note});
+  var rc = node.getBoundingClientRect();
+  node.setAttribute(MARK, node.hasAttribute('style') ? node.getAttribute('style') : '\u0000');
+  node.style.setProperty('outline', '4px solid #e8102a', 'important');
+  node.style.setProperty('outline-offset', '-4px', 'important');
+  return JSON.stringify({boxed: true, rung: rung, note: note, tag: node.tagName.toLowerCase(),
+                         rect: {x: Math.round(rc.left + (window.scrollX || 0)),
+                                y: Math.round(rc.top + (window.scrollY || 0)),
+                                width: Math.round(rc.width), height: Math.round(rc.height)}});
+})()"""
+
+
+def live_box_js(kind=None, driven_tab=None) -> str:
+    """The JS expression that outlines this state's own subtree in the LIVE page (see above).
+    `kind` is the state's kind (`modal`/`panel`/`tab`, or None to read the shape off the page);
+    `driven_tab` picks the selected tab on a two-tabset page, exactly as `find_tab_subtree` does."""
+    import json as _json
+    ladder = [[sel, excl] for sel, excl in _DIALOG_LADDER]
+    return (_BOX_JS.replace("__LADDER__", _json.dumps(ladder))
+            .replace("__KIND__", _json.dumps(kind))
+            .replace("__TAB__", _json.dumps(driven_tab))
+            .replace("__POPUP__", _json.dumps(_POPUP_LISTBOX))
+            .replace("__MARK__", BOX_MARK))
 
 
 # A TOAST IS NOT PART OF THE PAGE. Lightning's toast manager renders a transient notification
