@@ -83,5 +83,16 @@ household group, interaction summary, action plan, party profile, insurance poli
 health90 (Health Cloud Console): patient console, care plan, care request, assessment task, appointment console,
 new contact (standard form), UM case, provider contract.
 
+## Parser walkthrough (tests/parser-walkthrough.robot)
+
+A suite to RUN when you want to show what the parser does, step by step, and what goes over to the AI. One test
+per page; each logs its six stages to the console and the Robot log: 1 open the page, 2 capture it (bytes, shadow
+roots opened, hidden subtrees dropped), 3 parse it (elements, chrome vs the page's own, by family, the first ten as
+label / family / tag), 4 the call the parser proposes for those ten, its backup and what the agent is told, 5 the
+exact `Gz Read Page` text the Test Agent receives (lines, bytes, against the raw capture), 6 one summary line.
+Stages 2, 3, 4 and 6 are keywords in `resources/garzai_parser_walkthrough.py`, which calls the page reader's own
+functions on the same parser bundle and re-implements nothing. It only reads the page. First page: slockard Zoo
+Nightmare Inputs; to add another, copy the test and change the login triple and the navigation line.
+
 Corrections: edit the line in the suite, push, and name the file -- the loop reads the edited lines back as
 review corrections keyed by row (`review_table.py correct --from-robot`).
