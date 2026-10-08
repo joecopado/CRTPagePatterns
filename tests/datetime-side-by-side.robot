@@ -22,7 +22,7 @@ Resource                      ../resources/common.robot
 Resource                      ../resources/garzai_navigation.robot
 Suite Setup                   Setup Browser
 Suite Teardown                End suite
-
+Library    QVision
 
 *** Variables ***
 # Each box located through its own field's legend -- independent of any anchor. Kept as variables: an `=` inside an
@@ -48,6 +48,9 @@ ${REVIEWED_TIME}              //fieldset[legend[contains(normalize-space(.),'Rev
     TypeText                  Date              9/1/2026        anchor=Start Time (Estimated)
     TypeText                  Date              9/2/2026        anchor=End Time (Estimated)
     TypeText                  Time              12:30 PM        anchor=End Time (Estimated)
+    DropDown                  Time              1:00 PM
+    ClickText                 Time               anchor=End Time (Estimated)              partial_match=false
+    WriteText                 1:00 PM
     Show Every Datetime Box
     Run Keyword And Warn On Failure    VerifyInputValue    ${END_TIME}    12:30 PM
     [Teardown]                ClickText         Cancel          partial_match=False
@@ -84,3 +87,5 @@ Show Every Datetime Box
         Log To Console        ${name}: date=${date} time=${time}
         Log                   ${name}: date=${date} time=${time}
     END
+
+
