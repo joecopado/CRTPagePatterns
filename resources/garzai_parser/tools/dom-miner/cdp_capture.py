@@ -283,6 +283,31 @@ def lazy_ready(state: dict) -> bool:
 DEFAULT_MAX_DEPTH = 120
 
 
+def unprototype(value):
+    """Undo Prototype.js's `Array.prototype.toJSON` double encoding (found 2026-10-06 on a classic
+    Visualforce page, slockard `/apex/Zoo_VF_Components`).
+
+    Every classic Visualforce page loads Prototype.js, which defines `Array.prototype.toJSON` returning a
+    JSON STRING. The serializers end in `JSON.stringify({... stats: {depthCapped: [] ...}})`, so on such a
+    page every array inside the payload arrives as the string "[]" / "[{...}]" -- non-empty, so truthy --
+    and the depth-cap warning iterated its CHARACTERS and died with `string indices must be integers`
+    (the capture exited 1 on a page that was not depth-capped at all). A scalar-looking string that is a
+    JSON array is turned back into the list; everything else is left exactly as it came. Never applied to
+    `html` / `title` / `path` / `host` (page text, which may legitimately look like an array)."""
+    if isinstance(value, dict):
+        return {k: (v if k in ("html", "title", "path", "host") else unprototype(v))
+                for k, v in value.items()}
+    if isinstance(value, list):
+        return [unprototype(v) for v in value]
+    if isinstance(value, str) and value[:1] == "[" and value[-1:] == "]":
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return value
+        return unprototype(parsed) if isinstance(parsed, list) else value
+    return value
+
+
 def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
     """The in-page serializer, with the walk() depth cap as a parameter.
 
@@ -300,7 +325,7 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
                labels:0, inputs:0, customElements:0, closedRootSuspects:0, shadowDepthCapped:0};
   var inShadow = 0;   // >0 while walk() is inside an open shadow root (completeness counters)
   var SECRET = [
-    /\b00D[A-Za-z0-9]{12,}\b/g,
+    /\b00D[A-Za-z0-9]{12,}(?:![A-Za-z0-9._\-]+|\b)/g,
     /(sid|sessionId|access_token|refresh_token|otp|token)=[^&"'\s<>]+/gi,
     /Bearer\s+[A-Za-z0-9._\-]{20,}/gi,
     // a PEM private key printed as page text (Copado AI node traces leak one in 6 of 23);
@@ -430,7 +455,8 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
 SERIALIZER = build_serializer()  # backward-compat module attribute; capture()/frame splice pass max_depth explicitly
 
 PY_SECRETS = [
-    re.compile(r"\b00D[A-Za-z0-9]{12,}\b"),
+    # the WHOLE session id `00D<org id>!<body>`: the body is the bearer secret (ledger f0b59a65da)
+    re.compile(r"\b00D[A-Za-z0-9]{12,}(?:![A-Za-z0-9._\-]+|\b)"),
     re.compile(r"(sid|sessionId|access_token|refresh_token|otp|token)=[^&\"'\s<>]+", re.I),
     re.compile(r"Bearer\s+[A-Za-z0-9._\-]{20,}", re.I),
     re.compile(r"\b[A-Za-z0-9_\-]{24,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\b"),
@@ -741,7 +767,8 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                   org: str | None = None, no_redact: bool = False,
                   lazy_timeout: float = 20.0, expand_collapsed: bool = True,
                   page_state: str | None = None, entered_via: str | None = None,
-                  host_url: str | None = None):
+                  host_url: str | None = None, settle_json: str | None = None,
+                  screenshot_json: str | None = None):
     import websockets
 
     serializer = build_serializer(max_depth)
@@ -858,11 +885,17 @@ async def capture(url: str, out_path: str, port: int, settle: float,
         # collapsed section gets its chance to load too.
         expand = {"status": "SKIPPED", "details": 0, "details_opened": 0, "toggles": 0,
                   "toggles_clicked": 0, "skipped_links": 0}
+        if not expand_collapsed:
+            # --no-expand (crawl fix 4, 2026-10-06): a crawl's STATE capture must be the state as it
+            # is -- the expander clicks disclosure buttons inside and behind an open modal or menu
+            # and so mutates the very state under measurement (review 3a: 17 crawl captures carry
+            # the pre-2026-09-22 expander's open-combobox signature)
+            expand["why"] = "no-expand: the caller asked for the page as it is"
         if expand_collapsed:
             try:
                 r = await c.send("Runtime.evaluate",
                                  {"expression": _EXPAND_JS, "returnByValue": True})
-                expand = json.loads(r["result"]["value"])
+                expand = unprototype(json.loads(r["result"]["value"]))
                 expand["status"] = "OK"
             except Exception:                                        # noqa: BLE001
                 expand["status"] = "COULD-NOT-CHECK"
@@ -877,7 +910,7 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                 r = await c.send("Runtime.evaluate",
                                  {"expression": _LAZY_READY_JS, "returnByValue": True})
                 try:
-                    state = json.loads(r["result"]["value"])
+                    state = unprototype(json.loads(r["result"]["value"]))
                 except Exception:                                    # noqa: BLE001
                     state = {}
                     break
@@ -908,6 +941,7 @@ async def capture(url: str, out_path: str, port: int, settle: float,
         r = await c.send("Runtime.evaluate",
                          {"expression": serializer, "returnByValue": True, "timeout": 60000})
         payload = json.loads(r["result"]["value"])
+        payload["stats"] = unprototype(payload.get("stats") or {})
 
         capped = payload["stats"].get("depthCapped") or []
         if capped:
@@ -948,6 +982,8 @@ async def capture(url: str, out_path: str, port: int, settle: float,
     # function (the lazy-related-list poll result). It shadowed the argument and the header
     # stamped the poll dict as the state name -- caught live 2026-09-18 on the first real
     # capture, which is exactly what a live proof is for.
+    settle_stamp, settle_line = _settle_stamp(settle_json)
+    shot_stamp, shot_line = _screenshot_stamp(screenshot_json)
     state_name = _stamp_value(page_state, "") or dialog_state_name(html) or DEFAULT_STATE
     state_name = _stamp_value(state_name, DEFAULT_STATE)
     entered_via_name = _stamp_value(entered_via, UNKNOWN_ENTERED_VIA)
@@ -982,6 +1018,14 @@ async def capture(url: str, out_path: str, port: int, settle: float,
         # there. One line, three fields, `|`-separated so it reads by eye and parses by regex.
         f"<!-- state: {state_name} | entered_via: {entered_via_name} "
         f"| host_url: {state_host_url} -->\n"
+        # crawl fix 4 (2026-10-06): the collapsed-UI expander's result, in EVERY case. It used to be
+        # computed and dropped -- a silent mutation of the page under capture.
+        + _stamp_line("expand", expand.get("status") or "COULD-NOT-CHECK",
+                      {k: v for k, v in expand.items() if k != "status"})
+        # crawl fix 3: the settle the CALLER ran before this capture (`--settle-json`), when given
+        + settle_line
+        # crawl fix 5: the full-page screenshot the caller took of THIS state, its region boxed
+        + shot_line +
         f"<!-- cross-origin-frames: {json.dumps(frame_stats)} -->\n"
         f"<!-- redaction: {json.dumps(redaction, sort_keys=True)} -->\n"
         "<!-- serialization: open shadow roots emitted as "
@@ -997,8 +1041,51 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                       "landed": payload["path"], "nav_path": requested_path,
                       "path_matches": path_matches, "lazy_wait": lazy,
                       "state": state_name, "entered_via": entered_via_name,
-                      "host_url": state_host_url,
+                      "host_url": state_host_url, "expand": expand, "settle": settle_stamp,
+                      "screenshot": shot_stamp,
                       "redaction": redaction, **payload["stats"]}))
+
+
+def _stamp_line(key: str, status: str, body) -> str:
+    """One header line, the status word first so it reads by eye, the JSON after it for a reader:
+    `<!-- <key>: <STATUS> {json} -->`. A double hyphen inside the JSON is escaped so the comment
+    cannot end early (a reason string may quote a flag)."""
+    blob = json.dumps(body, sort_keys=True, default=str).replace("--", "-\\u002d")
+    return f"<!-- {key}: {status} {blob} -->\n"
+
+
+def _settle_stamp(settle_json: str | None) -> tuple:
+    """(parsed stamp or None, header line or ''). Only a caller that RAN a settle passes one."""
+    if not settle_json:
+        return None, ""
+    try:
+        st = json.loads(settle_json)
+    except ValueError:
+        return {"raw": settle_json[:400]}, _stamp_line(
+            "settle", "COULD-NOT-CHECK", {"why": "--settle-json was not JSON",
+                                          "raw": settle_json[:400]})
+    if not isinstance(st, dict):
+        return {"raw": st}, _stamp_line("settle", "COULD-NOT-CHECK",
+                                        {"why": "--settle-json was not an object"})
+    return st, _stamp_line("settle", "SETTLED" if st.get("settled") else "UNSETTLED", st)
+
+
+def _screenshot_stamp(screenshot_json: str | None) -> tuple:
+    """(parsed stamp or None, header line or ''): `<!-- screenshot: <path> {...} -->`, or
+    `<!-- screenshot: COULD-NOT-CHECK {...} -->` when the caller's shot has no path."""
+    if not screenshot_json:
+        return None, ""
+    try:
+        st = json.loads(screenshot_json)
+    except ValueError:
+        st = {"why": "--screenshot-json was not JSON", "raw": screenshot_json[:400]}
+    if not isinstance(st, dict):
+        st = {"why": "--screenshot-json was not an object", "raw": st}
+    path = st.get("path")
+    status = str(path) if path else "COULD-NOT-CHECK"
+    # a path is one token in the line: whitespace or a comment terminator would break the reader
+    status = re.sub(r"\s+", "%20", status).replace("--", "-%2D")
+    return st, _stamp_line("screenshot", status, {k: v for k, v in st.items() if k != "path"})
 
 
 def main():
@@ -1059,6 +1146,19 @@ def main():
                      help="the URL the --entered-via control was clicked ON. Same page for an "
                           "in-page modal; the host page for a routed one (a quick action, "
                           "/lightning/o/<Obj>/new), which is what lets the store write the LINK")
+    ap.add_argument("--no-expand", dest="no_expand", action="store_true",
+                     help="do NOT run the collapsed-UI expander before serializing (it opens every "
+                          "<details> and clicks every disclosure button). A crawl passes this on a "
+                          "STATE capture, where the expander would mutate the state being captured. "
+                          "The header's `expand:` line says SKIPPED either way -- never silent")
+    ap.add_argument("--settle-json", dest="settle_json", default=None,
+                     help="the settle the CALLER ran just before this capture, as JSON (at least "
+                          "`settled`). Stamped as `<!-- settle: SETTLED|UNSETTLED {...} -->` so an "
+                          "unsettled state is still captured and says so itself")
+    ap.add_argument("--screenshot-json", dest="screenshot_json", default=None,
+                     help="the screenshot the CALLER took of this state just before the capture, as "
+                          "JSON with `path` (and e.g. `box`, `full_page`). Stamped "
+                          "`<!-- screenshot: <path> {...} -->`; no path stamps COULD-NOT-CHECK")
     ap.add_argument("--no-redact", action="store_true",
                      help="keep emails/phones/person names/record ids in the written capture. "
                           "OWNED test orgs only (dev1/slockard/fsc7f/health90/copado-trial) -- "
@@ -1076,7 +1176,8 @@ def main():
                         target_id=(a.target_id or None),
                         org=a.org, no_redact=a.no_redact, lazy_timeout=a.lazy_timeout,
                         page_state=a.state, entered_via=a.entered_via,
-                        host_url=a.host_url))
+                        host_url=a.host_url, expand_collapsed=not a.no_expand,
+                        settle_json=a.settle_json, screenshot_json=a.screenshot_json))
 
 
 if __name__ == "__main__":

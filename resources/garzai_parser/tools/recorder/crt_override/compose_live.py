@@ -60,6 +60,7 @@ import descriptor as DESC         # noqa: E402  (the page's own description of t
 import disambiguation_args as DA   # noqa: E402  (the ONE place a described `index` becomes QWeb's numeric `anchor`)
 import pattern_library as PL       # noqa: E402  (buckets + the verified recipes)
 from pom import keys as PK         # noqa: E402  (the page key, for provenance)
+from pom import scope as SCOPE     # noqa: E402  (the ONE place "is this the base state?" is answered)
 
 UNVERIFIED = '# unverified: parser proposal'
 
@@ -1661,6 +1662,48 @@ def _lorem_cells(length) -> tuple:
     return ['%s.Lexify' % FAKER_LIB, 'text=%s' % ('?' * n)], 'Lexify of %d letters (length %d)' % (n, length)
 
 
+# D34 (the user, 2026-10-08, docs/DECISIONS.md): a record's Name is COMPANY-STYLE on a non-person
+# object, and a person name only where the field means a person. LABEL_MEANING's last row maps ANY
+# trailing `name` to the person class, so `asdf` in `Opportunity Name` saved `Michael Bell`
+# (sl-stacked, 2026-10-07); `Account Name` was already company by its own label row. These are the
+# sobjects whose own Name IS a person's (compared casefolded; the org map's API names).
+PERSON_NAME_OBJECTS = frozenset({'contact', 'lead', 'user', 'individual', 'campaignmember'})
+
+
+def name_meaning(meaning, why, meta) -> tuple:
+    """(meaning, why) for a label the router read as the generic `name` class, decided by the OBJECT.
+
+    The object is the org-map field the router already holds (`meta['object']`, `meta['name']`):
+      * no object (no org-map field, or an entry that does not name one) -> the person class is KEPT
+        (today's answer, byte-identical) and the `why` says COULD-NOT-CHECK, because the label alone
+        cannot tell a record's Name from a person's;
+      * a person object (`PERSON_NAME_OBJECTS`) -> the person class;
+      * a non-person object's OWN Name field (API name `Name`) -> `company`;
+      * any other field of a non-person object whose label merely ends in `name` (`Manager Name`)
+        -> the person class, kept and said: it is not the record's Name and the label cannot say
+        whether it names a person or a thing.
+    A label of any other meaning is returned untouched."""
+    if meaning != 'name':
+        return meaning, why
+    obj = str((meta or {}).get('object') or '').strip()
+    api = str((meta or {}).get('name') or '').strip()
+    if not obj:
+        return meaning, ("%s; COULD-NOT-CHECK: the object is unknown (no org-map field for this "
+                         "label), so a record's Name cannot be told from a person's -- the person "
+                         "name is kept (D34)" % why)
+    if obj.casefold() in PERSON_NAME_OBJECTS:
+        return meaning, '%s; %s is a person object: a person name (D34)' % (why, obj)
+    if not api:
+        return meaning, ("%s; COULD-NOT-CHECK: the org-map entry names object %s but not the field, "
+                         "so it cannot be told to be the record's Name -- the person name is kept "
+                         "(D34)" % (why, obj))
+    if api.casefold() != 'name':
+        return meaning, ("%s; %s.%s is not the object's own Name field, so it is not a record name "
+                         "-- the person name is kept (D34)" % (why, obj, api))
+    return 'company', ("%s; %s.Name is a record name on a non-person object: company-style (D34)"
+                       % (why, obj))
+
+
 def faker_cells(cls, label=None, meta=None, iso=False, locale=None, meaning=None) -> tuple:
     """(the FakerLibrary cells, why) for one generator CLASS -- a provider meaning ('first',
     'company', ...), 'number', 'date', 'text', 'pick' -- or (None, why)."""
@@ -1683,6 +1726,7 @@ def faker_cells(cls, label=None, meta=None, iso=False, locale=None, meaning=None
         return ['%s.Date' % FAKER_LIB, 'pattern=%s' % fmt], 'a date %s%s' % (why, _datetime_note(meta))
     if cls == 'text':
         m, m_why = (meaning, 'meaning given') if meaning else label_meaning(label)
+        m, m_why = name_meaning(m, m_why, meta)       # D34: a record's Name is decided by its object
         if m and m in FAKER_PROVIDERS:
             kw, extra, width = FAKER_PROVIDERS[m]
             if m == 'date':
@@ -1866,14 +1910,40 @@ def value_cell(line) -> str | None:
     return cells[_VALUE_CELL]
 
 
+_LOCATOR_CELL = 1
+
+
+def _clean_locator_cell(cell: str) -> str:
+    """The LOCATOR cell through the ONE label normaliser (`pattern_library.clean_label`, W3) --
+    unless it is an xpath, which is not a label and whose trailing `*` or internal spacing are
+    part of the expression.
+
+    F262 (the user's n13 container run): `TypeText    *Company    ${lead_company}` and
+    `*Opportunity Name` reached the pane. W3 routes the parser and recipe rungs through
+    `clean_label`, but a STOCK line the composer only REWRITES THE VALUE of never passes either:
+    its locator cell is whatever the Copado recorder wrote, and on a required field that is the
+    label with the SLDS `<abbr class="slds-required">*</abbr>` in front of it. A marker in a
+    locator is a locator that changes the day the field stops being required. This is the same
+    normaliser, called at the one place a stock line is re-rendered -- never a second strip site.
+    """
+    if not isinstance(cell, str) or not cell:
+        return cell
+    s = cell.lstrip()
+    if s.startswith(('/', '(', 'xpath=', 'css=', '${', '//')):
+        return cell                      # an xpath/CSS locator or a variable, not a rendered label
+    return PL.clean_label(cell) or cell
+
+
 def replace_value_cell(line, new_value) -> str:
     """The same composed line with its VALUE cell replaced -- indentation and every trailing cell
-    (anchor=, partial_match=, a family argument, the unverified marker) kept exactly."""
+    (anchor=, partial_match=, a family argument, the unverified marker) kept exactly, and the
+    LOCATOR cell normalised through the one label normaliser (`_clean_locator_cell`, F262)."""
     cells = _cells(line or '')
     if len(cells) <= _VALUE_CELL:
         return line
     indent = line[: len(line) - len(line.lstrip())]
     cells = list(cells)
+    cells[_LOCATOR_CELL] = _clean_locator_cell(cells[_LOCATOR_CELL])
     cells[_VALUE_CELL] = new_value
     return indent + '    '.join(cells)
 
@@ -2444,35 +2514,63 @@ def container_pack_dir() -> str | None:
 _PACK_CACHE: dict = {}
 
 
-def _store_record(page_key: str | None, org: str | None, state_root: str | None = None):
+def _store_record(page_key: str | None, org: str | None, state_root: str | None = None,
+                  state: str | None = None):
     """The store record for one page key, loaded at most once per process. Never raises: a
     recording in progress must not die because the store is missing, stale or unreadable.
 
+    Returns `(record_or_None, source)`. `source` is one of:
+        'state'         found at the compound key `<page_key>::state=<state>`
+        'base-fallback' `state` named a non-base state but only the BASE record exists (or none
+                        does) -- the caller must not let this record answer for the named state
+                        as if it were verified there (V-n14b 6a, CAUGHT-BUG 2)
+        'base'          no named state was asked for; the plain page-key record, if any
+        'none'          nothing on disk at all
+
     `state_root` None is the machine's own store (`~/.claude/state`), which is what the two
-    capture-side callers have always read. The container passes its pack dir."""
+    capture-side callers have always read. The container passes its pack dir.
+
+    `state` (item 6, ledger F265): a NAMED, non-base state first tries a STATE-SPECIFIC record at
+    the compound key `<page_key>::state=<state>` -- a modal never changes `page_key` (D15/D16), so
+    without this every control that lives only inside a modal's own state is consulted against the
+    page's DEFAULT record and always derives. No writer lands that file yet (the merge writers are
+    a separate item); when it does not exist this falls back to the base `page_key` record exactly
+    as before, so an un-split page behaves byte-identically. The cache key stays `(page_key, org)`
+    / `(page_key, org, state_root)` -- UNCHANGED shape -- whenever `state` is None/base, which is
+    what `test_consult_merged_call_2026_09_22._consult_row` seeds directly and must keep working."""
     if not page_key:
-        return None
+        return None, 'none'
+    named_state = bool(state) and not SCOPE.is_base_state(state)
+    if named_state:
+        scoped, _src = _store_record('%s::state=%s' % (page_key, state), org, state_root)
+        if scoped is not None:
+            return scoped, 'state'
+        # no state-specific record on disk (yet): fall through to the page's own base record,
+        # never an exception -- but the SOURCE says this was a fallback, never a silent 'state'
     cache = _STORE_CACHE if state_root is None else _PACK_CACHE
     ck = (page_key, org) if state_root is None else (page_key, org, state_root)
     if ck in cache:
-        return cache[ck]
-    rec = None
-    try:
-        import sys as _sys
-        import os as _os
-        _pom = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "pom")
-        if _pom not in _sys.path:
-            _sys.path.insert(0, _pom)
-        from store import Store                      # noqa: F401
-        rec = Store(state_root=state_root).get(page_key, org) if state_root else Store().get(page_key, org)
-    except Exception:
+        rec = cache[ck]
+    else:
         rec = None
-    cache[ck] = rec
-    return rec
+        try:
+            import sys as _sys
+            import os as _os
+            _pom = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "pom")
+            if _pom not in _sys.path:
+                _sys.path.insert(0, _pom)
+            from store import Store                      # noqa: F401
+            rec = Store(state_root=state_root).get(page_key, org) if state_root else Store().get(page_key, org)
+        except Exception:
+            rec = None
+        cache[ck] = rec
+    if named_state:
+        return rec, ('base-fallback' if rec is not None else 'none')
+    return rec, ('base' if rec is not None else 'none')
 
 
 def consult_row(out: dict, row: dict, page_key: str | None, org: str | None,
-                indent: str = '    ', store_root=_DEFAULT_STORE) -> dict:
+                indent: str = '    ', store_root=_DEFAULT_STORE, state: str | None = None) -> dict:
     """Fold a store answer into a composed result, IN PLACE, and always say what happened.
 
     `out['consult']` is written on every call -- verified, known-unverified, unknown-control,
@@ -2485,6 +2583,18 @@ def consult_row(out: dict, row: dict, page_key: str | None, org: str | None,
     "there is no pack here": the answer is `unknown-page` and the derived line stands, byte for
     byte -- never a silent fall back to `~/.claude/state`, which a container does not have and a
     replay must not read.
+
+    `state` (item 6, ledger F265) is threaded straight to `_store_record`: see its docstring for
+    the compound-key/fallback rule. Passing none is the exact behaviour this had before item 6.
+
+    THE FALLBACK NEVER LEADS A NAMED STATE (V-n14b 6a, CAUGHT-BUG 2). When `state` names a real,
+    non-base state and `_store_record` answers `source == 'base-fallback'` -- no record exists at
+    the compound key, only the page's own default-state record -- a rung learned in the DEFAULT
+    state is not allowed to answer `verified` for a control asked about in a NAMED state (CLAUDE.md:
+    "a member carries `scope`; absent is COULD-NOT-CHECK, never `own`"). `verified` is downgraded to
+    `known-unverified` and `unknown-control` is re-worded to name the missing state record; every
+    other verdict (`known-unverified`, `unknown-page`) is already the honest answer and passes
+    through untouched.
     """
     out.setdefault('consult', None)
     if not out.get('line'):
@@ -2500,17 +2610,29 @@ def consult_row(out: dict, row: dict, page_key: str | None, org: str | None,
             _sys.path.insert(0, _pom)
         import consult as _consult
         if store_root is _DEFAULT_STORE:
-            record = _store_record(page_key, org)
+            record, source = _store_record(page_key, org, state=state)
         elif store_root:
-            record = _store_record(page_key, org, str(store_root))
+            record, source = _store_record(page_key, org, str(store_root), state=state)
         else:
-            record = None            # no pack dir: consult() answers unknown-page and says why
+            record, source = None, 'none'   # no pack dir: consult() answers unknown-page and says why
         answer = _consult.consult(record, label, family, page_key=page_key)
         if store_root is not _DEFAULT_STORE and not store_root:
             answer = dict(answer, why=(
                 'no page-object pack is shipped with this build (%s is unset and no '
                 '<library>/garzai_pom is on disk) -- deriving, exactly as before this build'
                 % PACK_DIR_ENV))
+        elif bool(state) and not SCOPE.is_base_state(state) and source == 'base-fallback':
+            answer = dict(answer)
+            if answer.get('verdict') == _consult.VERIFIED:
+                answer['verdict'] = _consult.KNOWN_UNVERIFIED
+                answer['rung'] = None
+                answer['why'] = ('the store holds this control only in the %s state; state %r '
+                                 'has no record -- deriving, and saying so'
+                                 % (SCOPE.BASE_STATE, state))
+            elif answer.get('verdict') == _consult.UNKNOWN_CONTROL:
+                answer['why'] = ('unknown-control: state %r has no record and the %s state\'s '
+                                 'record does not have this control either -- deriving'
+                                 % (state, SCOPE.BASE_STATE))
     except Exception as exc:
         out['consult'] = {'verdict': 'COULD-NOT-CHECK',
                           'why': '%s while consulting the store (%s)' % (type(exc).__name__, exc)}
@@ -2785,20 +2907,67 @@ def live_capture(drv, org: str | None = None, max_depth: int = 120) -> dict:
 # a datatable swapping a row, a wizard step replacing its fields -- so the stale parse answered with
 # a label that is no longer on the page (challenge D10 finding 8, 2026-09-19). The count still
 # travels, and the CONTENT of the controls travels with it: tag plus the first of
-# aria-label / name / placeholder / text, for the controls and their labels, capped and hashed.
+# aria-label / name / placeholder / text, for the controls and their labels, hashed.
 # One execute_script, the same round trip the count cost.
+#
+# IT PIERCES OPEN SHADOW ROOTS (F267, V-n14b item 5a). `getElementsByTagName`, `querySelectorAll`
+# and `textContent` all stop at a native shadow root, and Lightning puts 76-87% of a page's
+# controls behind one (measured over the 28 committed goldens: `lead-new-modal` 277 of 317
+# invisible). A state change made ENTIRELY inside a shadow root -- five options rendering under an
+# existing host -- flipped this on 0 of 28, so the branch that recaptures was never entered and the
+# STALE parse was served: a wrong answer, not a refusal. That is challenge D10 finding 8 returning
+# through the very signal written to prevent it. The walk below therefore recurses into
+# `el.shadowRoot`. A CLOSED root stays invisible -- nothing in the page can see it -- and a change
+# confined to one is a known blind spot, not a claim.
+#
+# TOASTS AND STATUS REGIONS ARE EXCLUDED, SUBTREE AND ALL. A success toast flipped the old
+# fingerprint on 28 of 28, and again when it auto-dismissed: two real 4 s captures per toast,
+# inside the server lock, for a page whose controls did not change. A field-level validation error
+# is also `role=alert` and is excluded ON PURPOSE for the same reason -- the message is new, the
+# controls are not, and the composer's answer about them is unchanged.
+#
+# NO CAP. The old 400-control cap made an in-place relabel past it invisible (1 of 28 goldens is
+# already over: `breadth/fsc7f__setup__flows.html`, 886 light-DOM controls, and counting through
+# shadow puts far more of them over). The controls fold into a 32-bit FNV-1a hash IN JS instead,
+# so the return value stays a short `count|controls|hash` string however big the page is.
+#
+# IT NEVER READS `value`. Typing must not cost a capture: the read-back, not a recapture, is what
+# proves what landed (measured: 0 of 28 flips on a typed value, and that is correct).
 _FINGERPRINT_JS = r"""
 /* __gzFingerprint */
-var n = document.getElementsByTagName('*').length;
-var els = document.querySelectorAll('input,select,textarea,button,a,label,legend,[role],[contenteditable="true"]');
-var out = [String(n), String(els.length)];
-var cap = els.length < 400 ? els.length : 400;
-for (var i = 0; i < cap; i++) {
-  var e = els[i], t = '';
-  try { t = e.getAttribute('aria-label') || e.getAttribute('name') || e.getAttribute('placeholder') || e.textContent || ''; } catch (err) { t = ''; }
-  out.push(e.tagName + '=' + String(t).replace(/\s+/g, ' ').trim().slice(0, 40));
+var SKIP = '[role="alert"],[role="status"],.slds-notify_container,lightning-platform-toast';
+var CTRL = 'input,select,textarea,button,a,label,legend,[role],[contenteditable="true"]';
+var n = 0, c = 0, h = 2166136261;
+function fold(s) {
+  for (var i = 0; i < s.length; i++) { h = ((h ^ s.charCodeAt(i)) * 16777619) >>> 0; }
+  h = ((h ^ 10) * 16777619) >>> 0;
 }
-return out.join('|');
+function skip(e) {
+  try { return !!(e.matches && e.matches(SKIP)); } catch (err) { return false; }
+}
+function walk(root) {
+  var kids = root.children;
+  if (!kids) { return; }
+  for (var i = 0; i < kids.length; i++) {
+    var e = kids[i];
+    if (skip(e)) { continue; }
+    n++;
+    var m = false;
+    try { m = !!(e.matches && e.matches(CTRL)); } catch (err) { m = false; }
+    if (m) {
+      c++;
+      var t = '';
+      try { t = e.getAttribute('aria-label') || e.getAttribute('name') || e.getAttribute('placeholder') || e.textContent || ''; } catch (err) { t = ''; }
+      /* sliced BEFORE the whitespace collapse: a role=group container's textContent is the whole
+         subtree, and normalising every one of those in full is quadratic on a Setup page */
+      fold(e.tagName + '=' + String(t).slice(0, 200).replace(/\s+/g, ' ').trim().slice(0, 40));
+    }
+    if (e.shadowRoot) { walk(e.shadowRoot); }
+    walk(e);
+  }
+}
+walk(document);
+return n + '|' + c + '|' + (h >>> 0).toString(16);
 """
 
 
@@ -2806,7 +2975,10 @@ def _fingerprint(drv) -> str:
     """A content-sensitive page fingerprint, or `'-1'` when the page could not answer.
 
     Never a bare node count: two different pages, and one page before and after an in-place
-    re-render, routinely carry the same count."""
+    re-render, routinely carry the same count. It crosses every OPEN shadow root (a CLOSED one is
+    invisible to any script in the page, so a change confined to one is a stated blind spot) and
+    excludes toasts and status regions subtree and all, including a field-level validation error:
+    the message changed, the controls did not. See `_FINGERPRINT_JS` above for the measurements."""
     try:
         raw = drv.execute_script(_FINGERPRINT_JS)
     except Exception:
@@ -2825,18 +2997,30 @@ SCRIPT_TIMEOUT_S = 4
 PAGE_ASK_MS = 6000               # what the injected JS waits; this module must finish inside it
 
 
-def capture_allowed(cache: dict, now: float | None = None) -> tuple[bool, float]:
+def capture_allowed(cache: dict, now: float | None = None, fp_changed: bool = False) -> tuple[bool, float]:
     """(allowed, seconds since the last capture). At most one capture per CAPTURE_MIN_INTERVAL_S per
-    composer: a page that changes faster than that is answered COULD-NOT-CHECK, never re-walked."""
+    composer FOR AN UNCHANGED PAGE: a page whose content fingerprint has not moved is answered
+    COULD-NOT-CHECK rather than re-walked.
+
+    `fp_changed` True ALWAYS allows the capture, however recently the last one ran (CH-Q2 2b,
+    ledger F265): a fresh fingerprint is exactly the modal-just-opened signal (`_fingerprint`
+    below is already the cache key's second half, one `execute_script` per ask), and the budget's
+    own docstring/comment ("the stall the user saw when every click recaptured") is about a page
+    that keeps re-asking with NOTHING changed, never about a state a person just opened. Before
+    this, the user's Lead modal composed nothing for its first 5 s -- the modal changed the
+    fingerprint and was refused anyway."""
     now = time.time() if now is None else now
     last = float(cache.get('last_capture_t') or 0.0)
     since = now - last
+    if fp_changed:
+        return True, since
     return (last == 0.0 or since >= CAPTURE_MIN_INTERVAL_S), since
 
 
 def compose_live_element(drv, target_element, rendered: str, org: str | None = None,
                          cache: dict | None = None, url: str | None = None,
-                         form: str = 'keyword', descriptor: dict | None = None) -> dict:
+                         form: str = 'keyword', descriptor: dict | None = None,
+                         state: str | None = None) -> dict:
     """The driver layer: one capture per page (cached on url + node count), one execute_script to
     find the recorded element among the parsed rows by DOM identity (`===`), then the SAME pure
     composition. Recaptures once when the target is not among the cached rows -- the page moved.
@@ -2849,6 +3033,12 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
     through the SAME rule `pom/match.py` states then names the row, and the answer says which way
     it got there -- `matched_by: identity | descriptor`.
 
+    `state` is the STATE the describer/capture stamped this row in (CLAUDE.md's locator doctrine:
+    "a step is scoped to the state it was recorded in"; D16). A modal never changes `url`, so the
+    capture cache and the store consult would otherwise both key on the page's structural page_key
+    alone and answer for the DEFAULT state's record even when the control lives only in a modal's
+    own state (CH-Q2 2b, ledger F265). `None`/the base state means exactly what it always has.
+
     IT CONSULTS THE STORE (F247). Every one of the three composing returns below goes through the
     SAME `consult_row` the two capture-side entry points use -- there is no third copy of the rule
     -- against a store rooted at `container_pack_dir()`. No pack dir is `unknown-page`: the derived
@@ -2857,18 +3047,30 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
     cache = cache if cache is not None else {}
     pack_dir = container_pack_dir()
     url = url or (drv.current_url or '')
+    t_fp0 = time.time()
     fp = _fingerprint(drv)
-    out_extra = {'recaptured': False, 'capture_ms': cache.get('capture_ms', 0.0)}
+    fingerprint_ms = round((time.time() - t_fp0) * 1000, 1)
+    out_extra = {'recaptured': False, 'capture_ms': cache.get('capture_ms', 0.0),
+                 'fingerprint_ms': fingerprint_ms}
     try:
         drv.set_script_timeout(SCRIPT_TIMEOUT_S)   # a navigation mid-capture must not hold the driver 30 s
     except Exception:
         pass
     for attempt in (1, 2):
         if cache.get('url') != url or cache.get('fingerprint') != fp or 'parsed' not in cache:
-            ok, since = capture_allowed(cache)
+            # a FRESH fingerprint (a modal just opened, a new page rendered) always gets its
+            # capture; the budget is for a page whose content has not moved (item 5, F265) --
+            # never true on the very first capture (`cache.get('fingerprint')` is then None).
+            fp_changed = bool(cache.get('fingerprint')) and cache.get('fingerprint') != fp
+            ok, since = capture_allowed(cache, fp_changed=fp_changed)
             if not ok:
                 return {'line': None, 'xpath_line': None, 'row': None,
-                        'why': 'COULD-NOT-CHECK: capture budget: the page changed %.1f s after the last capture (minimum %.0f s)' % (since, CAPTURE_MIN_INTERVAL_S), **out_extra}
+                        # V-n14b 5a: this branch is reachable ONLY with the fingerprint UNCHANGED (the
+                        # driver's URL moved before the DOM re-rendered, or `parsed` is missing at
+                        # the same fingerprint) -- "the page changed" was the one thing NOT true here
+                        'why': ('COULD-NOT-CHECK: capture budget: the url moved but the page content '
+                                'fingerprint is unchanged %.1f s after the last capture (minimum %.0f s '
+                                'for an unchanged page)' % (since, CAPTURE_MIN_INTERVAL_S)), **out_extra}
             # A capture that RAISES is the third state, not an exception thrown at the caller:
             # every other failure here returns a COULD-NOT-CHECK dict, and a page unloading
             # mid-serialize (or an empty document -- measured 2026-09-18, `ParserError: Document is
@@ -2880,6 +3082,15 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                 return {'line': None, 'xpath_line': None, 'row': None,
                         'why': 'COULD-NOT-CHECK: the capture failed: %s: %s' % (type(exc).__name__, exc),
                         **out_extra}
+            # V-n14b 6a/6b: derive the STATE beside the capture, from the SAME html the parse just
+            # used -- the pure function `up.py --op capture`'s own stamp uses (`cdp_capture.py:470`,
+            # already lazy-imported at module load, tools/dom-miner on sys.path since line 53).
+            # None means the base state; the function never guesses and this never raises.
+            try:
+                import cdp_capture
+                cache['state'] = cdp_capture.dialog_state_name(shot['html'])
+            except Exception:
+                cache['state'] = None
             # the budget is spent by a capture that PARSED, never by one that failed: stamping it
             # first blinded the composer for the following 5 s every time a capture went wrong
             cache['last_capture_t'] = time.time()
@@ -2890,6 +3101,10 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
             cache['xpaths'] = [r.get('identity_xpath') or '' for r in cache['parsed'].rows]
             out_extra['capture_ms'] = shot['capture_ms']
             out_extra['recaptured'] = attempt > 1 or out_extra['recaptured']
+        # an explicit `state=` from the caller still wins; otherwise a cache HIT keeps the state
+        # this same page/modal derived on its own capture (V-n14b 6a/6b) -- this line applies to
+        # every consult_row call below, on every attempt of this loop.
+        state = state or cache.get('state')
         parsed: Parsed = cache['parsed']
         t0 = time.time()
         try:
@@ -2901,10 +3116,10 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
         if i >= 0:
             res = compose_for_row_live(drv, target_element, parsed.rows[i], rendered, form)
             consult_row(res, parsed.rows[i], parsed.page_key, org, _indent(rendered),
-                        store_root=pack_dir)
+                        store_root=pack_dir, state=state)
             res.update({'row': _row_summary(parsed.rows[i]), 'page_key': parsed.page_key,
                         'match_ms': match_ms, 'rows': len(parsed.rows), 'matched_by': 'identity',
-                        **out_extra})
+                        'state': state, **out_extra})
             return res
         # no identity: what the PAGE said about the element still names a row (F40)
         if descriptor:
@@ -2912,10 +3127,11 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
             if row is not None:
                 res = compose_for_row_live(drv, target_element, row, rendered, form)
                 consult_row(res, row, parsed.page_key, org, _indent(rendered),
-                            store_root=pack_dir)
+                            store_root=pack_dir, state=state)
                 res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
                             'match_ms': match_ms, 'rows': len(parsed.rows),
-                            'matched_by': 'descriptor', 'descriptor_why': why, **out_extra})
+                            'matched_by': 'descriptor', 'descriptor_why': why, 'state': state,
+                            **out_extra})
                 if res.get('why'):
                     res['why'] = '%s (by descriptor: %s)' % (res['why'], why)
                 return res
@@ -2963,7 +3179,7 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                     # step, never for the row that happens to carry its recipe.
                     target_row = {'label': None, 'element_type': None, 'tag': row.get('tag')}
                     consult_row(res, target_row, parsed.page_key, org, _indent(rendered),
-                                store_root=pack_dir)
+                                store_root=pack_dir, state=state)
                 else:
                     res = {'line': None, 'xpath_line': None,
                            'backups': [_recipe_dormant(_indent(rendered), dormant,
@@ -2973,7 +3189,8 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
                                    'record -- kept dormant (D19)' % (row.get('n'), row.get('pattern'))),
                            'consult': {'verdict': 'skipped', 'why': 'nothing was composed for this row'}}
                 res.update({'row': _row_summary(row), 'page_key': parsed.page_key,
-                            'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra})
+                            'match_ms': match_ms, 'rows': len(parsed.rows), 'state': state,
+                            **out_extra})
                 return res
         if attempt == 1 and _fingerprint(drv) != cache.get('fingerprint'):
             # the page moved under us: ONE recapture, and only when the DOM actually changed -- a
@@ -2985,6 +3202,51 @@ def compose_live_element(drv, target_element, rendered: str, org: str | None = N
         return {'line': None, 'xpath_line': None, 'row': None, 'page_key': parsed.page_key,
                 'why': 'no parsed row and no recipe step resolves to this element',
                 'match_ms': match_ms, 'rows': len(parsed.rows), **out_extra}
+
+
+def _pct_bucket(rows) -> dict:
+    """p50/p90/max over one already-filtered, already-non-negative population. `n=0` (never a
+    bare `[]` or a fabricated 0) is the honest answer when the population is empty."""
+    vals = sorted(v for v in (r.get('queue_wait_ms') for r in rows)
+                  if isinstance(v, (int, float)))
+    if not vals:
+        return {'n': 0, 'p50': None, 'p90': None, 'max': None}
+
+    def _pct(p):
+        return vals[min(len(vals) - 1, int(round(p * (len(vals) - 1))))]
+
+    return {'n': len(vals), 'p50': _pct(0.50), 'p90': _pct(0.90), 'max': vals[-1]}
+
+
+def queue_wait_stats(rows) -> dict:
+    """F271 (V-n14a #4, defect C). The ONE shared percentile over `queue_wait_ms`, called by both
+    `build_override.py`'s generated `_queue_wait_stats()` (live, over `STATE["frame_asks"]`) and
+    `mirror.summarise_frame_asks` (offline, over the rows `/asks` or `compose-asks.jsonl` holds) --
+    before this they were two independently written restatements of one percentile and already
+    disagreed: over the SAME 5-row fixture (one row missing `kind` entirely), the server's
+    `kind == "compose"` filter counted n=4 while the mirror's `kind != "flush"` filter counted n=5,
+    p90 902 vs 7000.
+
+    THE SPLIT (measured, V-n14a #4): the stock eye's own compose asks carry a queue wait of
+    ~0-1 ms; the safety net's carry a STRUCTURAL ~900 ms debounce floor (the backstop's own `HOLD`
+    window, deliberately counted in). Both are `kind: "compose"`, and folding them into one
+    percentile means the reported p90 is decided by whichever eye happened to fire more that
+    session, never by an actual queue -- so they are reported SEPARATELY here, plus `all` for a
+    caller that still wants the combined number with eyes open about what it mixes.
+
+    A NEGATIVE `queue_wait_ms` (the two page-side clock stamps disagree with the order they were
+    taken in -- the wall clock moved) is excluded from every percentile bucket and counted in
+    `negative_n`, never silently folded in as though it were a real wait (CLAUDE.md's
+    no-silent-truncation rule: an elide may never be silent)."""
+    compose = [r for r in (rows or []) if isinstance(r, dict) and r.get('kind') == 'compose']
+    negative_n = sum(1 for r in compose
+                      if isinstance(r.get('queue_wait_ms'), (int, float)) and r['queue_wait_ms'] < 0)
+    non_negative = [r for r in compose
+                     if not (isinstance(r.get('queue_wait_ms'), (int, float)) and r['queue_wait_ms'] < 0)]
+    stock = [r for r in non_negative if not r.get('synthetic')]
+    safety_net = [r for r in non_negative if r.get('synthetic')]
+    return {'stock_eye': _pct_bucket(stock), 'safety_net': _pct_bucket(safety_net),
+            'all': _pct_bucket(non_negative), 'negative_n': negative_n}
 
 
 # ----------------------------------------------------------------------------- CLI

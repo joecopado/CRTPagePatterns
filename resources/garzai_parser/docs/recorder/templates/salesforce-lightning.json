@@ -1,6 +1,10 @@
 {
   "keywordRouting": {
-    "_note": "Stream 2A 2026-09-09 (attack plan Phase 2A; essay docs/proposals/challenge-2026-09-08/C2-keyword-assignment.md). THE keyword router, as DATA. A control's DOM family says WHAT it is; fill vs verify vs actuate is the CALLER's INTENT, so it is three named slots here and two element fields (hint_fill / hint_verify) on the parsed element -- never a two-keyword string like 'TypeText / ClickText' baked into one `keyword`, which is what the parser emitted until this table landed. `metadataTypes` routes a DESCRIBE TYPE and WINS over the family when the org map has the field (CLAUDE.md: 'metadata routes the keyword, DOM is the backstop'); it is kept in step with tools/qforce-lite/predict.py:type_to_keyword by tools/recorder/tests/test_keyword_router_contract_2026_09_09.py, which also proves every keyword named here is a real rung in export._CRT_KW_MAP / writer._KW_MAP / library/index.json. A family with no keyword states a `reason` -- the tri-state rule, never silence. `_default` is the safety net: a family nobody has written a row for still yields a stated reason rather than an unexplained blank.",
+    "_fillFirstInGrid_why": "parser-one 4c(a), 2026-10-07 (docs/audit/parser-one-2026-10-06/README.md section 4c; error ledger c2be56b628). `fillFirst` (stream 2A: a control you FILL never leads with a blind click) was skipped for every control inside a table/grid, and a Visualforce pageBlock or classic Setup edit form lays its fields out in a <table> -- so `Zoo Text` on wave3/vf-form-tab.html proposed `click_table_cell(row=<N>, col=\"row/col coordinates (r{N}/c{M})\")` FIRST and TypeText second. A fill keyword listed here leads inside a grid too, when the control already offers it; the table rung stays offered after it, flagged as the placeholder it is. Measured on the parser-one corpus: 110 actionable typing controls (input_field 102, textarea 8) moved, 0 of the 714 store-verified elements among them. Only TypeText is listed: a checkbox / picklist in a data row stays a flagged placeholder first (5906e488 W2), and nothing measured says which call is right for those 3,442 controls. Test: tools/recorder/tests/templates/test_typing_control_in_table_leads_with_fill_4c.py.",
+    "fillFirstInGrid": [
+      "TypeText"
+    ],
+    "_note":"Stream 2A 2026-09-09 (attack plan Phase 2A; essay docs/proposals/challenge-2026-09-08/C2-keyword-assignment.md). THE keyword router, as DATA. A control's DOM family says WHAT it is; fill vs verify vs actuate is the CALLER's INTENT, so it is three named slots here and two element fields (hint_fill / hint_verify) on the parsed element -- never a two-keyword string like 'TypeText / ClickText' baked into one `keyword`, which is what the parser emitted until this table landed. `metadataTypes` routes a DESCRIBE TYPE and WINS over the family when the org map has the field (CLAUDE.md: 'metadata routes the keyword, DOM is the backstop'); it is kept in step with tools/qforce-lite/predict.py:type_to_keyword by tools/recorder/tests/test_keyword_router_contract_2026_09_09.py, which also proves every keyword named here is a real rung in export._CRT_KW_MAP / writer._KW_MAP / library/index.json. A family with no keyword states a `reason` -- the tri-state rule, never silence. `_default` is the safety net: a family nobody has written a row for still yields a stated reason rather than an unexplained blank.",
     "families": {
       "input_field": {
         "fill": "TypeText",
@@ -138,11 +142,69 @@
         "verify": "Omni Verify Output Field",
         "why": "an OmniScript radio group has no label[for]; Omni Radio resolves the input by its VALUE attribute inside the omni host and re-reads which values ended up checked."
       },
+      "omni_radio_group": {
+        "fill": "Omni Radio",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P1 (2026-10-07): the OmniStudio radio GROUP itself (its <legend> caption) -- the same keyword as an option, addressed by the group's data-omni-key, with the option to pick as the value."
+      },
+      "omni_multiselect": {
+        "fill": "Omni Multiselect",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P1 (2026-10-07): an OmniStudio multi-select is a checkbox GROUP whose every input carries the element's name; Omni Multiselect ticks the values asked for inside the data-omni-key host and re-reads which ended up checked (keywords_omni.omni_multiselect)."
+      },
+      "omni_multiselect_group": {
+        "fill": "Omni Multiselect",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P1 (2026-10-07): the multi-select GROUP itself (its <legend> caption), addressed by its data-omni-key; the values to tick are the call's second argument."
+      },
+      "omni_checkbox": {
+        "fill": "Omni Checkbox",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P2 (2026-10-07): an OmniScript checkbox has no label element at all; data-omni-key is the whole locator (keywords_omni.omni_checkbox re-reads `checked`)."
+      },
+      "omni_date": {
+        "fill": "Omni Date",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P2 (2026-10-07): the OmniStudio date picker is a TEXT input with the format in its label, not a lightning-datepicker -- Set Datetime / a native date keyword misses it (v3 evidence, fsc7f capture 02); Omni Date types it inside the data-omni-key host and reads it back normalised."
+      },
+      "omni_lookup": {
+        "fill": "Omni Lookup",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P2 (2026-10-07): a server-backed OmniStudio lookup -- typing is local, the option list a round trip; Omni Lookup waits for it inside the data-omni-key host (a timeout is COULD-NOT-CHECK, never a pass)."
+      },
+      "omni_typeahead": {
+        "fill": "Omni Typeahead",
+        "fillFirst": true,
+        "verify": "Omni Verify Output Field",
+        "why": "parser-one P2 (2026-10-07): an OmniStudio typeahead opens its listbox on TYPING, never on a click (measured on dev1 2026-09-05: the CAUGHT-BUG that produced Omni Typeahead); ComboBox / PickList report an empty field."
+      },
       "dual_listbox": {
         "fill": "Multi Pick List",
         "fillFirst": true,
         "verify": "VerifyField",
         "why": "the dual-listbox is the multi-select picklist shape; PickList drives only one half of it."
+      },
+      "file": {
+        "fill": "Upload File To Record",
+        "fillFirst": true,
+        "verify": null,
+        "why": "parser-one P5 (2026-10-07; v3 `file`): a native file input takes a FILE, never typed text -- keywords_upload.upload_file sends the path to the dropzone's input, waits for the upload to settle and confirms the file attached to the record (SOQL), which QWeb's UploadFile never did."
+      },
+      "listbox": {
+        "fill": null,
+        "verify": null,
+        "reason": "parser-one P3 (2026-10-07): a dual-listbox PANE (Available / Chosen) -- its options are listed as their own rows and the group is filled with Multi Pick List on the dual listbox's own label; the pane itself takes no keyword."
+      },
+      "option": {
+        "fill": null,
+        "verify": null,
+        "reason": "parser-one P3 (2026-10-07): one visible option of a dual listbox -- clicked (ClickItem by its data-value) to select it, then moved with the 'Move selection to ...' button; filling the field is Multi Pick List on the group's label."
       },
       "output_field": {
         "fill": null,
@@ -598,8 +660,29 @@
         "lightning-dual-listbox"
       ],
       "_why": "2026-09-10 (user, Zoo_Nightmare_Inputs 'Entitled Services'): a hand-built SLDS dueling list has no lightning-dual-listbox host -- two ul[role=listbox] under Available/Selected with unnamed move controls between them -- and produced NO row. Read by capture_orchestration (candidate pass) and component_classifier._structural_container_family; the family routes to the same dual_listbox keywords as the base component."
+    },
+    {
+      "family": "lookup",
+      "containerClassFragments": [
+        "forceSearchInputLookupDesktop"
+      ],
+      "skipIfDescendantTags": [
+        "input"
+      ],
+      "labelFromOwnTags": [
+        "label"
+      ],
+      "_why": "parser-one P8 (2026-10-07; v3 `aura-lookup`): an Aura force:inputLookup with a record CHOSEN renders <label>Account Name</label> and a pill -- no <input> -- and v1 emitted nothing for the field (customer-cpq/02-new-opportunity-modal.html `Account Name`, v3-only). The wrapper is the lookup row, named by its own <label>; with no record chosen (an <input> inside) the input is the row instead (hostFamilyRules aura-lookup) and the wrapper is skipped."
     }
   ],
+  "labelExcludeClassFragments": [],
+  "tableRowLabel": {
+    "labelCellClassFragments": [
+      "labelCol"
+    ]
+  },
+  "note_tableRowLabel": "2026-10-07 (F19, the product's harness runs on dev1 New Permission Set and gzchores Add Picklist Values): a classic form row -- Visualforce pageBlockSectionItem, a classic Setup edit form -- puts the visible label in a cell whose class carries one of labelCellClassFragments and the control in the data cell after it; the row's <label for> often names a wrapper id, never the control. The `table_row_label` rung of labelPrecedence reads that cell (after the association rungs, before placeholder / title). `input_value` names an <input type=submit|button|reset> by its value, the text QWeb's ClickText matches.",
+  "_why_labelExcludeClassFragments": "parser-one P8 (2026-10-07; v3 `switch`), HELD -- deliberately EMPTY. A lightning toggle's <label for> holds the field name AND the toggle's state text (span.slds-checkbox_faux_container: On / Off), so v1 names Health Cloud's toggle `Show fields on cards On` -- a label carrying a VALUE. Listing `slds-checkbox_faux_container` here fixes it (measured: 5 labels, markup labels +0.1 pt) but the recorder's injected JS resolver (tools/recorder/inject/core.js) reads the same state text, and test_label_parity's ratchet fell 0.850 -> 0.833 with only the parser changed ('Reuse an existing credential' vs '... Set up a new credential' on 09-garzai-console). Port both resolvers in ONE change (core.js + this key + the bundle rebuild), never one side.",
   "targetTags": [
     "button",
     "a",
@@ -607,6 +690,8 @@
     "select",
     "textarea",
     "runtime_omnistudio_common-output-field",
+    "runtime_omnistudio_common-radio-group",
+    "runtime_omnistudio_common-checkbox-group",
     "lightning-button",
     "lightning-button-icon",
     "lightning-button-menu",
@@ -684,10 +769,13 @@
   },
   "labelPrecedence": [
     "inner_text",
+    "input_value",
+    "group_caption",
     "aria_label",
     "standard_label",
     "aria_labelledby",
     "form_element_label",
+    "table_row_label",
     "placeholder",
     "title_attr",
     "sibling_label_text",
@@ -791,11 +879,140 @@
     },
     "omni_radio": {
       "keyword": "Omni Radio",
-      "call_template": "omni_radio(\"<data-omni-key of the OmniScript field>\", \"{locator}\")",
+      "call_template": "omni_radio(\"{key}\", \"{locator}\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "_why_key": "parser-one P1 (2026-10-07): the first argument was the LITERAL placeholder '<data-omni-key of the OmniScript field>' on every Omni Radio call; the key is on the control's own host in the capture (OmniScript data-omni-key, FlexCard data-element-label -- the two keywords_omni._require_host resolves), so it is read, and the placeholder is kept only when no host carries one.",
       "why": "An OmniScript radio group has no label[for] -- qforce_lite.keywords_omni.omni_radio resolves the input by its VALUE attribute inside the omni host and re-reads which values ended up checked (_confirm_readback), which is the only mechanism proven for this shape. ClickCheckbox's faux-span pattern is for a plain Lightning/LEX radio input, as its own caveat says.",
       "caveats": [
-        "The first argument is the OmniScript field's data-omni-key, not the visible label -- read it off the c-omni-* host, never guess it.",
-        "{locator} must be the radio's VALUE attribute; on this shape the rendered label and the value coincide, which is not guaranteed."
+        "The first argument is the OmniScript field's data-omni-key (a FlexCard's data-element-label), not the visible label -- read off the control's host; a call still carrying the placeholder found no host key in the capture.",
+        "The second argument must be the radio's VALUE attribute; on this shape the rendered label and the value coincide, which is not guaranteed."
+      ]
+    },
+    "file": {
+      "keyword": "Upload File To Record",
+      "call_template": "upload_file(\"<file path>\")  # anchor=\"<the related list's header>\" when the page has several dropzones",
+      "why": "parser-one P5 (2026-10-07; v3 `file`): Salesforce's Files dropzone exposes a real native <input type=file>, visually hidden the SLDS way. keywords_upload.upload_file sends the path to it, waits for the upload to settle and confirms the ContentDocumentLink on the record -- the CRT rung is Upload File To Record.",
+      "caveats": [
+        "The dropzone label ('Upload Files Or drop files') is the same on every standard dropzone: name the related list card with anchor= when the page carries more than one."
+      ]
+    },
+    "omni_radio_group": {
+      "keyword": "Omni Radio",
+      "call_template": "omni_radio(\"{key}\", \"<value>\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "why": "parser-one P1 (2026-10-07, v3 groupCaptions): the radio GROUP named by its <legend> -- one control in the layout and one step in a test. Omni Radio picks the option by its value inside the group's host.",
+      "caveats": [
+        "<value> is the option to pick (its VALUE attribute); the group's options are listed as their own rows."
+      ]
+    },
+    "omni_multiselect": {
+      "keyword": "Omni Multiselect",
+      "call_template": "omni_multiselect(\"{key}\", \"{locator}\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "why": "parser-one P1 (2026-10-07): one option of an OmniStudio multi-select (a checkbox GROUP whose every input carries the element's name). keywords_omni.omni_multiselect ticks the value inside the data-omni-key host and re-reads which values ended up checked; ClickCheckbox's faux-span pattern is for a plain Lightning/LEX checkbox.",
+      "caveats": [
+        "The second argument must be the checkbox's VALUE attribute; here the rendered label and the value coincide, which is not guaranteed."
+      ]
+    },
+    "omni_multiselect_group": {
+      "keyword": "Omni Multiselect",
+      "call_template": "omni_multiselect(\"{key}\", \"<value>\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "why": "parser-one P1 (2026-10-07, v3 groupCaptions): the multi-select GROUP named by its <legend>. Omni Multiselect ticks every value asked for (a list, or 'A|B') inside the group's host.",
+      "caveats": [
+        "<value> is one value or several joined by '|' (their VALUE attributes); the options are listed as their own rows."
+      ]
+    },
+    "omni_checkbox": {
+      "keyword": "Omni Checkbox",
+      "call_template": "omni_checkbox(\"{key}\", True)",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyFallbackOwnAttributes": [
+        "aria-label",
+        "placeholder"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "labelOptional": true,
+      "why": "parser-one P2 (2026-10-07): an OmniScript checkbox has no label element at all; data-omni-key is the whole locator (keywords_omni.omni_checkbox clicks only when the state differs and re-reads `checked`).",
+      "caveats": [
+        "The second argument is the wanted state (True / False)."
+      ]
+    },
+    "omni_date": {
+      "keyword": "Omni Date",
+      "call_template": "omni_date(\"{key}\", \"<value>\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyFallbackOwnAttributes": [
+        "aria-label",
+        "placeholder"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "why": "parser-one P2 (2026-10-07, v3 omni-date): the OmniStudio date picker is a TEXT input with the format in its label, not a lightning-datepicker -- Set Datetime / a native date keyword misses it. keywords_omni.omni_date types it inside the data-omni-key host and reads it back with the MM-DD-YYYY / ISO shift normalised.",
+      "caveats": [
+        "<value> is ISO YYYY-MM-DD (the keyword normalises the calendar's MM-DD-YYYY read-back)."
+      ]
+    },
+    "omni_lookup": {
+      "keyword": "Omni Lookup",
+      "call_template": "omni_lookup(\"{key}\", \"<value>\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyFallbackOwnAttributes": [
+        "aria-label",
+        "placeholder"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "why": "parser-one P2 (2026-10-07, v3 omni-lookup): a server-backed OmniStudio lookup -- typing is local, the option list a round trip. keywords_omni.omni_lookup types the search inside the data-omni-key host, waits for the list and commits the choice (a timeout is COULD-NOT-CHECK, never a pass).",
+      "caveats": [
+        "Pass choose=<option> to pick a result other than the typed text."
+      ]
+    },
+    "omni_typeahead": {
+      "keyword": "Omni Typeahead",
+      "call_template": "omni_typeahead(\"{key}\", \"<value>\")",
+      "keyFromAncestorAttributes": [
+        "data-omni-key",
+        "data-element-label"
+      ],
+      "keyFallbackOwnAttributes": [
+        "aria-label",
+        "placeholder"
+      ],
+      "keyPlaceholder": "<data-omni-key of the OmniScript field>",
+      "replacesFamilyRung": true,
+      "why": "parser-one P2 (2026-10-07, v3 omni-typeahead): an OmniStudio typeahead opens its listbox on TYPING, never on a click -- a select-style keyword reports an empty field (measured on dev1 2026-09-05, the CAUGHT-BUG that produced keywords_omni.omni_typeahead).",
+      "caveats": [
+        "Pass choose=<option> to pick a result other than the typed text."
       ]
     }
   },
@@ -955,8 +1172,208 @@
         "omni_step"
       ],
       "match": "any"
+    },
+    {
+      "family": "radio-group",
+      "variant": "omni_radio_group",
+      "whenInsideTags": [
+        "runtime_omnistudio_common-radio-group"
+      ],
+      "_why": "parser-one P1 (2026-10-07): the OmniStudio radio group's caption row (groupCaptions) routes to Omni Radio; a lightning-radio-group keeps radio-group's ClickCheckbox. `whenInsideTags` is met by the node itself or any ancestor (v3's hostTags)."
+    },
+    {
+      "family": "checkbox-group",
+      "variant": "omni_multiselect_group",
+      "whenInsideTags": [
+        "runtime_omnistudio_common-checkbox-group"
+      ]
+    },
+    {
+      "family": "checkbox",
+      "variant": "omni_multiselect",
+      "whenInsideTags": [
+        "runtime_omnistudio_common-checkbox-group",
+        "runtime_omnistudio_omniscript-omniscript-multiselect"
+      ]
+    },
+    {
+      "family": "checkbox",
+      "variant": "omni_checkbox",
+      "whenInsideTags": [
+        "runtime_omnistudio_omniscript-omniscript-checkbox",
+        "runtime_omnistudio_common-checkbox"
+      ]
+    },
+    {
+      "family": "date",
+      "variant": "omni_date",
+      "whenInsideTags": [
+        "runtime_omnistudio_common-date-picker"
+      ]
+    },
+    {
+      "family": "lookup",
+      "variant": "omni_lookup",
+      "whenInsideTags": [
+        "runtime_omnistudio_common-lookup",
+        "runtime_omnistudio_omniscript-omniscript-lookup"
+      ]
+    },
+    {
+      "family": "combobox",
+      "variant": "omni_typeahead",
+      "whenInsideTags": [
+        "runtime_omnistudio_common-typeahead",
+        "runtime_omnistudio_omniscript-omniscript-typeahead"
+      ]
     }
   ],
+  "ariaLabelExtendsVisibleText": {
+    "_why": "parser-one P7 (2026-10-07; v3 reads aria-label first). <a aria-label=\"View all dependencies for Zoo Status\">View all dependencies</a>, once per dependent picklist: visible text first named both links `View all dependencies` -- two identical labels for two different controls (2 of v1's 5 T14 label disagreements on the edit modal) that a caller then had to index. When a LINK's visible text is a strict word-boundary prefix of its aria-label, the aria-label (the same words, completed with what tells them apart) is its name; label source aria_label, so ClickItem leads. Visible text stays first in every other case (locator doctrine). Read by element_compiler._aria_label_extends.",
+    "enabled": true,
+    "tags": [
+      "a"
+    ],
+    "onlyFamilies": [
+      "link"
+    ],
+    "_why_onlyFamilies": "measured on the parser-one corpus with every <a> in scope: 220 labels moved, and the ones on an <a> classified BUTTON (role=button or slds-button) appended boilerplate rather than a distinguishing name ('See Documentation' -> 'See Documentation Open in a New Salesforce Tab', 'Set Up' -> 'Set Up: AI-Powered Selling Initial Setup'); the link family only (the brief's case)."
+  },
+  "inputTypeFamilies": {
+    "_why": "parser-one P5 (2026-10-07; v3 `file` family, inputTypes [\"file\"]): an <input> of this type IS this family. A native file input fell through to input_field (TypeText) -- or, hidden the SLDS way, was dropped as noise (see noiseExemptInputTypes). Read by component_classifier's input branch.",
+    "file": "file"
+  },
+  "noiseExemptInputTypes": [
+    "file"
+  ],
+  "_why_noiseExemptInputTypes": "parser-one P5 (2026-10-07): Salesforce's Files dropzone input is <input type=file class=\"slds-file-selector__input slds-assistive-text\"> -- real and driveable, but carrying the assistive-text class noiseClassFragments drops (the README's v3-only `Upload Files Or drop files` label; W2.15: v1 drops the file input). An input of a type listed here is never noise; every other assistive-text node still is.",
+  "hostFamilyRules": {
+    "_why": "parser-one P2 (2026-10-07, docs/audit/parser-one-2026-10-06/README.md section 4a; v3 `families` hostTags). An OmniStudio picker renders a plain <input type=text> inside its own component host, so v1 called all three `input_field` and routed them to TypeText (T14 OmniScript step: Zoo Date, Zoo Lookup, Zoo Typeahead -- three family misses v3 gets right). A node of `nodeTags` whose NEAREST listed host is one of a rule's `hostTags` IS that rule's family (the families T14's map and every reader already know); the OmniStudio KEYWORD comes from the familyVariants rows above. Read by component_classifier._host_family. Remove a rule to restore input_field for that host.",
+    "enabled": true,
+    "skipNodeTypes": [
+      "checkbox",
+      "radio",
+      "hidden",
+      "submit",
+      "button",
+      "reset"
+    ],
+    "rules": [
+      {
+        "name": "omni-date",
+        "hostTags": [
+          "runtime_omnistudio_common-date-picker"
+        ],
+        "nodeTags": [
+          "input"
+        ],
+        "family": "date"
+      },
+      {
+        "name": "omni-lookup",
+        "hostTags": [
+          "runtime_omnistudio_common-lookup",
+          "runtime_omnistudio_omniscript-omniscript-lookup"
+        ],
+        "nodeTags": [
+          "input"
+        ],
+        "family": "lookup"
+      },
+      {
+        "name": "omni-typeahead",
+        "hostTags": [
+          "runtime_omnistudio_common-typeahead",
+          "runtime_omnistudio_omniscript-omniscript-typeahead"
+        ],
+        "nodeTags": [
+          "input"
+        ],
+        "family": "combobox"
+      },
+      {
+        "name": "aura-lookup",
+        "_why": "parser-one P8 (2026-10-07; v3 `aura-lookup`, classFragment forceSearchInputLookupDesktop): the Aura force:inputLookup wrapper has no tag of its own, so its host is recognised by CLASS (`hostClassFragments`). With no record chosen its <input> is the lookup (was input_field -> TypeText; the lookup family routes Aura Lookup); with one chosen there is no input and the wrapper itself is the row (structuralContainerRules, aura-lookup).",
+        "hostClassFragments": [
+          "forceSearchInputLookupDesktop"
+        ],
+        "nodeTags": [
+          "input"
+        ],
+        "family": "lookup"
+      },
+      {
+        "name": "dual-listbox-pane",
+        "_why": "parser-one P3 (2026-10-07; v3 `listbox` family, collapseToHost false). A lightning-dual-listbox is the GROUP (Zoo Tags) AND its two panes (`ul[role=listbox]`, named by aria-labelledby: Available / Chosen) AND every visible option -- T14's edit modal lists all five, v1 listed the group alone (4 of its 6 recall misses there). The panes are visited by capture_orchestration._emit_host_members (no other pass reaches a role=listbox).",
+        "hostTags": [
+          "lightning-dual-listbox"
+        ],
+        "nodeRoles": [
+          "listbox"
+        ],
+        "family": "listbox",
+        "emitMembers": true
+      },
+      {
+        "name": "dual-listbox-option",
+        "_why": "parser-one P3 (2026-10-07; v3 `option` family). A dual listbox's option (div[role=option].slds-listbox__option) is a control a person clicks to select before moving it -- named by its own text (`ownTextNames`, v3 ownTextOutranksNearestLabel) and addressed by its data-value. Scoped to the dual-listbox HOST (v3's own groupHostTags guard on its dual-listbox row rule): a combobox / picklist dropdown option is a VALUE and stays picklist_option (skipped).",
+        "hostTags": [
+          "lightning-dual-listbox"
+        ],
+        "nodeRoles": [
+          "option"
+        ],
+        "family": "option",
+        "emitMembers": true,
+        "ownTextNames": true,
+        "maxMembersPerHost": 20,
+        "_why_maxMembersPerHost": "the Gz Read Page budget (README section 5): measured first without it, the Copado user-story form's 'Metadata Types in Selection' listed 81 options and its plan went 7 -> 11 calls (3 captures of that form). A dual listbox holding more options than one plan page (20 controls) lists NONE of them -- the group's Multi Pick List fills it -- and its pane rows carry `members_not_listed` so the elision is stated, never silent."
+      }
+    ]
+  },
+  "groupCaptions": {
+    "_why": "parser-one P1 (2026-10-07; v3 `groupCaptions`, stream V1 2026-09-08). An OmniStudio radio group and multi-select are ONE field in the layout and one control in a test step, but the group's name lives only in its <legend> -- every member input carries the OPTION's name -- so v1 emitted no element for `Zoo Radio` or `Zoo Multi Select` (T14 OmniScript step: 2 of v1's 3 recall misses). The host becomes one row of the group family v1 already uses for lightning-radio-group / lightning-checkbox-group, named by its caption (label source `group_caption`); its options keep their own rows. The hosts are listed in targetTags so the target pass visits them. Read by component_classifier.group_caption_rule and element_compiler._group_caption_text; set enabled:false to restore the pre-P1 output.",
+    "enabled": true,
+    "rules": [
+      {
+        "hostTags": [
+          "runtime_omnistudio_common-radio-group"
+        ],
+        "family": "radio-group",
+        "captionTags": [
+          "legend"
+        ],
+        "captionClassFragments": [
+          "slds-form-element__legend"
+        ]
+      },
+      {
+        "hostTags": [
+          "runtime_omnistudio_common-checkbox-group"
+        ],
+        "family": "checkbox-group",
+        "captionTags": [
+          "legend"
+        ],
+        "captionClassFragments": [
+          "slds-form-element__legend"
+        ]
+      }
+    ]
+  },
+  "ownNameInHost": {
+    "_why": "parser-one P1 (2026-10-07; v3 `hostInnerKeepsOwnName`, stream V1 2026-09-08). The OmniStudio date picker's icon button carries aria-label=\"Zoo Date\" -- the FIELD's name, the same one its input carries -- and title=\"Select Date\", its own. v1 named it `Zoo Date` (a second element with the field's label, a T14 false positive) and T14 labels it `Select Date`. Locator doctrine: an icon-only control with no visible text is named by its title. The rule fires ONLY when the aria-label equals another control's aria-label in the same host; a distinct aria-label still wins. Read by element_compiler._own_name_in_host.",
+    "enabled": true,
+    "hostTags": [
+      "runtime_omnistudio_common-date-picker"
+    ],
+    "nodeTags": [
+      "button"
+    ],
+    "attrs": [
+      "title"
+    ]
+  },
   "note_familyVariants": "familyVariants: routes a control to a VARIANT entry of familyKeywords instead of the family default. Keys: family, variant, whenIdentificationMatches ({field: regex} over `identification`), whenContextKeys (context keys whose presence marks the variant), whenTagIs (the control's REAL html tag, 2026-09-10: a native <select> is the dropdown_select variant -> DropDown), match ('any' default, or 'all'). Added by the wave-2 review close (stream P1, 2026-09-07, finding F21): an OmniScript radio group was routed to ClickCheckbox against the 'radio' family's own caveat. The omni marker lives here as DATA.",
   "labelSourceCaveats": {
     "assistive_text": "This label came from SCREEN-READER-ONLY markup (an slds-assistive-text / sr-only span) -- nothing on this control is visible to a sighted person, so a rendered-text search may not find it. Confirm the click landed (read-back or the optical witness) before trusting this step."
@@ -988,6 +1405,10 @@
       "ClickItem",
       "ClickText",
       "ClickElement"
+    ],
+    "_requiredExactKeywords_why": "PA-02, ported from the product 2026-10-07 (parser-one step 1; Claude-CRT 78a8b94 fx3 1). A REQUIRED control's label renders with its marker -- <label><abbr class=\"slds-required\">*</abbr>Opportunity Name</label> reads `*Opportunity Name` -- and QWeb's exact text match compares the whole text (get_by_label.js: innerText.trim() === locator; TEXT_MATCH xpath: normalize-space(.) = locator). `TypeText  Opportunity Name  <v>  partial_match=False` therefore resolves NOTHING: CRT job 204052 (round 2), `QWebElementNotFoundError: Unable to find element for locator Opportunity Name in 10.0 sec`. The brain held the rule first (error ledger 697b459067, 2026-08-26: never pass partial_match=False to TypeText on a Salesforce form; 1eb2b7735b, 2026-09-06) and A3 (0ead6538) contradicted it by listing TypeText above with no required check. A keyword listed here never carries the pin on a required control (behavioral_metadata.is_required or validation.required); the index/anchor the same pass guarantees is what separates the colliding labels, and the hint's caveat says why. A non-required label keeps the pin. Only LABEL-resolved input keywords belong here: ClickItem resolves by attribute value and ClickText by element text, where the marker does not sit in the way. Test: tools/recorder/tests/templates/test_required_label_typetext_unpinned_pa02.py.",
+    "requiredExactKeywords": [
+      "TypeText"
     ]
   },
   "formElementLabel": {

@@ -42,6 +42,68 @@ def resolved_text_matches(requested: str, resolved_text: str) -> bool:
     return normalize_visible_text(requested) == normalize_visible_text(resolved_text)
 
 
+def css_case_only_match(requested: str, rendered_text: str | None, dom_text: str | None) -> bool:
+    """True iff the resolved element's DOM text equals `requested` EXACTLY and its rendered text is that same
+    text drawn in another letter case -- CSS `text-transform` (ledger c60b1831d8 'General' drawn 'GENERAL',
+    d0c87fb2f0 'Gantt' drawn 'GANTT', 2026-10-06).
+
+    Why the DOM text decides: stock QWeb matches DOM text, never CSS-painted text. Its exact matcher
+    (`QWeb/internal/search_strategy.py` TEXT_MATCH) compares the XPath string-value
+    `normalize-space(translate(., "\\u00a0", " "))`, which is the element's textContent; Selenium's `elem.text`
+    is the RENDERED text, after text-transform. So a label a person reads in capitals is still matched by its
+    markup. The user (2026-10-06) chose stock behaviour because suites export to CRT: this accepts what stock
+    accepts and adds NO case-insensitive match -- `requested` must equal the DOM text exactly.
+
+    Narrow on purpose, so it cannot weaken the Save / Save & New guard: (1) there must BE rendered text (an
+    element that renders nothing -- an icon button with only screen-reader text -- is not this case); (2) the
+    rendered and DOM text must be the same text up to case, so a superstring, hidden extra text or a
+    different word on either side is still refused."""
+    rendered = normalize_visible_text(rendered_text)
+    dom = normalize_visible_text(dom_text)
+    if not rendered or not dom:
+        return False
+    return dom == normalize_visible_text(requested) and rendered.casefold() == dom.casefold()
+
+
+# QWeb 3.8.3 `QWeb/internal/js/get_clickable.js` line 9 -- the controls stock ClickText's default (non-shadow) path
+# matches by innerText, exact (line 16) OR case-insensitive (line 18), before any xpath runs.
+STOCK_CLICKABLE_SELECTOR = ('button, a, label, *[type="submit"], *[type="button"], *[type="reset"], li[data-value], '
+                            'input[type="radio"], *[role="tab"], *[role="button"], *[ng-click], *[data-ng-click],[href]')
+STOCK_CLICKABLE_ATTRS = ("type", "data-value", "role", "ng-click", "data-ng-click", "href")
+
+
+def is_stock_clickable(tag: str | None, attrs: dict) -> bool:
+    """True iff an element with this tag and these attributes (name -> value, None when absent) matches
+    STOCK_CLICKABLE_SELECTOR. `type` compares case-insensitively (an HTML attribute selector on `type` does);
+    `role` exactly; presence is enough for li[data-value], [ng-click], [data-ng-click] and [href]."""
+    tag = (tag or "").lower()
+    typ = (attrs.get("type") or "").lower()
+    if tag in ("button", "a", "label") or typ in ("submit", "button", "reset"):
+        return True
+    if (tag == "li" and attrs.get("data-value") is not None) or (tag == "input" and typ == "radio"):
+        return True
+    if attrs.get("role") in ("tab", "button"):
+        return True
+    return any(attrs.get(a) is not None for a in ("ng-click", "data-ng-click", "href"))
+
+
+def clickable_case_insensitive_match(requested: str, rendered_text: str | None, dom_text: str | None) -> bool:
+    """Stock ClickText on a clickable control (`is_stock_clickable`): get_clickable.js keeps an element whose WHOLE
+    innerText, trimmed, equals the locator exactly or case-insensitively (`text.trim().toLowerCase() ===
+    locator.toLowerCase()`). The user (2026-10-06): "do it the way it would work for someone stock" and "would be
+    cool if it could utilize the visible capital text too" -- stock's clickable path does both, so 'Gantt',
+    'GANTT' and 'gantt' all name a tab authored 'Gantt' and drawn 'GANTT'.
+
+    Compared against the rendered text (what innerText reads, CSS-painted) OR the DOM text (textContent), whole
+    text, whitespace-normalised. Equality, never containment: 'Save' / 'save' against 'Save & New' or 'SAVE & NEW'
+    is still refused. An element with no rendered text is not this rule (the icon-only case keeps its own path)."""
+    rendered = normalize_visible_text(rendered_text)
+    want = normalize_visible_text(requested).lower()
+    if not rendered or not want:
+        return False
+    return rendered.lower() == want or normalize_visible_text(dom_text).lower() == want
+
+
 def needs_retype_repair(typed: str, actual_value: str | None) -> bool:
     """True iff a just-typed field's actual value does not match what was
     typed and therefore needs type_text_clearing's clear()+send_keys()

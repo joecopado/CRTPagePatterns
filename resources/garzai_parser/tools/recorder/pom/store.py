@@ -34,7 +34,12 @@ Record schema -- docs/recorder/POM.md. The short version:
              then streaming (a `Stop` button), then done (a `Copy` button). The default state is
              called "default" and is never written.
   rung      {kw, args, kwargs, name?, body?, why, score, n_verified, n_failed, n_unverified,
-             last_verdict, last_seen, failure_signal, origin: session|seed|repair|l0}
+             last_verdict, last_seen, failure_signal, origin: session|seed|repair|l0|proven,
+             proven?: {stamps: {"<session>#<step>#<kind>": {kind, result, at, seq, run, source, evidence}},
+                       n_pass, n_fail, by_kind, last, result}}
+             -- `proven` is written by `stamp_proven` alone (D27): which VALIDATION proved or failed the
+             call, never a verdict that it merely acted. `n_verified` is a live verdict, not a proof.
+Every `put` passes the record through the page-content scrub (`scrub_record`) first.
   rung_stats host/org-level {family: {kw: {won, failed}}} merged from lessons.jsonl
   patterns  names of library keywords that applied here
   flows     {flow_name: [step numbers]}
@@ -47,9 +52,12 @@ Everything is merged, never overwritten: a second visit adds counts.
 from __future__ import annotations
 
 import glob
+import hashlib
+import importlib.util
 import json
 import os
 import re
+import sys
 import time
 from typing import Any, Iterable
 
@@ -860,6 +868,241 @@ def rung_key(c: dict) -> str:
                       sort_keys=True, default=str)
 
 
+# ---------------------------------------------------------- THE PAGE-CONTENT SCRUB (security, 2026-10-07)
+# Every write of page content into the store goes through the brain's ONE page-content scrub,
+# `tools/dom-miner/cdp_capture.py:scrub` (PY_SECRETS: the WHOLE session id `00D<org>!<body>` -- ledger
+# f0b59a65da, the body is the bearer secret -- `sid=`/`token=` values, a Bearer header, a JWT, a PEM
+# private key, a consumer key). A label, a modal title, a page title or a rung's argument is page TEXT,
+# and the CRT editor's Live Testing pane prints `PASS: JwtAuthenticate <token>`: a capture of that page
+# carried the token into every record built from it. Found by the product's engine-fixes audit
+# (Claude-CRT 148068a): its engine/pom is generated from this file and was the one page-content write
+# left unscrubbed. The scrub is IMPORTED, never copied, so the two cannot drift; when it cannot load,
+# `put` raises -- a store write never falls back to writing unscrubbed.
+_SCRUB = None
+
+
+def _page_content_scrub():
+    """The brain's page-content scrub function (cdp_capture.scrub), loaded once, by file path: no sys.path edit."""
+    global _SCRUB
+    if _SCRUB is None:
+        mod = sys.modules.get("cdp_capture")
+        if mod is None or not hasattr(mod, "scrub"):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir,
+                                "dom-miner", "cdp_capture.py")
+            spec = importlib.util.spec_from_file_location("cdp_capture", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            sys.modules.setdefault("cdp_capture", mod)
+        _SCRUB = mod.scrub
+    return _SCRUB
+
+
+def scrub_record(obj):
+    """A copy of `obj` with every string -- values AND dict keys (an element id holds its label) -- through the
+    page-content scrub. Two keys that differed only inside a secret both survive (`<key>~2`): never one dropped."""
+    scrub = _page_content_scrub()
+
+    def walk(v):
+        if isinstance(v, str):
+            return scrub(v)
+        if isinstance(v, dict):
+            out = {}
+            for k, x in v.items():
+                nk = scrub(k) if isinstance(k, str) else k
+                if nk in out:
+                    i = 2
+                    while "%s~%d" % (nk, i) in out:
+                        i += 1
+                    nk = "%s~%d" % (nk, i)
+                out[nk] = walk(x)
+            return out
+        if isinstance(v, (list, tuple)):
+            return [walk(x) for x in v]
+        return v
+
+    return walk(obj)
+
+
+# ------------------------------------------------------- PROVEN BY A VALIDATION (D27, the user 2026-10-07)
+# "take your picks - my caveat is the full screenshot can validate steps success, the query if that was
+# the value entered, or any other measure you can think of." The brain held 819 verified calls on slockard
+# and only 26 carried a read-back: a live verdict mostly meant "found and acted without an error". A call
+# is PROVEN only by a validation, and the stamp says which:
+#
+#   read_back          a value read back off the control and compared BY MEANING matched what was asked
+#   soql               an app-level SOQL read showed the entered value landed in the org
+#   screenshot_judged  a full-page screenshot was judged to show the step's effect (its file is named)
+#   observed_effect    the page navigated, or the state the click opened was acted in by the next step
+#
+# A FAILED validation is stamped too, so the call is demoted (match.proven_failed) until a newer one
+# passes. `could_not_act` is a FAILURE-ONLY kind: the call did not resolve its control (not found,
+# ambiguous, the wrong control kind) -- it can never prove a call, and "acted" is not a kind at all.
+# Every stamp carries the run context (org, user, profile; None = not known, stated), the time and the
+# session step it came from; (session, step, kind) is its identity, so a replayed backfill stamps nothing
+# twice and a stamp is evidence, never overwritten.
+VALIDATION_KINDS = ("read_back", "soql", "screenshot_judged", "observed_effect")
+FAILURE_ONLY_KINDS = ("could_not_act",)
+PROVEN_RESULTS = ("pass", "fail")
+ORIGIN_PROVEN = "proven"
+#: the kwargs that locate a control (D14's described form); everything else on a call is data or a runtime knob
+LOCATOR_KWARGS = ("index", "anchor", "tag", "partial_match", "css", "limit_traverse", "object")
+#: runtime knobs: how long or how a call waited, never which control it found
+RUNTIME_KWARGS = frozenset({"timeout", "delay", "interval", "fail_fast_ms", "settle", "wait"})
+
+
+def proven_call(call: dict) -> dict:
+    """The LOCATOR identity of a call: {'kw', 'args', 'kwargs'} with the data taken out.
+
+    D19 / C1 (consult.merged_call): the store's rung supplies the LOCATOR, a recorded step supplies the
+    DATA -- so a past run's typed value (`TypeText Amount 150000`), a verify's expected value
+    (`VerifyField Company Acme`) and a compound setter's sub-field values (`Set Address street=...`) are
+    never stored, and a runtime knob (`timeout=`) is not part of which control a call found. A keyword
+    that takes no data keeps every positional cell (`click_item_first <label> button`: the second is a
+    tag). A numeric `anchor` is QWeb's index mode and is stored as `index` (D14's described form, the one
+    a captured rung carries), `partial_match` as a bool."""
+    kw = call.get("kw") or call.get("name")
+    args = [str(a) for a in (call.get("args") or [])]
+    if M.takes_data(kw) or M.is_compound_setter(kw):
+        args = args[:1]
+    kwargs = {}
+    for k, v in (call.get("kwargs") or {}).items():
+        if k in RUNTIME_KWARGS or v in (None, ""):
+            continue
+        if M.is_compound_setter(kw) and k not in LOCATOR_KWARGS:
+            continue
+        kwargs[k] = v
+    anchor = kwargs.get("anchor")
+    if isinstance(anchor, (int, str)) and str(anchor).strip().isdigit() and "index" not in kwargs:
+        kwargs.pop("anchor")
+        kwargs["index"] = int(str(anchor).strip())
+    if "index" in kwargs and str(kwargs["index"]).strip().isdigit():
+        kwargs["index"] = int(str(kwargs["index"]).strip())
+    if isinstance(kwargs.get("partial_match"), str):
+        kwargs["partial_match"] = kwargs["partial_match"].strip().lower() not in ("false", "0", "no", "off")
+    return {"kw": kw, "args": args, "kwargs": kwargs}
+
+
+def _proven_summary(stamps: dict) -> dict:
+    """Counts and the most recent stamp, recomputed from the stamps alone (a re-run cannot drift them)."""
+    by_kind: dict = {}
+    n_pass = n_fail = 0
+    for s in stamps.values():
+        c = by_kind.setdefault(s["kind"], {"pass": 0, "fail": 0})
+        c[s["result"]] += 1
+        if s["result"] == "pass":
+            n_pass += 1
+        else:
+            n_fail += 1
+    last = max(stamps.values(), key=lambda s: (str(s.get("at") or ""), int(s.get("seq") or 0))) if stamps else None
+    return {"n_pass": n_pass, "n_fail": n_fail, "by_kind": by_kind,
+            "last": ({k: last.get(k) for k in ("kind", "result", "at", "run", "source")} if last else None),
+            "result": last["result"] if last else None}
+
+
+def stamp_proven(rec: dict, *, label: str, family: str | None, call: dict, kind: str, result: str,
+                 run: dict, source: dict, at: str | None = None, evidence: dict | None = None,
+                 tag: str | None = None, attrs: dict | None = None, container: str | None = "") -> dict:
+    """Stamp one validation of one call onto the control it ran on, in `rec` (pure: no disk; Store.stamp writes).
+
+    WRITER 5 (F82): the control is named by `identify_control` BEFORE anything is written, so a stamp lands
+    on the element the capture or a driven step already holds -- never a twin. The rung is the one whose
+    LOCATOR identity (`proven_call`) equals the call's; none -> a new rung with that identity, origin
+    `proven`. Raises ValueError, writing nothing, on a kind that is not a validation (`acted` included), a
+    result other than pass/fail, a failure-only kind given as a pass, no label, no session step, or a run
+    context without org/user/profile keys. Returns {'stamped', 'why', 'key', 'element_id', 'rung_key',
+    'minted_element', 'minted_rung'}."""
+    if kind not in VALIDATION_KINDS and kind not in FAILURE_ONLY_KINDS:
+        raise ValueError("stamp_proven: %r is not a validation -- a call is proven only by %s; 'acted without an "
+                         "error' never proves it (D27)" % (kind, ", ".join(VALIDATION_KINDS)))
+    if result not in PROVEN_RESULTS:
+        raise ValueError("stamp_proven: result must be one of %s, not %r" % (PROVEN_RESULTS, result))
+    if kind in FAILURE_ONLY_KINDS and result != "fail":
+        raise ValueError("stamp_proven: %r records a failure only; it never proves a call" % kind)
+    if not label or not str(label).strip():
+        raise ValueError("stamp_proven: no label -- the store names a control by its label")
+    if not isinstance(source, dict) or not source.get("session") or source.get("step") in (None, ""):
+        raise ValueError("stamp_proven: source needs {'session', 'step'} -- a stamp is idempotent per session step")
+    if not isinstance(run, dict) or not all(k in run for k in ("org", "user", "profile")):
+        raise ValueError("stamp_proven: run needs 'org', 'user' and 'profile' (None = not known, stated)")
+    pc = proven_call(call)
+    if not pc["kw"]:
+        raise ValueError("stamp_proven: the call names no keyword")
+    key = "%s#%s#%s" % (source["session"], source["step"], kind)
+    els = rec.setdefault("elements", {})
+    eid = identify_control(rec, label, family, attrs=attrs, tag=tag, container=container or "")
+    minted_el = eid not in els
+    el = els.get(eid)
+    if el is None:
+        el = {"family": family, "label": label, "container": container or "", "attrs": stable_attrs(attrs),
+              "tag": tag, "ladder": [], "effects": {}, "n_seen": 0, "last_seen": None}
+        if not tag and not stable_attrs(attrs):
+            el["source"] = DRIVEN
+    ladder = el.setdefault("ladder", [])
+    want = rung_key(pc)
+    rung = next((r for r in ladder if rung_key(r) == want), None) or \
+        next((r for r in ladder if rung_key(proven_call(r)) == want), None)
+    if rung is not None and key in ((rung.get("proven") or {}).get("stamps") or {}):
+        return {"stamped": False, "why": "already stamped: %s (a stamp is evidence, never overwritten)" % key,
+                "key": key, "element_id": eid, "rung_key": want, "minted_element": False, "minted_rung": False}
+    els[eid] = el
+    minted_rung = rung is None
+    if rung is None:
+        rung = {"_key": want, "kw": pc["kw"], "args": pc["args"], "kwargs": pc["kwargs"], "name": None,
+                "body": None, "why": "the call a run proved or disproved by a validation", "score": None,
+                "n_verified": 0, "n_failed": 0, "n_unverified": 0, "last_verdict": None, "last_seen": None,
+                "failure_signal": None, "origin": ORIGIN_PROVEN}
+        ladder.append(rung)
+    at = at or _iso(now())
+    p = rung.setdefault("proven", {})
+    stamps = p.setdefault("stamps", {})
+    stamps[key] = {"kind": kind, "result": result, "at": at, "seq": len(stamps) + 1,
+                   "run": {k: run.get(k) for k in ("org", "user", "profile")},
+                   "source": {"session": source["session"], "step": source["step"]},
+                   "evidence": dict(evidence or {})}
+    p.update(_proven_summary(stamps))
+    return {"stamped": True, "why": "%s %s" % (kind, result), "key": key, "element_id": eid, "rung_key": want,
+            "minted_element": minted_el, "minted_rung": minted_rung}
+
+
+# ---------------------------------------------------------------- the ONE slug rule (V-n14b 6a)
+# CAUGHT-BUG 1: `_path_for_key` used to sanitise a key and plain-truncate to 180 chars with no
+# further check. A state name is a modal TITLE (`cdp_capture.dialog_state_name`), i.e. arbitrary
+# heading text of arbitrary length, so two DIFFERENT compound keys
+# `<page_key>::state=<state>` -- two modal titles on the same long page key -- sanitised to the
+# SAME 180-char prefix and silently shared one file; at a page key >= 182 chars the state file IS
+# the base file, because the compound suffix falls entirely past the truncation point.
+#
+# THE FIX: past 180 chars the tail becomes a content hash, not a truncation -- two keys differing
+# only past character 180 now differ in their hash too. `_SLUG_HEAD` (140) keeps the front of the
+# slug human-legible; `sha1(key)[:12]` is enough entropy that two real keys colliding on it is not
+# a live concern here (this is a filename, not a security boundary).
+#
+# BACK-COMPAT: a record already on disk was written under the OLD plain-truncated name -- measured
+# at least once for real (`org-map/slockard/pom/slockard_lightning_app_id_n_Zoo_Base_Inputs_
+# ...Zoo_F.json`, 180 chars). `_path_for_key` probes that LEGACY name first and returns it when it
+# exists, so the fix does not orphan a record already on disk; only a lookup for a key with no
+# file under either name computes the NEW (hashed) path.
+_SLUG_CAP = 180
+_SLUG_HEAD = 140
+
+
+def slug_for_key(key: str) -> str:
+    """The canonical, collision-safe filename slug for ANY store key -- a plain page key or a
+    compound `<page_key>::state=<state>` one, of any length. The ONE place this repo turns a key
+    into a slug; `page_pack.slug_for` calls this rather than keeping its own copy, so the export
+    writer and `Store.get`'s reader can never drift apart (its own docstring's promise)."""
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")
+    if len(slug) <= _SLUG_CAP:
+        return slug
+    return slug[:_SLUG_HEAD] + "~" + hashlib.sha1(key.encode("utf-8", "replace")).hexdigest()[:12]
+
+
+def legacy_slug_for_key(key: str) -> str:
+    """The OLD naming rule -- sanitise, then plain-truncate to 180 chars, no hash. Kept only so a
+    LOOKUP can still find a record a pre-fix writer already put on disk under this name."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")[:_SLUG_CAP]
+
+
 class Store:
     def __init__(self, state_root: str | None = None, docs_root: str | None = None):
         self.state_root = state_root or K.STATE
@@ -912,9 +1155,22 @@ class Store:
             return json.load(f)
 
     def _path_for_key(self, key: str) -> str | None:
+        """The on-disk path for ANY store key (a plain page key or a compound
+        `<page_key>::state=<state>` one). See `slug_for_key`/`legacy_slug_for_key` above for why
+        there are two names and which one a LOOKUP tries first."""
         partition = key.split("|", 1)[0]
-        slug = re.sub(r"[^A-Za-z0-9._-]+", "_", key).strip("_")[:180]
-        for base in (os.path.join(self.org_map_dir, partition, "pom"), os.path.join(self.apps_dir, partition, "pom")):
+        slug = slug_for_key(key)
+        legacy = legacy_slug_for_key(key)
+        bases = (os.path.join(self.org_map_dir, partition, "pom"), os.path.join(self.apps_dir, partition, "pom"))
+        if legacy != slug:
+            # a record on disk from before this fix -- or one a still-unfixed writer (`key_for`'s
+            # own `keys.page_key` slug) put there today -- was named the OLD way. Probed FIRST so
+            # the fix never orphans it (V-n14b 6a CAUGHT-BUG 1, the real Zoo record at the cap).
+            for base in bases:
+                p = os.path.join(base, legacy + ".json")
+                if os.path.exists(p):
+                    return p
+        for base in bases:
             p = os.path.join(base, slug + ".json")
             if os.path.exists(p):
                 return p
@@ -923,9 +1179,12 @@ class Store:
         return os.path.join(base_dir, partition, "pom", slug + ".json")
 
     def put(self, rec: dict) -> str:
+        """Write one record. Every string in it -- values and keys -- passes the page-content scrub first
+        (`scrub_record`; the caller's dict is not changed), and a scrub that cannot load raises: nothing
+        unscrubbed is ever written."""
         path = rec["_path"]
+        body = scrub_record({k: v for k, v in rec.items() if not k.startswith("_")})
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        body = {k: v for k, v in rec.items() if not k.startswith("_")}
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(body, f, indent=1, sort_keys=True, default=str)
@@ -957,7 +1216,8 @@ class Store:
         a rung with history. Returns {pages: n, elements: n, rungs: n, skipped: [...]}."""
         org = session.get("org")
         stats = {"pages": set(), "elements": 0, "rungs": 0, "skipped": [], "dropped_hostless": 0,
-                 "links": 0, "opens": 0, "states": 0, "twins_attached": 0}
+                 "links": 0, "opens": 0, "states": 0, "twins_attached": 0,
+                 "failed_effects_skipped": 0}
         flow_name = flow_name or session.get("name")
         open_recs: dict[str, dict] = {}
         steps = [normalise_step(s) for s in session.get("steps", [])]
@@ -1040,6 +1300,20 @@ class Store:
             kind, target = step_effect(
                 step, pk["key"],
                 nxt if ev.get("kind") in LEADS_TO_KINDS else None, landed_key)
+            # NO PHANTOM STATES (crawl fix 7, 2026-10-06; CRAWLER-REVIEW-2026-10-06 section 7.1). A
+            # step whose OWN verdict says it did not act -- the keyword raised, or it acted on the
+            # wrong thing (COULD-NOT-CHECK / CAUGHT-BUG) -- proves nothing about where the control
+            # leads, what it opens or which state the page was in: up.py keeps a raised click as a
+            # step, and its provisional `effect` used to become an `opens`, a link and a state.
+            # Measured: the slockard Zoo Case record carried 14 empty `Edit Zoo <Field>` states from
+            # clicks that raised AmbiguousClickTarget. Such a step still records its element and its
+            # rung (the ladder learns the failure below); it writes no effect and no membership. A
+            # step with NO verdict at all (older writers) is unchanged.
+            failed = bool(step.get("verdict")) and step.get("verdict") not in VERIFIED
+            if failed:
+                if kind:
+                    stats["failed_effects_skipped"] = stats.get("failed_effects_skipped", 0) + 1
+                kind, target = None, None
             if kind == "nav" and target and str(target).startswith("http"):
                 # an explicit nav target given as a URL is stored as the PAGE KEY it resolves to,
                 # never the raw URL (a record id in a link is a link nothing can look up)
@@ -1080,7 +1354,7 @@ class Store:
                 ps["last_seen"] = rec["last_seen"]
             # ------------------------------------------------- which STATE the page was in
             state = step.get("state")
-            if state and state != DEFAULT_STATE:
+            if state and state != DEFAULT_STATE and not failed:
                 ps = page_state(rec, state)
                 if not replayed:
                     ps["n_seen"] += 1
@@ -1176,9 +1450,35 @@ class Store:
                         o[k] = c[k]          # lessons.jsonl is the ledger; stats are a rebuild, not a sum
             tmp = p + ".tmp"
             with open(tmp, "w") as f:
-                json.dump(old, f, indent=1, sort_keys=True)
+                json.dump(scrub_record(old), f, indent=1, sort_keys=True)
             os.replace(tmp, p)
         return n
+
+    def stamp(self, url: str, org: str | None, stamps: list[dict]) -> dict:
+        """Apply `stamp_proven` for each of `stamps` (its keyword arguments, one dict each) to the record of the
+        page `url` is on, and write the record ONCE through `put` (scrubbed) when anything was stamped.
+
+        Returns {'key', 'path', 'stamped', 'already', 'results'}; a URL with no page host stamps nothing
+        ({'key': None, 'why': ...}). A stamp that raises (not a validation, no label ...) is reported in its
+        result row with `refused`, never written and never silent."""
+        pk = self.key_for(url, org)
+        if not pk.get("host"):
+            return {"key": None, "path": None, "stamped": 0, "already": 0, "results": [],
+                    "why": "no page host in %r -- not a page" % (url,)}
+        rec = self._open(pk)
+        results = []
+        for s in stamps:
+            try:
+                r = stamp_proven(rec, **s)
+            except ValueError as exc:
+                r = {"stamped": False, "refused": True, "why": str(exc)}
+            results.append(r)
+        n = sum(1 for r in results if r.get("stamped"))
+        if n:
+            self.put(rec)
+        return {"key": pk["key"], "path": pk["path"], "stamped": n,
+                "already": sum(1 for r in results if not r.get("stamped") and not r.get("refused")),
+                "results": results}
 
     def merge_l0(self, url: str, org: str | None, l0: dict, source: str, captured_at: str | None = None) -> dict:
         """Attach an L0 index (v3, or the v1 census fallback) to the page: elements not yet known

@@ -82,12 +82,16 @@ class ComponentClassifier:
         rules = getattr(self.config, 'STRUCTURAL_CONTAINER_RULES', None) or []
         for rule in rules:
             frags = rule.get('containerClassFragments') or []
-            if not any(f in classes for f in frags):
+            if not any(f.lower() in classes for f in frags):     # `classes` is lower-cased; a fragment may not be
                 continue
             # the base component (lightning-dual-listbox) renders this same structure inside its
             # own host, which already classifies by tag -- never a second row for the same control
             inside = {t.lower() for t in (rule.get('skipIfInsideTags') or [])}
             if inside and tag.find_parent(lambda p: p.name and p.name.lower() in inside) is not None:
+                continue
+            # parser-one P8 (2026-10-07): a wrapper holding one of these tags is not the control -- its descendant is
+            # (an Aura lookup with no record chosen: its <input> is the lookup, claimed by hostFamilyRules)
+            if any(tag.find(t) is not None for t in (rule.get('skipIfDescendantTags') or [])):
                 continue
             role = rule.get('requiredDescendantRole')
             need = int(rule.get('minDescendantRoleCount') or 1)
@@ -97,6 +101,86 @@ class ComponentClassifier:
                     continue
             return rule.get('family')
         return None
+
+    # ------------------------------------------------------------ parser-one step 3 P1/P2 (2026-10-07)
+    def group_caption_rule(self, tag_name):
+        """The template `groupCaptions` rule whose `hostTags` name this tag, or None. A group host (an OmniStudio
+        radio / checkbox group) is ONE control in the layout and one step in a test, named by its <legend>; its
+        member options keep their own rows (v3 `groupCaptions`, T14: `Zoo Radio`, `Zoo Multi Select`)."""
+        spec = getattr(self.config, 'GROUP_CAPTIONS', None) or {}
+        if not spec or spec.get('enabled') is False:
+            return None
+        for rule in spec.get('rules') or []:
+            if tag_name in {t.lower() for t in (rule.get('hostTags') or [])}:
+                return rule
+        return None
+
+    def _host_rules_index(self):
+        """({host tag: [rules]}, every rule's nodeTags, every rule's nodeRoles) over the template's
+        `hostFamilyRules`, built once per classifier."""
+        cached = getattr(self, '_host_rule_cache', None)
+        spec = getattr(self.config, 'HOST_FAMILY_RULES', None) or {}
+        if cached is not None and cached[0] is spec:
+            return cached[1], cached[2], cached[3]
+        index, node_tags, node_roles = {}, set(), set()
+        frags = []
+        if spec and spec.get('enabled') is not False:
+            for rule in spec.get('rules') or []:
+                for host in rule.get('hostTags') or []:
+                    index.setdefault(host.lower(), []).append(rule)
+                # parser-one P8 (2026-10-07; v3 hostClassFragments): a host recognised by a CLASS fragment (the Aura
+                # force:inputLookup wrapper div.forceSearchInputLookupDesktop has no tag of its own)
+                for frag in rule.get('hostClassFragments') or []:
+                    frags.append((frag, rule))
+                node_tags |= {t.lower() for t in (rule.get('nodeTags') or [])}
+                node_roles |= {r.lower() for r in (rule.get('nodeRoles') or [])}
+        self._host_class_frags = frags
+        self._host_rule_cache = (spec, index, node_tags, node_roles)
+        return index, node_tags, node_roles
+
+    def _host_rules_of(self, node, index):
+        """The hostFamilyRules rules a node hosts -- by its tag, then by a class fragment -- in template order."""
+        out = list(index.get(node.name.lower(), []))
+        frags = getattr(self, '_host_class_frags', None) or []
+        if frags:
+            classes = ' '.join(node.get('class') or [])
+            out += [rule for frag, rule in frags if frag in classes and rule not in out]
+        return out
+
+    def host_rule_for(self, tag):
+        """The template `hostFamilyRules` rule that claims this node, or None: the node's tag is one of a rule's
+        `nodeTags` or its role one of its `nodeRoles`, its type is not one of `skipNodeTypes`, and its NEAREST
+        ancestor among every rule's `hostTags` is one of that rule's (the nearer host wins, as in v3).
+        Memoised per node for one parse."""
+        if not getattr(tag, 'name', None):
+            return None
+        memo = self.__dict__.setdefault('_host_rule_memo', {})
+        if id(tag) in memo:
+            return memo[id(tag)]
+        rule = None
+        index, node_tags, node_roles = self._host_rules_index()
+        name = tag.name.lower()
+        role = (tag.get('role') or '').lower()
+        frags = [f for f, _r in (getattr(self, '_host_class_frags', None) or [])]
+        if (index or frags) and (name in node_tags or (role and role in node_roles)):
+            spec = getattr(self.config, 'HOST_FAMILY_RULES', None) or {}
+            skip = {t.lower() for t in (spec.get('skipNodeTypes') or ())}
+            if (tag.get('type') or '').lower() not in skip:
+                host = tag.find_parent(lambda t: t.name and (
+                    t.name.lower() in index
+                    or (frags and any(f in ' '.join(t.get('class') or []) for f in frags))))
+                for cand in (self._host_rules_of(host, index) if host is not None else []):
+                    if (name in {t.lower() for t in (cand.get('nodeTags') or [])}
+                            or (role and role in {r.lower() for r in (cand.get('nodeRoles') or [])})):
+                        rule = cand
+                        break
+        memo[id(tag)] = rule
+        return rule
+
+    def _host_family(self, tag, tag_name, tag_type):
+        """The family the `hostFamilyRules` rule claiming this node declares, or None (see host_rule_for)."""
+        rule = self.host_rule_for(tag)
+        return rule.get('family') if rule else None
 
     def _record_layout_field_family(self, tag, tag_name):
         """Phase 1B 2026-09-09 -- the read-mode record-DETAIL field shape.
@@ -200,6 +284,14 @@ class ComponentClassifier:
         # (`slds-listbox__option`) or one of its `_modifier` variants -- never as a prefix of a
         # different class; and a node carrying `role="combobox"` is the control, never an option
         # inside one, whatever it is styled with.
+        # parser-one step 3 P2/P3 (2026-10-07): a node inside a listed component host IS that host's family (an
+        # OmniStudio date picker's text input is a date; a dual listbox's pane and option are a listbox and an
+        # option) -- FIRST, because a dual-listbox option carries the very class / role the next two lines skip as
+        # a dropdown value. Inert without the template's `hostFamilyRules`.
+        host_family = self._host_family(tag, tag_name, tag_type)
+        if host_family:
+            return host_family
+
         if role != 'combobox' and self._has_picklist_option_class(tag):
             return 'picklist_option'
         if role == 'option' and 'slds-path__' not in classes:
@@ -217,6 +309,13 @@ class ComponentClassifier:
         structural_family = self._structural_container_family(tag, classes)
         if structural_family:
             return structural_family
+
+        # parser-one step 3 P1/P2 (2026-10-07): v3's host-scoped vocabulary, as template data. A group host (an
+        # OmniStudio radio / checkbox group) is ONE control; a node inside a listed component host IS that host's
+        # family (an OmniStudio date picker's text input is a date). Both are inert without the template keys.
+        caption_rule = self.group_caption_rule(tag_name)
+        if caption_rule:
+            return caption_rule.get('family') or 'unknown'
 
         if tag_name == 'lightning-input-field':
             return 'input_field'
@@ -264,6 +363,11 @@ class ComponentClassifier:
             return 'textarea'
 
         if tag_name in ('input', 'lightning-input'):
+            # parser-one P5 (2026-10-07; v3 `file`): an input type the template names IS that family (a native file
+            # input is never a text field -- it needs the file chooser). Inert without `inputTypeFamilies`.
+            typed_family = (getattr(self.config, 'INPUT_TYPE_FAMILIES', None) or {}).get(tag_type)
+            if typed_family:
+                return typed_family
             if tag_type == 'checkbox':
                 return 'checkbox'
             if tag_type == 'radio':
@@ -546,10 +650,19 @@ class ComponentClassifier:
         if not tag or tag.name != 'select':
             return None
         options = []
+        # PA-14 (ported from the product 2026-10-07, overlay OV-PA14-select-option-labels retired): inside a captured
+        # shadow root (`<template shadowrootmode>`) every string is a TemplateString, which get_text() drops by
+        # default -- so every option of a native <select> in an LWC read label '' (Zoo_Nightmare_Inputs Territory:
+        # ['', '', '', '']). The same rule text_engine._TEXT_TYPES already applies.
+        try:
+            from bs4.element import NavigableString as _NS, TemplateString as _TS
+            _types = (_NS, _TS)
+        except ImportError:                                 # older bs4: template strings are plain NavigableStrings
+            _types = None
         for opt in tag.find_all('option'):
             option_data = {
                 'value': opt.get('value', ''),
-                'label': opt.get_text(strip=True),
+                'label': (opt.get_text(strip=True, types=_types) if _types else opt.get_text(strip=True)),
             }
             if opt.get('selected'):
                 option_data['selected'] = True

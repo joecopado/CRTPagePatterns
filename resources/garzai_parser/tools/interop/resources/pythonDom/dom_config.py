@@ -483,6 +483,40 @@ class DomConfiguration:
     # here: the rung is inert until a template declares the shape.
     FORM_ELEMENT_LABEL = {}
 
+    # parser-one step 3, P1 + P2 (2026-10-07, docs/audit/parser-one-2026-10-06/README.md section 4a): v3's
+    # host-scoped family vocabulary, ported as v1 template data. All three are EMPTY here -- inert until a template
+    # declares them, so a parse on the class constants is unchanged.
+    #   HOST_FAMILY_RULES  {rules: [{hostTags, nodeTags, family}]} -- a node of `nodeTags` whose NEAREST listed
+    #                      component host is one of `hostTags` IS `family` (an OmniStudio date picker's text input
+    #                      is a date, not an input_field). Template key `hostFamilyRules`.
+    #   GROUP_CAPTIONS     {rules: [{hostTags, family, captionTags, captionClassFragments}]} -- a group host (an
+    #                      OmniStudio radio / checkbox group) is ONE control, named by its <legend>; label source
+    #                      `group_caption`. Template key `groupCaptions`.
+    #   OWN_NAME_IN_HOST   {hostTags, nodeTags, attrs} -- an icon-only node inside a host whose aria-label merely
+    #                      repeats the host field's own label is named by its own `attrs` (the date picker's
+    #                      title="Select Date"). Template key `ownNameInHost`.
+    HOST_FAMILY_RULES = {}
+    GROUP_CAPTIONS = {}
+    OWN_NAME_IN_HOST = {}
+    # parser-one step 3 P5 (2026-10-07; v3 `file` family, inputTypes ["file"]): an <input> whose `type` is a key here
+    # IS that family (`inputTypeFamilies`), and an input type listed in `noiseExemptInputTypes` is never noise --
+    # Salesforce's Files dropzone input is real but visually hidden the SLDS way (`slds-assistive-text`), which the
+    # noise class rule dropped. Both empty here: inert until a template declares them.
+    INPUT_TYPE_FAMILIES = {}
+    NOISE_EXEMPT_INPUT_TYPES = []
+    # parser-one step 3 P7 (2026-10-07; v3 reads aria-label first): {enabled, tags} -- a node of `tags` whose visible
+    # text is a strict word-boundary PREFIX of its aria-label is named by the aria-label (`View all dependencies` ->
+    # `View all dependencies for Zoo Status`). Template key `ariaLabelExtendsVisibleText`; empty here: inert.
+    ARIA_LABEL_EXTENDS_VISIBLE_TEXT = {}
+    # parser-one step 3 P8 (2026-10-07): class fragments of decoration INSIDE a <label> that is not the label (a
+    # lightning toggle's state text, `slds-checkbox_faux_container`: On / Off). Template `labelExcludeClassFragments`.
+    LABEL_EXCLUDE_CLASS_FRAGMENTS = []
+    # 2026-10-07 (F19, the product's harness runs on dev1 New Permission Set / gzchores Add Picklist Values): a classic form
+    # ROW -- Visualforce pageBlockSectionItem, a classic Setup edit form -- puts the label in a cell whose class carries one
+    # of `labelCellClassFragments` (`labelCol`) and the control in the data cell after it; its <label for> often names a
+    # wrapper id, never the control. {labelCellClassFragments} -- template key `tableRowLabel`; empty here: inert.
+    TABLE_ROW_LABEL = {}
+
     # 2026-09-10: every label rung truncates at this length (template `labelMaxLen`); the inner_text
     # rung used to REJECT anything over 60 characters outright (no label, no call).
     LABEL_MAX_LEN = 100
@@ -525,10 +559,13 @@ class DomConfiguration:
     # label_source that says what it is (F11, L2-R08/L2-R13).
     LABEL_PRECEDENCE = [
         'inner_text',
+        'input_value',          # 2026-10-07 (F19): an <input type=submit|button|reset> reads its value (what QWeb's ClickText matches)
+        'group_caption',        # parser-one P1 2026-10-07: produces only for a groupCaptions host (inert without one)
         'aria_label',
         'standard_label',
         'aria_labelledby',
         'form_element_label',   # 2026-09-11: parity with the template (the rung landed 2026-09-10; a template lacking the key must behave like the template)
+        'table_row_label',      # 2026-10-07 (F19): a classic form row's label cell; produces only with a `tableRowLabel` key
         'placeholder',
         'title_attr',
         'sibling_label_text',
@@ -659,6 +696,11 @@ class DomConfiguration:
             'TypeText', 'ClickCheckbox', 'PickList',
             'ComboBox', 'ClickItem', 'ClickText', 'ClickElement',
         ],
+        # PA-02 (ported from the product 2026-10-07; Claude-CRT 78a8b94): the label of a REQUIRED control renders
+        # with its marker (`*Opportunity Name`), which QWeb's exact text match cannot see through, so a TypeText
+        # hint for one never carries `partial_match=False` (CRT job 204052: QWebElementNotFoundError; error ledger
+        # 697b459067 held the rule since 2026-08-26). Template key `substringCollisions.requiredExactKeywords`.
+        'requiredExactKeywords': ['TypeText'],
     }
 
     # wave-2 close, stream P3 2026-09-07 (R22; L2-R22 on
@@ -1066,6 +1108,15 @@ class DomConfiguration:
         ("STRUCTURAL_CONTAINER_RULES", "structuralContainerRules", list),
         # 2026-09-10 -- the SLDS form-element label (label-wrapper + control, no for=), template-driven.
         ("FORM_ELEMENT_LABEL", "formElementLabel", dict),
+        # parser-one step 3 P1/P2 (2026-10-07) -- v3's host-scoped families, captions and own names, template-driven.
+        ("HOST_FAMILY_RULES", "hostFamilyRules", dict),
+        ("GROUP_CAPTIONS", "groupCaptions", dict),
+        ("OWN_NAME_IN_HOST", "ownNameInHost", dict),
+        ("INPUT_TYPE_FAMILIES", "inputTypeFamilies", dict),
+        ("NOISE_EXEMPT_INPUT_TYPES", "noiseExemptInputTypes", list),
+        ("ARIA_LABEL_EXTENDS_VISIBLE_TEXT", "ariaLabelExtendsVisibleText", dict),
+        ("LABEL_EXCLUDE_CLASS_FRAGMENTS", "labelExcludeClassFragments", list),
+        ("TABLE_ROW_LABEL", "tableRowLabel", dict),
         ("TARGET_TAGS", "targetTags", list),
         ("INTERACTIVE_ROLES", "interactiveRoles", list),
         # T12 2026-09-07 -- see FAMILY_KEYWORDS/CUSTOM_COMPONENT_TAG_KEYWORDS
@@ -1226,6 +1277,10 @@ class DomConfiguration:
         role = (tag.get('role') or '').lower()
         classes = ' '.join(tag.get('class') or [])
 
+        # parser-one P5 (2026-10-07): a native input of an exempt type (file) is a control however it is hidden
+        if (tag_name == 'input' and self.NOISE_EXEMPT_INPUT_TYPES
+                and (tag.get('type') or '').lower() in {t.lower() for t in self.NOISE_EXEMPT_INPUT_TYPES}):
+            return False
         if tag_name in self.NOISE_TAGS:
             return True
         if any(re.match(pattern, tag_name) for pattern in self.NOISE_TAG_PATTERNS):
@@ -1247,7 +1302,7 @@ class DomConfiguration:
         try:
             _cls = " ".join(tag.get("class") or []).lower()
             for _rule in (getattr(self, "STRUCTURAL_CONTAINER_RULES", None) or []):
-                if any(f in _cls for f in (_rule.get("containerClassFragments") or [])):
+                if any(f.lower() in _cls for f in (_rule.get("containerClassFragments") or [])):
                     return False
         except Exception:
             pass

@@ -227,7 +227,9 @@ class DomElementCompiler:
         if not tag:
             return None
         try:
-            if self.config._is_container_component(tag):
+            # parser-one P3 (2026-10-07): a node a `hostFamilyRules` rule claims (a dual listbox's <div role=option>)
+            # is that rule's control, never a generic layout <div>
+            if self.config._is_container_component(tag) and not self.classifier.host_rule_for(tag):
                 return None
 
             element_type = self.classifier._classify_element_type(tag)
@@ -237,6 +239,12 @@ class DomElementCompiler:
             identification = self._get_identification(tag)
             label_text = identification.get('label_text', '')
             if label_text and any(b in label_text for b in self.config.SYSTEM_TEXT_BLACKLIST):
+                return None
+            # parser-one P1 (2026-10-07): a group host is a control only when its OWN caption names it -- a group with
+            # no <legend> (the FlexCard loan calculator's radio groups) would otherwise borrow its first option's
+            # label through label_span, a second row with the option's name
+            if (identification.get('label_source') != 'group_caption'
+                    and self.classifier.group_caption_rule((tag.name or '').lower())):
                 return None
 
             behavioral_metadata = self._get_behavioral_metadata(tag, element_type)
@@ -261,7 +269,8 @@ class DomElementCompiler:
             is_output_only = element_type in self.classifier.OUTPUT_ONLY_TYPES
             key_attributes = self._get_key_attributes(tag)
             real_tag = tag.name.lower() if tag.name else 'unknown'
-            qforce_hints = self._get_qforce_hints(element_type, identification, context, key_attributes, real_tag)
+            qforce_hints = self._get_qforce_hints(element_type, identification, context, key_attributes, real_tag,
+                                                  node=tag)
 
             element_data = {
                 'element_type': element_type,
@@ -295,7 +304,7 @@ class DomElementCompiler:
             # key attributes -- the discriminator of a console tab is not a locator attribute
             all_attrs = {k: (' '.join(v) if isinstance(v, list) else v) for k, v in (tag.attrs or {}).items()}
             hint_fill, hint_verify, hint_source, hint_reason, _row = self._route_keywords(
-                self._family_variant(element_type, identification, context, real_tag, all_attrs),
+                self._family_variant(element_type, identification, context, real_tag, all_attrs, node=tag),
                 (identification or {}).get('label_text'))
             if hint_fill:
                 element_data['hint_fill'] = hint_fill
@@ -316,6 +325,12 @@ class DomElementCompiler:
                     % (element_type,))
 
             pruned = self._prune_empty_values(element_data)
+            # PA-09 (ported from the product 2026-10-07; Claude-CRT c146ff5 C1/C2/C3): the control's own facts,
+            # read off the node while it is in hand -- added AFTER the prune so a False (not readonly, not
+            # disabled) survives as a fact, never as absence. Additive: no hint reads them.
+            facts = self._control_facts(tag, element_type, all_attrs, real_tag, label_text, dropdown_data)
+            if facts:
+                pruned['control_facts'] = facts
             # interop T10: the source node, kept only so _row_anchor can read
             # the surrounding row while annotating repeated groups. It is
             # stripped again at the end of _deduplicate_form_fields, so it
@@ -388,6 +403,8 @@ class DomElementCompiler:
     # template-driven -- so a template that keeps the default order produces
     # byte-identical output (tests/templates/test_byte_equivalence.py).
     def _label_candidate(self, tag, source):
+        if source == 'group_caption':
+            return self._group_caption_text(tag) or None
         if source == 'aria_label':
             v = tag.get('aria-label')
             return v.strip()[:100] if v and v.strip() else None
@@ -410,6 +427,29 @@ class DomElementCompiler:
             return None
         if source == 'label_span':
             return self._find_label_span_text(tag) or None
+        if source == 'input_value':
+            # 2026-10-07 (F19): an <input type=submit|button|reset> shows its value as its text -- `<input type="button"
+            # value="Save">` on a Visualforce form had NO label at all (no title, no aria-label), so the card could not
+            # name the form's Save. QWeb's ClickText matches exactly this (search_strategy TEXT_MATCH's
+            # `//input[(@type="button" or @type="reset" or @type="submit" ...) and ... @value ...]`).
+            if (tag.name or '').lower() != 'input' or (tag.get('type') or '').lower() not in ('submit', 'button', 'reset'):
+                return None
+            v = ' '.join((tag.get('value') or '').split())
+            return v[:int(getattr(self.config, 'LABEL_MAX_LEN', None) or 100)] or None
+        if source == 'table_row_label':
+            return self._find_table_row_label(tag) or None
+        if source == 'label_ancestor':
+            # parser-one P6 (2026-10-07; v3 `label-ancestor`): the implicit HTML label -- a form control WRAPPED in
+            # its <label> is named by that label's visible text (`<label><input type=radio> topRight</label>`).
+            # Only a rung where a template lists it (web-generic.json).
+            tag_name = tag.name.lower() if tag.name else ''
+            if tag_name not in ('input', 'select', 'textarea'):
+                return None
+            wrapper = tag.find_parent('label')
+            if wrapper is None:
+                return None
+            cap = int(getattr(self.config, 'LABEL_MAX_LEN', None) or 100)
+            return self._visible_inner_text(wrapper, max_len=cap) or None
         if source == 'inner_text':
             tag_name = tag.name.lower() if tag.name else ''
             role = (tag.get('role') or '').lower()
@@ -425,9 +465,13 @@ class DomElementCompiler:
             # label. Roles listed in the template's `innerTextExcludedRoles`
             # therefore never claim the inner_text rung and fall through to their
             # accessible name.
-            if role and role in self._inner_text_excluded_roles():
+            # parser-one P3 (2026-10-07): a `hostFamilyRules` rule may declare that its member is named by its OWN
+            # visible text (a dual listbox's option: `Billing`) -- v3 `ownTextOutranksNearestLabel`; the rule, not
+            # the role, decides, so a combobox's dropdown option is still never labelled by its value
+            own_text = bool((self.classifier.host_rule_for(tag) or {}).get('ownTextNames'))
+            if role and role in self._inner_text_excluded_roles() and not own_text:
                 return None
-            if tag_name in ('button', 'a') or role == 'button':
+            if tag_name in ('button', 'a') or role == 'button' or own_text:
                 # wave-2 review close, stream P1 2026-09-07 (F11): was
                 # _get_safe_text, which happily concatenated an
                 # slds-assistive-text span onto the visible text
@@ -468,15 +512,135 @@ class DomElementCompiler:
             except Exception:
                 value = None
             if value:
+                if source == 'inner_text':
+                    # parser-one P7 (2026-10-07): a link whose visible text is a word-boundary PREFIX of its own
+                    # aria-label is named by the aria-label -- the same words, completed with what tells two such
+                    # links apart (`View all dependencies` -> `... for Zoo Status`). That case only: visible text
+                    # stays first everywhere else (locator doctrine).
+                    longer = self._aria_label_extends(tag, value)
+                    if longer:
+                        return longer, 'aria_label'
+                if source == 'aria_label':
+                    # parser-one P1 (2026-10-07, v3 `hostInnerKeepsOwnName`): an icon-only node whose aria-label
+                    # merely REPEATS the label of the field it sits in names itself by its own title
+                    own = self._own_name_in_host(tag, value)
+                    if own:
+                        return own, 'title_attr'
                 return value, source
         return None, None
+
+    # ------------------------------------------------------------ parser-one step 3 P1/P2 (2026-10-07)
+    def _group_caption_text(self, tag):
+        """A `groupCaptions` host's caption: the first descendant carrying one of the rule's
+        `captionClassFragments` (SLDS `slds-form-element__legend`), else its first `captionTags` node (<legend>),
+        read as a sighted person reads it (assistive text and aria-hidden markers out). '' for any other tag."""
+        if not getattr(tag, 'name', None):
+            return ''
+        rule = self.classifier.group_caption_rule(tag.name.lower())
+        if not rule:
+            return ''
+        frags = rule.get('captionClassFragments') or []
+        cap_tags = {t.lower() for t in (rule.get('captionTags') or [])}
+        fallback = None
+        for node in tag.find_all(True):
+            classes = ' '.join(node.get('class') or [])
+            if frags and any(f in classes for f in frags):
+                text = self._visible_inner_text(node, max_len=100)
+                if text:
+                    return text
+            if fallback is None and node.name and node.name.lower() in cap_tags:
+                fallback = node
+        if fallback is not None:
+            return self._visible_inner_text(fallback, max_len=100) or ''
+        return ''
+
+    def _own_name_in_host(self, tag, aria_label):
+        """Template `ownNameInHost`: for a node of `nodeTags` inside one of `hostTags` with NO visible text of its own,
+        whose aria-label equals the aria-label of another control in the same host (the field it decorates), the
+        first of its own `attrs` that says something else is its name. The OmniStudio date picker's icon button is
+        aria-label="Zoo Date" (the field's) and title="Select Date" (its own): T14 labels it `Select Date`, and v1
+        named it `Zoo Date` -- a second element with the field's label. Returns the name or None."""
+        spec = getattr(self.config, 'OWN_NAME_IN_HOST', None) or {}
+        if not spec or spec.get('enabled') is False or not getattr(tag, 'name', None):
+            return None
+        if tag.name.lower() not in {t.lower() for t in (spec.get('nodeTags') or [])}:
+            return None
+        hosts = {t.lower() for t in (spec.get('hostTags') or [])}
+        host = tag.find_parent(lambda t: t.name and t.name.lower() in hosts) if hosts else None
+        if host is None or self._visible_inner_text(tag):
+            return None
+        same = aria_label.strip()
+        if not any(n is not tag and (n.get('aria-label') or '').strip() == same
+                   for n in host.find_all(['input', 'textarea', 'select'])):
+            return None
+        for attr in spec.get('attrs') or []:
+            v = (tag.get(attr) or '').strip()
+            if v and v != same:
+                return v[:100]
+        return None
+
+    def _aria_label_extends(self, tag, visible):
+        """Template `ariaLabelExtendsVisibleText`: the node's aria-label when its tag is listed and its visible text
+        is a strict prefix of the aria-label ending on a word boundary; else None."""
+        spec = getattr(self.config, 'ARIA_LABEL_EXTENDS_VISIBLE_TEXT', None) or {}
+        if not spec or not spec.get('enabled') or not getattr(tag, 'name', None):
+            return None
+        if tag.name.lower() not in {t.lower() for t in (spec.get('tags') or [])}:
+            return None
+        aria = ' '.join((tag.get('aria-label') or '').split())
+        if not aria:
+            return None
+        only = spec.get('onlyFamilies')
+        if only and self.classifier._classify_element_type(tag) not in set(only):
+            return None            # an <a> styled or roled as a BUTTON is a button, not a link (measured: its
+                                   # aria-label appends boilerplate -- 'See Documentation Open in a New Salesforce Tab')
+        seen = ' '.join((visible or '').split())
+        if not seen or len(aria) <= len(seen) or not aria.startswith(seen):
+            return None
+        if aria[len(seen)].isalnum():
+            return None            # `Acc` is not a word prefix of `Account`
+        cap = int(getattr(self.config, 'LABEL_MAX_LEN', None) or 100)
+        return aria[:cap]
+
+    def _inside_tags(self, node, tags):
+        """True when `node` IS, or sits inside, one of `tags` (lower-cased names). Memoised per parse."""
+        if node is None or not getattr(node, 'name', None):
+            return False
+        memo = self.__dict__.setdefault('_inside_memo', {})
+        key = (id(node), tags)
+        if key not in memo:
+            memo[key] = (node.name.lower() in tags
+                         or node.find_parent(lambda t: t.name and t.name.lower() in tags) is not None)
+        return memo[key]
+
+    @staticmethod
+    def _host_key(node, attrs):
+        """The value of the first of `attrs` on `node` or its nearest ancestor carrying one -- the component key a
+        host-addressed keyword resolves by (keywords_omni._require_host: data-omni-key on an OmniScript element,
+        data-element-label on a FlexCard one). None when nothing carries one."""
+        cur = node
+        while cur is not None and getattr(cur, 'name', None):
+            for attr in attrs:
+                v = cur.get(attr)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+            cur = cur.parent
+        return None
 
     def _structural_label(self, tag):
         rules = getattr(self.config, 'STRUCTURAL_CONTAINER_RULES', None) or []
         classes = ' '.join(tag.get('class') or []).lower()
         for rule in rules:
+            own_tags = rule.get('labelFromOwnTags')
+            if own_tags and any(f.lower() in classes for f in (rule.get('containerClassFragments') or [])):
+                # parser-one P8 (2026-10-07): the control's OWN caption element (the Aura lookup wrapper's <label>)
+                own = tag.find(lambda n: n.name and n.name.lower() in {t.lower() for t in own_tags})
+                text = self._visible_label_text(own) if own is not None else ''
+                if text:
+                    return text[:100]
+                return None
             frag_label = rule.get('labelFromPrecedingClassFragment')
-            if not frag_label or not any(f in classes for f in (rule.get('containerClassFragments') or [])):
+            if not frag_label or not any(f.lower() in classes for f in (rule.get('containerClassFragments') or [])):
                 continue
             inside = set(id(n) for n in tag.find_all(True))
             for prev in tag.find_all_previous(True):
@@ -506,6 +670,7 @@ class DomElementCompiler:
                 result['label_text'] = won_text
                 result['label_source'] = source
 
+        _claim('group_caption')           # parser-one P1 2026-10-07: a groupCaptions host's <legend>
         _claim('form_element_label')      # 2026-09-10: a structural control's declared label source
 
         aria_label = tag.get('aria-label')
@@ -520,6 +685,7 @@ class DomElementCompiler:
         # TypeText was offered on 2 of 82 input fields across five pages. Measured before this branch.
         _claim('standard_label')
         _claim('aria_labelledby')
+        _claim('table_row_label')         # 2026-10-07 (F19): a classic form row's label cell (a template opts in)
 
         placeholder = tag.get('placeholder')
         if placeholder and placeholder.strip():
@@ -566,7 +732,9 @@ class DomElementCompiler:
         # per direct user experience: "spans and divs are notoriously used as
         # tables, buttons and text holders in SF".
         _claim('label_span')
+        _claim('label_ancestor')          # parser-one P6 2026-10-07: the wrapping <label> (a template opts in)
         _claim('inner_text')
+        _claim('input_value')             # 2026-10-07 (F19): an input button's value
         # wave-2 review close, stream P1 2026-09-07 (F11) -- LAST, by design:
         # screen-reader-only text is never what a person sees, so it labels a
         # control only when literally nothing else does (L2-R08's chevron-only
@@ -669,6 +837,14 @@ class DomElementCompiler:
                     hidden.decompose()
             except Exception:
                 continue
+        # parser-one P8 (2026-10-07): decoration inside the label that is not the name (a toggle's On / Off)
+        excl = getattr(self.config, 'LABEL_EXCLUDE_CLASS_FRAGMENTS', None) or []
+        if excl:
+            for deco in list(cloned.find_all(lambda n: n.name and any(f in ' '.join(n.get('class') or []) for f in excl))):
+                try:
+                    deco.decompose()
+                except Exception:
+                    continue
         return self.text_engine._get_safe_text(cloned, max_len=100)
 
     # interop T17 2026-09-07: what a SIGHTED user actually sees inside an
@@ -837,6 +1013,38 @@ class DomElementCompiler:
             cache = (root, index)
             self._label_for_cache = cache
         return cache[1].get(el_id, '')
+
+    def _find_table_row_label(self, tag) -> str:
+        """2026-10-07 (F19): the label of a control laid out in a classic form ROW -- the nearest preceding cell of the
+        control's own cell, in the same row, whose class carries one of the template's `tableRowLabel.
+        labelCellClassFragments` (`labelCol`): its <label>'s visible text, else the cell's own visible text. A
+        Visualforce pageBlockSectionItem renders `<th class="labelCol"><label for="...:permSetLabel">Label</label></th>
+        <td class="data2Col">...<input id="...:permSetLabelInput" title="label">` -- the <label for> names a wrapper, so
+        standard_label finds nothing and the field was named by its tooltip (`label`, `developerName`). Form controls
+        only (a button is named by its own text or value); '' when the template declares no fragment."""
+        spec = getattr(self.config, 'TABLE_ROW_LABEL', None) or {}
+        frags = [f for f in (spec.get('labelCellClassFragments') or []) if f]
+        name = (getattr(tag, 'name', None) or '').lower()
+        if not frags or name not in ('input', 'select', 'textarea'):
+            return ''
+        if name == 'input' and (tag.get('type') or '').lower() in ('hidden', 'submit', 'button', 'reset', 'image'):
+            return ''
+        cell = tag.find_parent(['td', 'th'])
+        if cell is None:
+            return ''
+
+        def _is_label_cell(t):
+            return (getattr(t, 'name', None) in ('td', 'th')
+                    and any(f in (t.get('class') or []) for f in frags))
+        prev = cell.find_previous_sibling(_is_label_cell)
+        if prev is None:
+            return ''
+        lab = prev.find('label')
+        text = self._visible_label_text(lab) if lab is not None else ''
+        if not text:
+            text = self._visible_inner_text(prev, max_len=100)
+        text = ' '.join((text or '').split()).strip('*').strip()
+        return text[:int(getattr(self.config, 'LABEL_MAX_LEN', None) or 100)]
 
     def _form_element_spec(self):
         return getattr(self.config, 'FORM_ELEMENT_LABEL', None) or {}
@@ -1024,7 +1232,8 @@ class DomElementCompiler:
                         return text
         return ''
 
-    def _get_qforce_hints(self, element_type, identification, context, attributes, real_tag=None) -> dict:
+    def _get_qforce_hints(self, element_type, identification, context, attributes, real_tag=None,
+                          node=None) -> dict:
         """Ranked locator recommendations, tied to how this project's own
         real keyword implementations (actions.py/qforce_lite.py) actually
         resolve elements -- not a generic aria_label/placeholder reliability
@@ -1068,25 +1277,82 @@ class DomElementCompiler:
         hints = []
 
         if in_grid:
-            locator = "row/col coordinates (r{N}/c{M})"
-            hints.append({
-                'keyword': 'Click Table Cell',
-                'locator': locator,
-                'call_example': _call_example('Click Table Cell', locator),
-                'confidence': TIER_UNVERIFIED,
-                'why': "Inside a table/grid -- real Salesforce list/related-list rows routinely repeat "
-                       "identical text across rows (same title, same owner name), so a text-based locator "
-                       "can be genuinely ambiguous even when this element's own label looks unique in "
-                       "isolation. Row/column position is the only address guaranteed unique by "
-                       "construction. Confirmed live 2026-07-29 against Salesforce Files' own list view.",
-                'caveats': ["Run UseTable first, on this table's own header label, to get the real "
-                            "row/col coordinates -- this hint can't resolve them statically."],
-            })
+            address = (context or {}).get('table_address') or {}
+            clickable = element_type in ('button', 'link')
+            if clickable and address.get('where') and address.get('column'):
+                # a runnable call: the row's unique value and the column (garzai_tables.robot's own shape)
+                where, column = address['where'], address['column']
+                hints.append({
+                    'keyword': 'Click Table Cell',
+                    'locator': where,
+                    # CLI-FIX-2 B1: the keyword's OWN signature, click_table_cell(table, where, column) and
+                    # garzai_tables.robot `[Arguments] ${table} ${where} ${column}`; [where, column] raised
+                    # TypeError when the card's call was run as written. The table is "" (the only table:
+                    # keywords_table reads `table or None`, the export writes ${EMPTY}), never None, which
+                    # _prune_empty_values drops from a list -- and "" is what `step` can be typed with.
+                    'args': ['', where, column],
+                    'column': column,
+                    'call_example': 'click_table_cell("", "%s", "%s")  # "" = the only table; name it when the page has several' % (where, column),
+                    'confidence': TIER_UNVERIFIED,
+                    'why': "Inside a table row whose value %r is unique in the capture; the control is addressed "
+                           "by that row and its column, which is how Click Table Cell resolves a cell. Unique in "
+                           "the CAPTURE only -- a live read-back is what verifies it." % where,
+                    'caveats': ['table is "" (the only table): pass the table label when the page has more than one table.'],
+                })
+                if address.get('real_table'):
+                    # PA-08 (ported from the product 2026-10-07, overlay OV-PA08-real-table retired; additive): a real
+                    # <table> with a <th> row -- an exporter may say it in plain QWeb, with ClickCell tag=
+                    hints[-1]['real_table'] = True
+                    hints[-1]['control_tag'] = address.get('control_tag')
+            elif clickable and (address.get('header_row') or address.get('row_text')) and label_text:
+                # a header-row control is not a data cell; a data row with no unique value is addressed by the
+                # control's own label -- the row text rides as an anchor CANDIDATE (D14), never baked in
+                hints.append({
+                    'keyword': 'ClickText',
+                    'locator': label_text,
+                    'call_example': _call_example('ClickText', label_text),
+                    'confidence': TIER_UNVERIFIED,
+                    'why': ("A control in the table header row, not a data cell: addressed by its own label."
+                            if address.get('header_row') else
+                            "Inside a table row with no value unique among the rows; addressed by the control's "
+                            "own label, and the row text is the anchor candidate when the label repeats."),
+                    'anchor_candidates': ([{'kind': 'row_cell', 'text': address['row_text'], 'scope': 'row'}]
+                                         if address.get('row_text') else []),
+                })
+            else:
+                locator = "row/col coordinates (r{N}/c{M})"
+                hint = {
+                    'keyword': 'Click Table Cell',
+                    'locator': locator,
+                    'call_example': _call_example('Click Table Cell', locator),
+                    'confidence': TIER_UNVERIFIED,
+                    'why': "Inside a table/grid -- real Salesforce list/related-list rows routinely repeat "
+                           "identical text across rows (same title, same owner name), so a text-based locator "
+                           "can be genuinely ambiguous even when this element's own label looks unique in "
+                           "isolation. Row/column position is the only address guaranteed unique by "
+                           "construction. Confirmed live 2026-07-29 against Salesforce Files' own list view.",
+                    'caveats': ["Run UseTable first, on this table's own header label, to get the real "
+                                "row/col coordinates -- this hint can't resolve them statically."],
+                }
+                if clickable:
+                    hint['disambiguation_status'] = 'COULD-NOT-DISAMBIGUATE: table row without a unique value'
+                    hint['placeholder'] = True
+                hints.append(hint)
 
         reliable_label_sources = (
             'standard_label', 'aria_labelledby', 'form_element_label', 'wrapped_label', 'label_span', 'sibling_label_text',
+            'table_row_label',      # 2026-10-07 (F19): a classic form row's visible label cell is a real associated label
         )
-        if element_type == 'checkbox' and label_text:
+        # parser-one P1/P2 (2026-10-07): a family VARIANT whose familyKeywords entry declares `replacesFamilyRung`
+        # (the OmniStudio variants) REPLACES the family's own Lightning rung below, as omni_radio already replaces
+        # radio's ClickCheckbox -- v3's evidence measured the stock rung missing those shapes (a typed text date, a
+        # typeahead that opens only on typing), so it is not offered as a backup either.
+        variant = self._family_variant(element_type, identification, context, real_tag, attributes, node=node)
+        variant_spec = ((getattr(self.config, 'FAMILY_KEYWORDS', None) or {}).get(variant)
+                        if variant != element_type else None) or {}
+        if variant_spec.get('replacesFamilyRung'):
+            pass
+        elif element_type == 'checkbox' and label_text:
             hints.append({
                 'keyword': 'ClickCheckbox',
                 'locator': label_text,
@@ -1262,7 +1528,7 @@ class DomElementCompiler:
         # template keys) -- per the 2026-09-07 standing rule, the
         # family->keyword mapping is DATA, not a new literal branch.
         family_hint = self._hints_for_family(
-            element_type, label_text, real_tag, identification=identification, context=context)
+            element_type, label_text, real_tag, identification=identification, context=context, node=node)
         if family_hint:
             hints.append(family_hint)
 
@@ -1490,11 +1756,40 @@ class DomElementCompiler:
             # Lightning radio input, and routing it to ClickCheckbox is the exact bug that finding
             # fixed. Caught by test_omnistudio_radio_routes_to_omni_radio_not_click_checkbox while
             # this call passed the raw `element_type`.
-            hints = self._fill_hint_first(
-                self._family_variant(element_type, identification, context, real_tag, attributes),
-                hints, label_text, label_source)
+            hints = self._fill_hint_first(variant, hints, label_text, label_source)
+        else:
+            # parser-one 4c(a), 2026-10-07: a TYPING control laid out in a table (a Visualforce pageBlock, a classic
+            # Setup edit form) led with the table placeholder `click_table_cell(row=<N>, ...)` and its TypeText
+            # second -- a call that cannot run as written, first. Its fill rung leads when the template lists the
+            # fill keyword in `keywordRouting.fillFirstInGrid`; the placeholder stays offered, flagged, after it.
+            hints = self._fill_hint_first_in_grid(variant, hints)
+
+        # CLI-FIX-2 W2 (2026-10-01): EVERY Click Table Cell hint with no row/column address is a placeholder,
+        # whatever the control's family -- the button/link branch above, a checkbox in a row, the datatable
+        # family's `row=<N>` template. It says so; a template is never presented as a call with a null status.
+        for h in hints:
+            if h.get('keyword') == 'Click Table Cell' and not h.get('args'):
+                h.setdefault('disambiguation_status',
+                             'COULD-NOT-DISAMBIGUATE: no row/column address in the capture')
+                h['placeholder'] = True
 
         return {'locator_options': hints} if hints else None
+
+    def _fill_hint_first_in_grid(self, element_type, hints):
+        """parser-one 4c(a): inside a table/grid, move an EXISTING fill rung to rung 0 -- only for a fill keyword the
+        template lists in `keywordRouting.fillFirstInGrid` (TypeText: 110 actionable typing controls on the
+        parser-one corpus led with the placeholder, every one with TypeText second). Never adds a rung and never
+        drops the table rung. A checkbox / picklist in a data row is NOT listed: 5906e488 W2 keeps "a checkbox in a
+        row" a flagged placeholder first, and nothing measured says which call is right for those 3,442 controls."""
+        allowed = self._routing().get('fillFirstInGrid') or []
+        row = self._routing_row(element_type)
+        fill = row.get('fill')
+        if not row.get('fillFirst') or not fill or fill not in allowed:
+            return hints
+        idx = next((i for i, h in enumerate(hints) if h.get('keyword') == fill), None)
+        if not idx:
+            return hints
+        return [hints[idx]] + [h for i, h in enumerate(hints) if i != idx]
 
     def _fill_hint_first(self, element_type, hints, label_text, label_source):
         """Put this family's FILL rung at rung 0, or state why there is none."""
@@ -1538,7 +1833,7 @@ class DomElementCompiler:
                                               'sibling_label_text') else [caveat],
         }] + hints
 
-    def _family_variant(self, element_type, identification, context, real_tag=None, attributes=None):
+    def _family_variant(self, element_type, identification, context, real_tag=None, attributes=None, node=None):
         """The FAMILY_KEYWORDS key to use for this control, honouring variants.
 
         wave-2 review close, stream P1 2026-09-07 (F21, L2-R27). An OmniScript
@@ -1578,6 +1873,11 @@ class DomElementCompiler:
                 # tab routed to `link`/ClickText although familyKeywords already held console-subtab
                 a = attributes or {}
                 checks.append(all(isinstance(a.get(k), str) and re.search(p, a.get(k)) for k, p in attr_patterns.items()))
+            inside = rule.get('whenInsideTags') or []
+            if inside:
+                # parser-one P1/P2 (2026-10-07): the control IS, or sits inside, one of these component hosts (v3's
+                # `hostTags`). Without the node in hand the condition cannot hold -- it never guesses.
+                checks.append(self._inside_tags(node, frozenset(t.lower() for t in inside)))
             if not checks:
                 continue
             if all(checks) if rule.get('match') == 'all' else any(checks):
@@ -1609,7 +1909,7 @@ class DomElementCompiler:
         return False
 
     def _hints_for_family(self, element_type, label_text, real_tag,
-                          identification=None, context=None) -> dict:
+                          identification=None, context=None, node=None) -> dict:
         """T12 2026-09-07: table-driven hint for a family with no branch in
         the elif chain above (output_field/datatable/radio), plus
         custom_component's explicit-absence hint. The mapping lives in
@@ -1655,10 +1955,36 @@ class DomElementCompiler:
         table = getattr(self.config, 'FAMILY_KEYWORDS', None) or {}
         # P1 2026-09-07 (F21): resolve the family's VARIANT (template-driven)
         # before the lookup -- an unmatched control keeps its own family name.
-        element_type = self._family_variant(element_type, identification, context, real_tag)
+        element_type = self._family_variant(element_type, identification, context, real_tag, node=node)
         spec = table.get(element_type)
         if not spec:
             return None
+        # parser-one P1/P2 (2026-10-07): a host-addressed keyword (the Omni family) takes the COMPONENT KEY as its
+        # first argument -- `{key}` in the call template, read off the control's nearest host carrying one of
+        # `keyFromAncestorAttributes` (data-omni-key / data-element-label, keywords_omni._require_host). No key in
+        # the capture: the template's stated `keyPlaceholder`, never a guessed value.
+        key_attrs = spec.get('keyFromAncestorAttributes') or []
+        key = self._host_key(node, key_attrs) if (key_attrs and node is not None) else None
+        if key is None and key_attrs and node is not None:
+            # the keyword's own last resort (keywords_omni.__host anchor #3): the leaf control's aria-label or
+            # placeholder -- a host with no metadata key (the OmniStudio designer's own typeaheads) is still reachable
+            for attr in spec.get('keyFallbackOwnAttributes') or []:
+                v = node.get(attr)
+                if isinstance(v, str) and v.strip():
+                    key = v.strip()
+                    break
+        fmt = {'locator': label_text or '', 'key': key or spec.get('keyPlaceholder') or '<key>'}
+        if not label_text and key and spec.get('labelOptional'):
+            # the key IS the address: an unlabelled OmniStudio checkbox is still driveable by its data-omni-key
+            return {
+                'keyword': spec['keyword'],
+                'locator': key,
+                'call_example': spec['call_template'].format(**fmt),
+                'confidence': TIER_UNVERIFIED,
+                'why': spec['why'],
+                'caveats': list(spec.get('caveats', [])) + [
+                    "No visible label: addressed by its component key %r alone." % key],
+            }
         if not label_text:
             # 2026-09-07 L3-C on T12 (CAUGHT-BUG): 14 labelless radios fell through this `return None`
             # to the generic ClickItem hint -- the no-read-back click the row claimed to have closed.
@@ -1676,7 +2002,7 @@ class DomElementCompiler:
         return {
             'keyword': spec['keyword'],
             'locator': label_text,
-            'call_example': spec['call_template'].format(locator=label_text),
+            'call_example': spec['call_template'].format(**fmt),
             # D14: a TEMPLATE cannot declare a hint verified -- only a live read-back can.
             'confidence': TIER_UNVERIFIED,
             'why': spec['why'],
@@ -2153,6 +2479,129 @@ class DomElementCompiler:
             folded['required_source'] = 'rendered marker'
         return folded or None
 
+    # 2026-10-01 (parser-table-button): a clickable control inside a table used to get the TEMPLATE
+    # `Click Table Cell  row/col coordinates (r{N}/c{M})` -- 168 of the 321 controls the from-zero path
+    # got wrong against a store-verified rung (docs/audit/cli-2026-10-01/MEASURE-HINTS-PARITY.md).
+    # The address below mirrors garzai_tables.robot's own row model so the call it proposes is one
+    # `Click Table Cell` can resolve: a column is `data-label`, else the header row's cell at the same
+    # position, else `#<position>`; the row is named by the first column whose value is unique among the
+    # table's data rows (else the first unique pair of columns), as `<column>:<value>`.
+    _CLICKABLE_TAGS = ('a', 'button', 'lightning-button', 'lightning-button-icon', 'lightning-button-menu')
+    _CLICKABLE_ROLES = ('button', 'link', 'menuitem')
+    _SKIP_KEY_COLUMNS = re.compile(r'^(row number|choose a row|select\b)', re.I)
+
+    @staticmethod
+    def _cell_text(cell) -> str:
+        parts = []
+        for node in cell.find_all(string=True):
+            if type(node).__name__ not in ('NavigableString', 'TemplateString'):
+                continue
+            if node.find_parent(['style', 'script', 'svg']):
+                continue
+            if node.find_parent(lambda t: t.name and 'slds-assistive-text' in (t.get('class') or [])):
+                continue
+            parts.append(str(node))
+        return re.sub(r'\s+', ' ', ' '.join(parts)).strip()
+
+    @staticmethod
+    def _row_cells(tr):
+        return [c for c in tr.find_all(['td', 'th'], recursive=False)] or \
+            [c for c in tr.find_all(True, recursive=False) if (c.get('role') or '') in ('gridcell', 'cell', 'rowheader', 'columnheader')]
+
+    def _is_header_row(self, tr) -> bool:
+        if (tr.get('data-row-key-value') or '') == 'HEADER' or tr.find_parent('thead') is not None:
+            return True
+        cells = self._row_cells(tr)
+        return bool(cells) and all(c.name == 'th' and (c.get('role') or '') == 'columnheader' for c in cells)
+
+    def _table_model(self, table):
+        """headers + data rows of one table, built once per parse (kept beside the tag so a recycled
+        id() of a collected soup can never serve a stale model)."""
+        cache = self.__dict__.setdefault('_table_model_cache', {})
+        hit = cache.get(id(table))
+        if hit and hit[0] is table:
+            return hit[1]
+        headers, body, th_header = [], [], False     # PA-08: was the header row made of <th> cells?
+        for tr in table.find_all(lambda t: t.name == 'tr' or (t.get('role') or '') == 'row'):
+            cells = self._row_cells(tr)
+            if not cells:
+                continue
+            if not headers and self._is_header_row(tr):
+                headers = [(c.get('aria-label') or c.get('data-label') or '').strip() or self._cell_text(c) for c in cells]
+                th_header = all(c.name == 'th' for c in cells)
+            elif not self._is_header_row(tr):
+                body.append((tr, cells))
+        cols = None
+        rows = []
+        for tr, cells in body:
+            names = [((c.get('data-label') or c.get('field-label') or '').strip()
+                      or (headers[i] if i < len(headers) else '') or '#%d' % (i + 1)) for i, c in enumerate(cells)]
+            rows.append((tr, names, [self._cell_text(c) for c in cells]))
+        # PA-08 (ported from the product 2026-10-07, overlay OV-PA08-real-table retired; additive keys only): the ONE
+        # real-table flag (CLI-FIX-4, ledger e78876fb5c 2026-08-26) -- an HTML <table> whose header row is <th> cells,
+        # and NOT a Lightning datatable / tree grid (those render a <table> in the capture but are not a real table
+        # to the page: querySelectorAll('table') = 0 on a list view). Only this shape may export as plain QWeb
+        # UseTable + ClickCell; every other table step calls our own table keywords.
+        real = (table.name == 'table' and th_header and bool(headers)
+                and table.find_parent(lambda t: t.name in ('lightning-datatable', 'lightning-tree-grid')) is None)
+        model = {'headers': headers, 'rows': rows, 'real_table': real}
+        cache[id(table)] = (table, model)
+        return model
+
+    def _unique_where(self, model, row_index):
+        """`<column>:<value>` naming ONLY this data row, or None. First one column, then one pair."""
+        _tr, names, vals = model['rows'][row_index]
+        others = [r for i, r in enumerate(model['rows']) if i != row_index]
+        usable = [i for i, n in enumerate(names)
+                  if vals[i] and not self._SKIP_KEY_COLUMNS.match(n) and not n.startswith('#')]
+
+        def clash(cols):
+            for _t, o_names, o_vals in others:
+                lookup = {n: v for n, v in zip(o_names, o_vals)}
+                if all(lookup.get(names[i], '').lower() == vals[i].lower() for i in cols):
+                    return True
+            return False
+        for i in usable:
+            if not clash([i]):
+                return '%s:%s' % (names[i], vals[i])
+        for a in range(len(usable)):
+            for b in range(a + 1, len(usable)):
+                if not clash([usable[a], usable[b]]):
+                    return '%s:%s;%s:%s' % (names[usable[a]], vals[usable[a]], names[usable[b]], vals[usable[b]])
+        return None
+
+    def _table_address(self, tag):
+        """Where a clickable control sits in its table, or None (not clickable / no row)."""
+        role = (tag.get('role') or '').lower()
+        if not ((tag.name or '').lower() in self._CLICKABLE_TAGS or role in self._CLICKABLE_ROLES):
+            return None
+        tr = tag.find_parent(lambda t: t.name == 'tr' or (t.get('role') or '') == 'row')
+        if tr is None:
+            return None
+        if self._is_header_row(tr):
+            return {'header_row': True}
+        table = tr.find_parent(self.config._is_any_table)
+        if table is None:
+            return None
+        model = self._table_model(table)
+        idx = next((i for i, r in enumerate(model['rows']) if r[0] is tr), None)
+        if idx is None:
+            return None
+        cells = self._row_cells(tr)
+        cpos = next((i for i, c in enumerate(cells) if c is tag or tag in c.descendants), None)
+        if cpos is None:
+            return None
+        column = model['rows'][idx][1][cpos]
+        where = self._unique_where(model, idx)
+        row_text = next((v for v in model['rows'][idx][2] if v), '')
+        out = {'column': column, 'row_text': row_text}
+        if model.get('real_table'):     # PA-08: a real <th> table -- ClickCell needs the control's real tag (tag=)
+            out['real_table'] = True
+            out['control_tag'] = (tag.name or '').lower()
+        if where:
+            out['where'] = where
+        return out
+
     def _get_context_info(self, tag) -> dict:
         if not tag:
             return None
@@ -2217,6 +2666,11 @@ class DomElementCompiler:
             # _get_qforce_hints can recommend row/col addressing for ANY
             # table shape, not only lightning-datatable.
             context['in_grid'] = True
+
+        if context.get('is_in_datatable') or context.get('in_grid'):
+            address = self._table_address(tag)
+            if address:
+                context['table_address'] = address
 
         quick_action = tag.find_parent(lambda t: t.name and t.name in (
             'force-quick-action-panel', 'forceActionBody',
@@ -2671,6 +3125,12 @@ class DomElementCompiler:
         """
         keys = set()
         for hint in (el.get('qforce_hints') or {}).get('locator_options') or []:
+            if hint.get('args'):
+                # parser-one item 8 (2026-10-07): an ADDRESSED Click Table Cell's locator is its ROW
+                # ('Account Name:Demo Account 1'), shared by every control in that row -- not a first argument
+                # (the call's first argument is the table, ""); (row, column) is the address. Counting it made
+                # one link in a 5-control row group_size 5.
+                continue
             loc = hint.get('locator')
             if loc:
                 keys.add(loc)
@@ -2881,6 +3341,16 @@ class DomElementCompiler:
             gs = dis.get('group_size') or 1
             if gs <= 1:
                 continue
+            lead = ((el.get('qforce_hints') or {}).get('locator_options') or [{}])[0]
+            # 2026-10-01: a Click Table Cell addressed by its row's unique value + column carries its own
+            # address, so the LEAD never gains an index (_rebake_index_anchor skips a hint with args). Error
+            # ledger 012f780f7b (2026-10-07): skipping the whole ELEMENT here also dropped its position from
+            # `disambiguation.index`, so its KEYWORD fallbacks (ClickText / ClickItem on the same label) lost it --
+            # the 18 owner-alias links `jgarz` on the slockard Account list all proposed click_text("jgarz",
+            # index=1) and Gz Read Page listed 18 identical lines, each clicking row 1. An addressed member whose
+            # label genuinely repeats now keeps its position (below); a label-less run of them -- no resolution
+            # key that repeats -- still shares one meaningless position and is still skipped.
+            addressed = bool(lead.get('args'))
             anchor = dis.get('anchor')
             scope = dis.get('anchor_scope')
             # D14 2026-09-09: this used to `continue` here whenever the text
@@ -2894,6 +3364,12 @@ class DomElementCompiler:
             # CANDIDATES, and the caller chooses.
 
             keys = self._resolution_keys(el)
+            if addressed:
+                # the addressed lead's own locator is its ROW ('Account Name:Demo Account 1'), shared by every
+                # control in that row -- a count through it ranks a control among its row-mates, not among the
+                # same-LABEL matches a keyword fallback resolves through (measured: the one 'hviss' link on the
+                # slockard Account list came out index 4 of its row's 5 controls). Only label keys count here.
+                keys = {k for k in keys if k != lead.get('locator')}
             best_key, best_n = None, 0
             for key in sorted(keys):
                 n = max(locator_counts.get(key, 1), label_counts.get(key, 1))
@@ -2911,14 +3387,29 @@ class DomElementCompiler:
             # group) is the number, and only a genuinely repeated key
             # overrides it.
             idx = None
-            if best_key is not None and best_n > 1:
-                try:
-                    idx = order[best_key].index(id(el)) + 1
-                except (KeyError, ValueError):
-                    idx = None
-            if idx is None:
-                idx = (getattr(self, '_a3_group_index', {}).get(id(el))
-                       or dis.get('index') or 1)
+            if addressed:
+                # 012f780f7b: only a label that genuinely repeats defines a sequence for the fallbacks. A
+                # position an earlier pass already stamped on the member is KEPT (the 20 'Show Actions' row
+                # buttons: 1..20 among the buttons, where the page-wide sequence would count each button's cell
+                # too, 2,4..40 -- which numbering QWeb resolves there is COULD-NOT-CHECK offline, and this rule
+                # does not move it); a member with none gets its DOM position among the same-label matches.
+                if best_key is None or best_n <= 1:
+                    continue
+                idx = dis.get('index')
+                if not idx:
+                    try:
+                        idx = order[best_key].index(id(el)) + 1
+                    except (KeyError, ValueError):
+                        continue
+            else:
+                if best_key is not None and best_n > 1:
+                    try:
+                        idx = order[best_key].index(id(el)) + 1
+                    except (KeyError, ValueError):
+                        idx = None
+                if idx is None:
+                    idx = (getattr(self, '_a3_group_index', {}).get(id(el))
+                           or dis.get('index') or 1)
 
             tried = 'self-only' if scope == 'self' else (scope or 'none')
             dis['index'] = idx
@@ -2950,6 +3441,9 @@ class DomElementCompiler:
                 'element, it is positional, and it must be re-verified if the page\'s '
                 'contents change.'
                 % (gs, tried, idx))
+            if addressed:
+                dis['why'] += (' The lead Click Table Cell is addressed by its row and column and carries no '
+                               'index; index=%d is for the keyword fallbacks on the same label.' % idx)
             el['disambiguation'] = dis
             self._rebake_index_anchor(el, dis)
         return elements
@@ -2973,6 +3467,10 @@ class DomElementCompiler:
         cands = dis.get('anchor_candidates') or []
         for hint in hints:
             if hint.get('keyword') not in anchored:
+                continue
+            if hint.get('args'):
+                # a Click Table Cell already addressed by its row's unique value and its column
+                # (2026-10-01): a positional index on top of that would be wrong, not extra
                 continue
             if cands:
                 hint['anchor_candidates'] = [dict(c) for c in cands]
@@ -3102,6 +3600,10 @@ class DomElementCompiler:
         if not policy.get('enabled', True):
             return elements
         accepting = policy.get('partialMatchKeywords') or []
+        # PA-02 (ported from the product 2026-10-07, parser-one step 1; Claude-CRT 78a8b94): a keyword in
+        # `requiredExactKeywords` never carries the pin on a REQUIRED control -- its label renders `*<label>`
+        # and QWeb's exact match compares the whole text (CRT job 204052: QWebElementNotFoundError).
+        required_exact = set(policy.get('requiredExactKeywords') or [])
         for el in elements:
             if not isinstance(el, dict):
                 continue
@@ -3117,6 +3619,18 @@ class DomElementCompiler:
                     continue
                 if 'partial_match' in example:
                     continue
+                if hint.get('keyword') in required_exact and self._is_required_control(el):
+                    # the exact match cannot hold (the label reads `*<label>`): the pin would resolve nothing.
+                    # The index/anchor this pass already guarantees is what separates the colliding labels.
+                    hint.setdefault('caveats', []).append(
+                        "'%s' is contained in %s also rendered on this page, and QWeb resolves text by "
+                        "SUBSTRING by default -- but this control is REQUIRED, so its label renders with the "
+                        "marker (`*%s`) and QWeb's exact text match (`partial_match=False`) would find "
+                        "nothing (CRT: QWebElementNotFoundError). call_example leaves the exactness pin off; "
+                        "the index/anchor it carries is what separates the labels."
+                        % (locator, ', '.join("'%s'" % o for o in others), hint.get('locator') or locator)
+                    )
+                    continue
                 hint['call_example'] = example[:-1] + ', partial_match=False)'
                 hint.setdefault('caveats', []).append(
                     "QWeb resolves text by SUBSTRING by default for this keyword too, not "
@@ -3128,6 +3642,15 @@ class DomElementCompiler:
                     % (locator, ', '.join("'%s'" % o for o in others))
                 )
         return elements
+
+    @staticmethod
+    def _is_required_control(el):
+        """True when the control is required: the parser's own flag (`required` / `aria-required` on the control,
+        `behavioral_metadata.is_required`) or the rendered marker folded into `validation.required` (F225) --
+        what Lightning draws the label's `*` from."""
+        meta = el.get('behavioral_metadata') or {}
+        validation = el.get('validation') or {}
+        return bool(meta.get('is_required') or validation.get('required'))
 
     def _page_locator_counts(self, elements):
         """How many ELEMENTS on this page offer each hint locator.
@@ -3147,6 +3670,7 @@ class DomElementCompiler:
             own = {
                 hint.get('locator') for hint in hints
                 if hint.get('locator') and 'coordinates' not in str(hint.get('locator'))
+                and not hint.get('args')     # parser-one item 8: an addressed row locator is not a repeat
             }
             for locator in own:
                 counts[locator] = counts.get(locator, 0) + 1
@@ -3340,6 +3864,10 @@ class DomElementCompiler:
         for hint in hints.get('locator_options', []) or []:
             if hint.get('keyword') not in anchored:
                 continue
+            if hint.get('args'):
+                # a Click Table Cell already addressed by its row's unique value and its column
+                # (2026-10-01): a positional index on top of that would be wrong, not extra
+                continue
             if cands:
                 hint['anchor_candidates'] = [dict(c) for c in cands]
             example = hint.get('call_example')
@@ -3435,6 +3963,258 @@ class DomElementCompiler:
             return ' '.join(css_class) if isinstance(css_class, list) else (css_class if css_class else None)
         except Exception:
             return None
+
+    # ------------------------------------------------ control facts (PA-09, ported 2026-10-07)
+    # The product's door-B consultation's top ask (Claude-CRT c146ff5 C1/C2/C3): the agent reached for
+    # `eval outerHTML` because the card said nothing about a control's tag, role, classes, read-only/disabled
+    # state or whether its list was open. These are FACTS read off the node -- never a judgement -- so a reader
+    # can choose a keyword without reading markup. The brain already carried the base facts in another shape
+    # (element_details.tag/type/attributes, behavioral_metadata.is_readonly/is_disabled/is_expanded -- each only
+    # when true -- and dropdown.options); this block states them explicitly (False kept), adds what the brain did
+    # not carry, and is ADDITIVE: no hint is changed here. The half of c146ff5 that changes calls
+    # (`_gesture_hints`: PA-12's list-opener lead, PA-11's decoy xpath) is NOT ported -- PA-12 is held for a live
+    # proof per org, PA-11 is its own register row.
+    CONTROL_FACT_TAGS = ('input', 'textarea', 'select', 'button', 'a')
+    _BOX_TAGS = ('fieldset', 'records-record-layout-item')
+
+    @staticmethod
+    def _class_tokens(tag) -> list:
+        cls = tag.get('class') or []
+        toks = cls if isinstance(cls, list) else str(cls).split()
+        return [t for t in toks if t][:16]
+
+    def _is_form_box(self, node) -> bool:
+        if not getattr(node, 'name', None):
+            return False
+        if node.name in self._BOX_TAGS:
+            return True
+        for tok in self._class_tokens(node):
+            if tok == 'slds-form-element' or (tok.startswith('slds-form-element_')
+                                              and not tok.startswith('slds-form-element__')):
+                return True
+        return False
+
+    def _form_box(self, tag, max_hops=8):
+        n, d = tag.parent, 1
+        while n is not None and d <= max_hops:
+            if self._is_form_box(n):
+                return n
+            n, d = n.parent, d + 1
+        return None
+
+    @staticmethod
+    def _bool_attr(attrs, name) -> bool:
+        v = attrs.get(name)
+        return v is not None and str(v).lower() != 'false'
+
+    def _expanded_state(self, tag, attrs):
+        """True / False when the node (or the dropdown trigger it sits in) says whether its list is open; None
+        when nothing on the page says (COULD-NOT-CHECK, never 'closed')."""
+        ae = attrs.get('aria-expanded')
+        if ae in ('true', 'false'):
+            return ae == 'true'
+        if attrs.get('role') not in ('combobox', 'listbox') and tag.name != 'select':
+            return None
+        n, d = tag.parent, 1
+        while n is not None and d <= 4:
+            toks = self._class_tokens(n)
+            if any(t.startswith('slds-dropdown-trigger') for t in toks):
+                return 'slds-is-open' in toks
+            if n.get('aria-expanded') in ('true', 'false'):
+                return n.get('aria-expanded') == 'true'
+            n, d = n.parent, d + 1
+        return None
+
+    def _committed_lookup(self, tag, attrs) -> bool:
+        """A read-only combobox holding a SAVED selection: a data-value, or its own Clear button within 3 parents."""
+        if attrs.get('data-value'):
+            return True
+        n = tag.parent
+        for _ in range(3):
+            if n is None:
+                break
+            if n.find('button', attrs={'data-clear-selection-button': True}) is not None or any(
+                    (b.get('title') or '').startswith('Clear') and (b.get('title') or '').endswith('Selection')
+                    for b in n.find_all('button')):
+                return True
+            n = n.parent
+        return False
+
+    def _stable_click_value(self, attrs, real_tag):
+        """The IDENTIFYING value a ClickItem matches, by the same ladder `_get_qforce_hints` ranks: name, data-*,
+        field-label, title / aria-label, data-value, placeholder -- not generated -- else none. A value every box of
+        its kind shares (a checkbox's `type`, a role, a class) is not identifying, so it is never offered here (the
+        rule of `_settle_bare_click_items`, register PA-10). The parser describes; it bakes no anchor (D14)."""
+        for name in ('data-target-selection-name', 'name', 'field-label', 'title', 'aria-label', 'data-label',
+                     'data-value', 'placeholder'):
+            v = attrs.get(name)
+            if v and not self.classifier.is_dynamic_value(str(v)):
+                return name, str(v)
+        return None, None
+
+    def _control_facts(self, tag, element_type, attrs, real_tag, label_text, dropdown_data) -> dict:
+        if real_tag not in self.CONTROL_FACT_TAGS and not attrs.get('role'):
+            return {}
+        facts = {
+            'tag': real_tag,
+            'type': attrs.get('type'),
+            'role': attrs.get('role'),
+            'class_tokens': self._class_tokens(tag),
+            'readonly': self._bool_attr(attrs, 'readonly') or attrs.get('aria-readonly') == 'true',
+            'disabled': self._bool_attr(attrs, 'disabled') or attrs.get('aria-disabled') == 'true',
+        }
+        exp = self._expanded_state(tag, attrs)
+        if exp is not None or attrs.get('role') in ('combobox', 'listbox') or real_tag == 'select':
+            facts['expanded'] = exp           # None = nothing on the page says (COULD-NOT-CHECK)
+        source, value = self._stable_click_value(attrs, real_tag)
+        if value:
+            facts['click_item'] = {'keyword': 'click_item', 'value': value, 'attribute': source, 'tag': real_tag,
+                                   'anchor_candidates': []}
+        # F12: a native <select> lists its options (the parser always read them into dropdown.options)
+        if real_tag == 'select':
+            opts = (dropdown_data or {}).get('options') or []
+            facts['options'] = [(o.get('label') or o.get('value')) if isinstance(o, dict) else str(o) for o in opts
+                                if ((o.get('label') or o.get('value')) if isinstance(o, dict) else o)]
+            facts['multiple'] = self._bool_attr(attrs, 'multiple')
+        # C3, the FACT only: a READ-ONLY input[role=combobox] with no saved selection is a list opener
+        if (real_tag == 'input' and attrs.get('role') == 'combobox' and facts['readonly']):
+            if self._committed_lookup(tag, attrs):
+                facts['saved_lookup'] = True
+            else:
+                facts['list_opener'] = True
+        # C2, the FACT only: an editable input with a READ-ONLY input before it in its own form element (a display
+        # decoy that a label resolver reaches first)
+        if real_tag in ('input', 'textarea') and not facts['readonly'] and not facts['disabled'] and label_text:
+            box = self._form_box(tag)
+            if box is not None:
+                before = []
+                for e in box.find_all(['input', 'textarea']):
+                    if e is tag:
+                        break
+                    before.append(e)
+                if any(self._bool_attr(e.attrs, 'readonly') for e in before):
+                    facts['readonly_decoy_before'] = True
+        return facts
+
+    def finish_control_facts(self, elements, soup=None):
+        """C1: after the anchor passes, every control's facts carry its anchor candidates (never baked into a call:
+        D14, F10) and its ClickItem alternative carries them too, with partial_match=False noted when a candidate's
+        text occurs more than once in the page's text INCLUDING hidden text -- QWeb matches an anchor by substring,
+        so a hidden copy ('Kickoff Workshop' matched 2 in door-B run 2) breaks it. No hint is touched."""
+        texts = []
+        if soup is not None:
+            for s in soup.find_all(string=True):
+                t = ' '.join(str(s).split())
+                if t:
+                    texts.append(t)
+        cache = {}
+
+        def hits(text):
+            if text not in cache:
+                cache[text] = sum(1 for t in texts if text in t)
+            return cache[text]
+
+        for el in elements:
+            facts = el.get('control_facts') if isinstance(el, dict) else None
+            if not isinstance(facts, dict):
+                continue
+            cands = list(((el.get('disambiguation') or {}).get('anchor_candidates')) or [])
+            if not cands:
+                for h in (el.get('qforce_hints') or {}).get('locator_options') or []:
+                    if h.get('anchor_candidates'):
+                        cands = list(h['anchor_candidates'])
+                        break
+            out = []
+            for c in cands:
+                c = dict(c)
+                if texts and c.get('text'):
+                    c['substring_hits'] = hits(c['text'])
+                out.append(c)
+            facts['anchor_candidates'] = out
+            facts['anchor_resolves'] = ('an anchor resolves to the NEAREST candidate in ANY direction (QWeb '
+                                        'proximity), not the next one below or after the label')
+            ci = facts.get('click_item')
+            if isinstance(ci, dict):
+                ci['anchor_candidates'] = out
+                repeated = [c['text'] for c in out if (c.get('substring_hits') or 0) > 1]
+                if repeated:
+                    ci['partial_match'] = False
+                    ci['partial_match_why'] = ('%r occurs %d times in the page text (hidden copies included); QWeb '
+                                               'matches an anchor by substring, so pin partial_match=False'
+                                               % (repeated[0], hits(repeated[0])))
+        return elements
+
+    # ---------------------------------------- record-page readers (PA-13, ported 2026-10-07)
+    _HIGHLIGHTS_TAGS = ('records-highlights-details-item',)
+    _RECORD_LAYOUT_TAGS = ('records-record-layout-item',)
+
+    def scope_record_page_readers(self, elements):
+        """PA-13 (ported from the product, Claude-CRT c146ff5 C5; parser-one step 1, 2026-10-07): a record page
+        renders a field in its highlights panel AND in its Details tab. get_field_value / verify_field resolve
+        ONLY the Details copy -- the brain's own qforce_lite.get_field_value walks
+        `//records-record-layout-item[.//*[normalize-space(text())="<label>"]]` first and indexes THAT match
+        set (`_field_xpath_chain`), and the licensed QForce VerifyField did the same on door-B's Lead record page
+        (`VerifyField  Company  index=2`, COULD-NOT-CHECK after 24.9 s) -- so counting both copies made the
+        unique Details copy `index=2`, a call with no second match. Members are re-counted among the copies the
+        reader resolves; a highlights copy keeps no index (the keyword reads the Details copy for it) and says
+        so. The same rule as D4: one own member -> no index; several -> their rank among themselves.
+        `group_size` stays the PAGE-WIDE count (wave-2 F5); `reader_count` is the reader's own count."""
+        def tag_of(el):
+            return ((el.get('element_details') or {}).get('tag') or '').lower()
+
+        groups = {}
+        for el in elements:
+            if not isinstance(el, dict) or el.get('element_type') != 'output_field':
+                continue
+            label = self._norm_label((el.get('identification') or {}).get('label_text'))
+            if label:
+                groups.setdefault(label, []).append(el)
+        for members in groups.values():
+            high = [e for e in members if tag_of(e) in self._HIGHLIGHTS_TAGS]
+            read = [e for e in members if tag_of(e) in self._RECORD_LAYOUT_TAGS]
+            if not high and not read:
+                continue
+            # the reader's own count: a same-label LINK or button elsewhere on the page (a related-list filter
+            # 'Phone', the Path's 'Lead Status') is no match for get_field_value either, so it never shifts the rank
+            if not high and all(((e.get('disambiguation') or {}).get('group_size') or 1) == len(read) for e in read):
+                continue
+            for e in high:
+                self._restamp_index(e, None, size=0)
+                dis = e.get('disambiguation') or {}
+                dis['region'] = 'highlights_panel'
+                dis['scope_index'] = ('highlights panel copy: get_field_value/verify_field read the Details tab '
+                                      'copy of this field (records-record-layout-item), never this one')
+                e['disambiguation'] = dis
+            for i, e in enumerate(read, 1):
+                self._restamp_index(e, i if len(read) > 1 else None, size=len(read))
+                if len(read) <= 1:
+                    dis = e.get('disambiguation') or {}
+                    dis['scope_index'] = 'unique among the copies the reader resolves (the highlights copy is not one)'
+                    e['disambiguation'] = dis
+        return elements
+
+    @staticmethod
+    def _restamp_index(el, new, size=None):
+        dis = el.get('disambiguation')
+        if isinstance(dis, dict):
+            # group_size stays the PAGE-WIDE count (F5: it never under-counts a label that repeats on the page);
+            # `reader_count` is how many of those copies the reading keyword resolves, and `index` ranks among them
+            dis['reader_count'] = size if new is not None else (0 if size is None else size)
+            if new is None:
+                dis.pop('index', None)
+                if dis.get('anchor_kind') == 'index':
+                    dis.pop('anchor_kind', None)
+            else:
+                dis['index'] = new
+        for h in (el.get('qforce_hints') or {}).get('locator_options') or []:
+            ce = h.get('call_example')
+            if isinstance(ce, str):
+                h['call_example'] = (re.sub(r',\s*index=\d+', '', ce) if new is None
+                                     else re.sub(r'index=\d+', 'index=%d' % new, ce))
+            if new is None:
+                h['caveats'] = [c for c in (h.get('caveats') or []) if 'call_example carries index=' not in c]
+                if h.get('disambiguated_by') == 'index':
+                    h.pop('disambiguated_by', None)
 
     def _prune_empty_values(self, data):
         if isinstance(data, dict):

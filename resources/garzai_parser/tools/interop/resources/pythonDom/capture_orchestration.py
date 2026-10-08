@@ -204,6 +204,50 @@ def _emit_row_controls(container, config, compiler, seen_node_ids):
             break
 
 
+def _emit_host_members(soup, config, compiler, seen_node_ids, skip_ids):
+    """parser-one step 3 P3 (2026-10-07): the members a template `hostFamilyRules` rule marks `emitMembers` -- nodes
+    no other pass visits (a dual listbox's two `ul[role=listbox]` panes) or would skip as a dropdown value (its
+    `div[role=option]` options) -- are emitted IN DOCUMENT ORDER under their host, each through the normal compiler
+    so it carries its family, label and hints. v3's `listbox` / `option` families with `collapseToHost: false`:
+    the group row stays, and its panes and visible options are listed beside it."""
+    spec = getattr(config, 'HOST_FAMILY_RULES', None) or {}
+    if not spec or spec.get('enabled') is False:
+        return
+    rules = [r for r in (spec.get('rules') or []) if r.get('emitMembers')]
+    if not rules:
+        return
+    hosts = {t.lower() for r in rules for t in (r.get('hostTags') or [])}
+    for host in soup.find_all(lambda t: t.name and t.name.lower() in hosts):
+        members = []
+        for node in host.find_all(True):
+            if id(node) in seen_node_ids or id(node) in skip_ids or config._is_noise(node):
+                continue
+            rule = compiler.classifier.host_rule_for(node)
+            if rule is not None and rule.get('emitMembers'):
+                members.append((node, rule))
+        # `maxMembersPerHost` (the Gz Read Page budget, README section 5): a host holding MORE members of a rule
+        # than one plan page lists none of them -- all or nothing, never a truncated list -- and every row it does
+        # emit says so (`members_not_listed`), so the elision is never silent. 81 metadata-type options in one
+        # Copado dual listbox are driven by Multi Pick List on the group, not read one by one.
+        held = []
+        for rule in rules:
+            cap = rule.get('maxMembersPerHost')
+            n = sum(1 for _node, r in members if r is rule)
+            if cap and n > int(cap):
+                held.append({'family': rule.get('family'), 'count': n, 'max_members_per_host': int(cap)})
+        held_families = {h['family'] for h in held}
+        for node, rule in members:
+            if rule.get('family') in held_families:
+                seen_node_ids.add(id(node))     # held, not dropped by accident: no later pass re-emits it
+                continue
+            data = compiler._extract_element_data(node, is_custom=True)
+            if data and data.get('element_type') not in config.SKIP_ELEMENT_TYPES:
+                if held:
+                    data['members_not_listed'] = [dict(h) for h in held]
+                seen_node_ids.add(id(node))
+                yield data
+
+
 class ElementList(list):
     """The element list, plus `.template` -- the PROVENANCE block naming the
     template file that produced this parse (interop T18, 2026-09-07).
@@ -295,6 +339,12 @@ def parse_elements_from_html(raw_html: str, config=None,
     # all read from the installed source, not assumed).  The anchor half was
     # already done by the seed above; this pins the flag.
     compiler.annotate_substring_collisions(elements)
+    # PA-13 (ported from the product 2026-10-07, parser-one step 1): a record page's highlights-panel copy of a
+    # field is not counted with the Details copy the readers resolve (get_field_value / verify_field).
+    compiler.scope_record_page_readers(elements)
+    # PA-09 (ported from the product 2026-10-07): each control's facts gain its anchor candidates and its
+    # ClickItem alternative's. Facts only -- the product's call-changing half (_gesture_hints) is not ported.
+    compiler.finish_control_facts(elements, soup=soup)
     # D14 2026-09-09: LAST -- after every pass that could have written a
     # confidence value, so there is exactly one place the two allowed states
     # ('unverified' / 'verified') are decided, and only the POM store can say
@@ -421,10 +471,17 @@ def _classify_soup(soup, config, text_engine, classifier, compiler, is_frame_con
                 continue
             if inside and tag.find_parent(lambda p: p.name and p.name.lower() in inside) is not None:
                 continue      # the base component's own inner structure: its host row already exists
+            if any(tag.find(t) is not None for t in (rule.get('skipIfDescendantTags') or [])):
+                continue      # parser-one P8: the wrapper's own <input> is the control (hostFamilyRules claims it)
             element_data = compiler._extract_element_data(tag, is_custom=True)
             if element_data and element_data.get("element_type") not in config.SKIP_ELEMENT_TYPES:
                 seen_node_ids.add(id(tag))
                 elements.append(element_data)
+
+    # parser-one step 3 P3 (2026-10-07): a host's emitMembers (a dual listbox's panes and visible options), in
+    # document order under the host, BEFORE the role pass below would meet the options one by one.
+    for element_data in _emit_host_members(soup, config, compiler, seen_node_ids, datatable_descendants):
+        elements.append(element_data)
 
     interactive_roles = config.INTERACTIVE_ROLES
     for tag in soup.find_all(attrs={"role": lambda r: r in interactive_roles}):

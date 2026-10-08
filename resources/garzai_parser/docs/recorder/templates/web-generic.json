@@ -283,6 +283,14 @@
   "grid",
   "treegrid"
  ],
+ "recordLayoutFieldRules": {
+  "_why_cds_table_cell": "2026-10-06 (CRAWLER-REVIEW-2026-10-06 section 10 row 10; the crawl-fix-2 stream). Copado's Angular app (na.devops.copado.com, Data Template list) renders each template name as <cds-table-cell role=\"link\"><span class=\"ctcell__value\">GarzAI API Template 17:40</span></cds-table-cell>. The inner_text rung is CODE-gated to button/a/role=button (element_compiler._label_candidate), so a non-native role=link control got NO label from any rung: 64 of 64 on each Data Template list capture (docs/recorder/review/cicd-demo-data-template-new/capture.html, .../capture-main-object-list-open.html). This key is a dict MERGED over the class default (dom_config._cast_template_value), so containerTags/readModeMarkerClassFragments/family keep their defaults; only the per-tag label class is added, read by the label_span rung for THIS tag alone -- the cell's visible value is the link's name. A role=button cell whose value span holds only an icon (commit experience) still has no label, measured unchanged.",
+  "labelClassFragmentsByTag": {
+   "cds-table-cell": [
+    "ctcell__value"
+   ]
+  }
+ },
  "gridDescendantEmission": {
   "_why": "No generic-web equivalent of lightning-tree-grid exists, so nothing is exploded. A real <table> is already reached through targetTags/interactiveRoles and _in_grid_container.",
   "containerTags": [],
@@ -291,16 +299,26 @@
  "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
  "labelPrecedence": [
   "inner_text",
+  "input_value",
   "aria_label",
   "standard_label",
   "aria_labelledby",
+  "table_row_label",
   "placeholder",
   "title_attr",
   "sibling_label_text",
   "label_span",
+  "label_ancestor",
   "assistive_text"
  ],
- "note_assistiveTextClassFragments": "assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
+ "_why_label_ancestor": "parser-one P6 (2026-10-07; v3 web-generic.v3.json label source `label-ancestor`): a form control WRAPPED in its <label> is named by that label's visible text -- the implicit HTML association. Ant Design's radios (`<label class=ant-radio-button-wrapper><span><input type=radio></span><span>topRight</span></label>`) parsed unlabelled and with no call here; generic-web markup-label recall was v3's one platform lead (99.0% vs 85.9%). Late on purpose: every explicit association above still wins.",
+ "tableRowLabel": {
+  "labelCellClassFragments": [
+   "labelCol"
+  ]
+ },
+ "note_tableRowLabel": "2026-10-07 (F19, the product's harness runs on dev1 New Permission Set and gzchores Add Picklist Values): a classic form row -- Visualforce pageBlockSectionItem, a classic Setup edit form -- puts the visible label in a cell whose class carries one of labelCellClassFragments and the control in the data cell after it; the row's <label for> often names a wrapper id, never the control. The `table_row_label` rung of labelPrecedence reads that cell (after the association rungs, before placeholder / title). `input_value` names an <input type=submit|button|reset> by its value, the text QWeb's ClickText matches.",
+ "note_assistiveTextClassFragments":"assistiveTextClassFragments: class fragments marking SCREEN-READER-ONLY text. Text inside one of these is stripped from every visible-label candidate and is only offered by the last `assistive_text` rung of labelPrecedence, with its own label_source. Added by the wave-2 review close (stream P1, 2026-09-07, finding F11) -- was a literal tuple in element_compiler.py, which is why 'inner_text' concatenated 'Show more navigation items' onto the visible '* More'.",
  "assistiveTextClassFragments": [
   "sr-only",
   "visually-hidden",
