@@ -1,0 +1,286 @@
+=== newcase  https://slockard-dev-ed.lightning.force.com/lightning/r/Account/0017Q000004biw8QAA/view
+GZ READ PAGE slockard|/lightning/r/Account/{id}/view -- 97 controls to act on (fresh read)
+  26 of 97 calls passed live before (# verified, from the job's store); the rest are derived from this page
+ 1. Follow [button] ClickText    Follow    partial_match=False    # verified x1
+ 2. Edit (1 of 2) [button] ClickText    Edit    partial_match=False    # verified x1
+ 3. Create New Product Request [button] ClickText    Create New Product Request    partial_match=False    # verified x1
+ 4. Book Appointment [button] ClickText    Book Appointment    partial_match=False    # verified x1
+ 5. Show more actions (screen-reader text) [button] ClickText    Show more actions    partial_match=False    # verified x1
+ 6. View Account Hierarchy [button] ClickItem    View Account Hierarchy    tag=button    partial_match=False    # verified x1
+ 7. Type [value] GetFieldValue    Type    # verified x1
+ 8. Phone (1 of 2) [value] GetFieldValue    Phone    # verified x1
+ 9. (512) 757-6000 (1 of 3) [link] ClickText    (512) 757-6000    partial_match=False
+10. Website [value] GetFieldValue    Website    # verified x1
+11. http://edgecomm.com [link] ClickText    http://edgecomm.com    partial_match=False
+12. Account Owner [value] GetFieldValue    Account Owner    # verified x1
+13. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="Account Owner"]/following::a)[1]
+14. Preview (1 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    # verified x1
+15. Change Owner [button] ClickItem    Change Owner    tag=button    partial_match=False    anchor=2    # verified x1
+16. Account Site [value] GetFieldValue    Account Site
+17. Industry [value] GetFieldValue    Industry    # verified x1
+18. Related [link] ClickText    Related    partial_match=False    # verified x1
+19. Details [link] ClickText    Details    partial_match=False    # verified x1
+20. Contacts (2) [link] ClickText    Contacts    partial_match=False    # verified x1
+  not listed: 46 chrome (Gz Read Page    include_chrome=True lists them); 1 with no call (Gz Show    <label> says why); 67 hidden subtrees never captured
+GZ READ PAGE page 1 of 5 ref 4c682792 -- NEXT: Gz Read Page    page=2    (one control in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+GZ READ PAGE slockard|/lightning/r/Account/{id}/view -- 97 controls to act on (same page as the last read)
+  26 of 97 calls passed live before (# verified, from the job's store); the rest are derived from this page
+21. New (1 of 8) [button] ClickText    New    partial_match=False
+22. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="Details"]/following::*[normalize-space(text())\="New"])[1]/following::a[1]
+23. Preview (2 of 12) [button] ClickText    Preview    anchor=2    partial_match=False
+24. sean@edge.com [link] ClickText    sean@edge.com    partial_match=False
+25. (512) 757-6000 (2 of 3) [link] ClickText    (512) 757-6000    anchor=2    partial_match=False
+26. Show Actions (1 of 11) (screen-reader text) [button] ClickText    Show Actions    partial_match=False
+27. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="sean@edge.com"]/following::*[normalize-space(text())\="(512) 757-6000"])[1]/following::a[1]
+28. Preview (3 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=3
+29. rose@edge.com [link] ClickText    rose@edge.com    partial_match=False
+30. (512) 757-6000 (3 of 3) [link] ClickText    (512) 757-6000    anchor=3    partial_match=False
+31. Show Actions (2 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=2    partial_match=False
+32. View All (1 of 4) [link] ClickText    View All    partial_match=False    # verified x1
+33. Opportunities (6+) [link] ClickText    Opportunities (6+)    partial_match=False
+34. New (2 of 8) [button] ClickText    New    anchor=2    partial_match=False
+35. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="rose@edge.com"]/following::*[normalize-space(text())\="New"])[1]/following::a[1]
+36. Preview (4 of 12) [button] ClickText    Preview    anchor=4    partial_match=False
+37. Show Actions (3 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=3    partial_match=False
+38. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="CPQ API 13117504"]/following::a)[1]
+39. Preview (5 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=5
+40. Show Actions (4 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=4    partial_match=False
+  not listed: 46 chrome (Gz Read Page    include_chrome=True lists them); 1 with no call (Gz Show    <label> says why); 67 hidden subtrees never captured
+GZ READ PAGE page 2 of 5 ref c4b01500 -- NEXT: Gz Read Page    page=3    (one control in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+GZ READ PAGE slockard|/lightning/r/Account/{id}/view -- 97 controls to act on (same page as the last read)
+  26 of 97 calls passed live before (# verified, from the job's store); the rest are derived from this page
+41. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="CPQ API 13108668"]/following::a)[1]
+42. Preview (6 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=6
+43. Show Actions (5 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=5    partial_match=False
+44. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="CPQ API 13176872"]/following::a)[1]
+45. Preview (7 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=7
+46. Show Actions (6 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=6    partial_match=False
+47. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="USD 2,710,000.00"]/following::a)[1]
+48. Preview (8 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=8
+49. Show Actions (7 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=7    partial_match=False
+50. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="USD 800,000.00"]/following::a)[1]
+51. Preview (9 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=9
+52. Show Actions (8 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=8    partial_match=False
+53. View All (2 of 4) [link] ClickText    View All    anchor=2    partial_match=False
+54. Quotes (0) [link] ClickText    Quotes (0)    partial_match=False
+55. New (3 of 8) [button] ClickText    New    anchor=3    partial_match=False
+56. Contracts (0) [link] ClickText    Contracts (0)    partial_match=False
+57. New (4 of 8) [button] ClickText    New    anchor=4    partial_match=False
+58. Contracted Prices (0) [link] ClickText    Contracted Prices (0)    partial_match=False
+59. New (5 of 8) [button] ClickText    New    anchor=5    partial_match=False
+60. Assets (0) [link] ClickText    Assets (0)    partial_match=False
+  not listed: 46 chrome (Gz Read Page    include_chrome=True lists them); 1 with no call (Gz Show    <label> says why); 67 hidden subtrees never captured
+GZ READ PAGE page 3 of 5 ref 9756f76d -- NEXT: Gz Read Page    page=4    (one control in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+GZ READ PAGE slockard|/lightning/r/Account/{id}/view -- 97 controls to act on (same page as the last read)
+  26 of 97 calls passed live before (# verified, from the job's store); the rest are derived from this page
+61. New (6 of 8) [button] ClickText    New    anchor=6    partial_match=False
+62. Subscriptions (0) [link] ClickText    Subscriptions (0)    partial_match=False
+63. New (7 of 8) [button] ClickText    New    anchor=7    partial_match=False
+64. Cases (3) [link] ClickText    Cases (3)    partial_match=False
+65. New (8 of 8) [button] ClickText    New    anchor=8    partial_match=False
+66. Preview (10 of 12) [button] ClickText    Preview    anchor=10    partial_match=False
+67. Rose Gonzalez [link] ClickText    Rose Gonzalez    partial_match=False
+68. Starting generator after electrical failure [link] ClickText    Starting generator after electrical failure    partial_match=False
+69. Show Actions (9 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=9    partial_match=False
+70. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="High"]/following::a)[1]
+71. Preview (11 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=11
+72. Sean Forbes (1 of 2) [link] ClickText    Sean Forbes    partial_match=False
+73. Shutting down of generator [link] ClickText    Shutting down of generator    partial_match=False
+74. Show Actions (10 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=10    partial_match=False
+75. (no label) [link] ClickElement    xpath\=(//*[normalize-space(text())\="Shutting down of generator"]/following::a)[1]
+76. Preview (12 of 12) [button] ClickItem    Preview    tag=button    partial_match=False    anchor=12
+77. Sean Forbes (2 of 2) [link] ClickText    Sean Forbes    anchor=2    partial_match=False
+78. Cannot start generator after electrical failure [link] ClickText    Cannot start generator after electrical failure    partial_match=False
+79. Show Actions (11 of 11) (screen-reader text) [button] ClickText    Show Actions    anchor=11    partial_match=False
+80. View All (3 of 4) [link] ClickText    View All    anchor=3    partial_match=False
+  not listed: 46 chrome (Gz Read Page    include_chrome=True lists them); 1 with no call (Gz Show    <label> says why); 67 hidden subtrees never captured
+GZ READ PAGE page 4 of 5 ref 45b88f7c -- NEXT: Gz Read Page    page=5    (one control in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+GZ READ PAGE slockard|/lightning/r/Account/{id}/view -- 97 controls to act on (same page as the last read)
+  26 of 97 calls passed live before (# verified, from the job's store); the rest are derived from this page
+81. Notes & Attachments (0) [link] ClickText    Notes & Attachments (0)    partial_match=False
+82. Upload Files [button] ClickText    Upload Files    partial_match=False
+83. Activity (1 of 2) [link] ClickText    Activity    partial_match=False    # verified x1
+84. Chatter (2 of 2) [link] ClickText    Chatter    partial_match=False    anchor=2    # verified x1
+85. New Task (1 of 2) [button] ClickItem    New Task    partial_match=False    tag=button    # verified x1
+86. No Additional New Task Actions [button] ClickItem    No Additional New Task Actions    tag=button    partial_match=False    # verified x1
+87. Timeline Settings [button] ClickItem    Timeline Settings    tag=button    partial_match=False    # verified x1
+88. Refresh [button] ClickText    Refresh    partial_match=False    # verified x1
+89. Expand All [button] ClickText    Expand All    partial_match=False    # verified x1
+90. View All (4 of 4) [button] ClickText    View All    anchor=4    partial_match=False
+91. Upcoming & Overdue (1 of 2) [button] ClickText    Upcoming & Overdue    partial_match=False    # verified x1
+92. Show All Activities [button] ClickText    Show All Activities    partial_match=False    # verified x1
+93. Dismiss [button] ClickText    Dismiss    partial_match=False
+94. Contact Name (1 of 2) [field] TypeText    Contact Name    <value>
+95. Status New [link] ClickText    Status New    partial_match=False
+96. Subject (1 of 2) [field] TypeText    Subject    <value>
+97. Description [text area] TypeText    Description    <value>
+  not listed: 46 chrome (Gz Read Page    include_chrome=True lists them); 1 with no call (Gz Show    <label> says why); 67 hidden subtrees never captured
+GZ READ PAGE page 5 of 5 ref a2d1a74a -- END of the page plan (97 controls; one in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+--- Gz Show Status
+RAISED: GZ SHOW "Status": COULD-NOT-CHECK -- no control with this label on slockard|/lightning/r/Account/{id}/view; closest: Status New, Contacts, Setup
+--- Gz Show Contact Name
+GZ SHOW "Contact Name" -- 1 control with this label on slockard|/lightning/r/Account/{id}/view
+#1 [field, <input>] member 1 of 2; label from standard_label; listed
+  rung 1 keyword     TypeText    Contact Name    <value>    (parser: TypeText by its label (standard_label))
+  rung 2 placeholder TypeText    Search Contacts...    <value>    (the field's placeholder text)
+  rung 3 xpath       TypeText    xpath\=//input[@title\="Search Contacts"]    <value>    (relative xpath, unique in the capture (stable_attr))
+  rung 4 xpath       TypeText    xpath\=//input[@placeholder\="Search Contacts..."]    <value>    (relative xpath, unique in the capture (stable_attr))
+  rung 5 xpath       TypeText    xpath\=//label[normalize-space(.)\="Contact Name"]/following::input[1]    <value>    (relative xpath, unique in the capture (label_association))
+  rung 6 xpath       TypeText    xpath\=//label[contains(normalize-space(.),"Contact Name")]/following::input[1]    <value>    (relative xpath, unique in the capture (label_association))
+  rung 7 xpath       TypeText    xpath\=(//*[normalize-space(text())\="Contact Name"]/following::input[@type\="text"])[1]    <value>    (relative xpath, unique in the capture (unique_preceding_text))
+  store: unknown-control -- the store knows this page but no input_field-family control labelled 'Contact Name'
+  anchor candidates: Start of Dialog
+  caveat: If this exact label doesn't resolve, try the field's placeholder text instead (anchor= to the field's real label if more than one lookup shares that placeholder) -- both are real, live-confirmed Combo (223 chars; whole text in the run artifact)
+GZ SHOW "Contact Name": use TypeText    Contact Name    <value>
+=== oppnew  https://slockard-dev-ed.lightning.force.com/lightning/o/Opportunity/new
+GZ READ PAGE slockard|/lightning/o/Opportunity/new -- 34 controls to act on (fresh read)
+  3 of 34 calls passed live before (# verified, from the job's store); the rest are derived from this page
+  a modal is open: run UseModal    On before these calls and UseModal    Off once it closes
+ 1. Cancel and close [button] ClickItem    Cancel and close    tag=button    partial_match=False    # verified x1
+ 2. Opportunity Owner [value] GetFieldValue    Opportunity Owner
+ 3. Select a date for Close Date [button] ClickItem    Select a date for Close Date    tag=button    partial_match=False
+ 4. Opportunity Name [field] TypeText    xpath=//lightning-primitive-input-simple[@variant\="label-stacked"]//input[@name\="Name"]    <value>    clear_key={CONTROL + a}    # verified x3
+ 5. Stage [picklist] PickList    Stage    <option>
+ 6. Probability (%) [field] TypeText    Probability (%)    <value>
+ 7. Type [picklist] PickList    Type    <option>
+ 8. Lead Source [picklist] PickList    Lead Source    <option>
+ 9. Amount [field] TypeText    Amount    <value>
+10. Next Step [field] TypeText    Next Step    <value>
+11. Opportunity Currency [picklist] PickList    Opportunity Currency    <option>
+12. Solution Type [picklist] PickList    Solution Type    <option>
+13. View all dependencies (1 of 2) [link] ClickText    View all dependencies    partial_match=False
+14. Product of Interest [picklist] PickList    Product of Interest    <option>
+15. View all dependencies (2 of 2) [link] ClickText    View all dependencies    anchor=2    partial_match=False
+16. Description [text area] TypeText    Description    <value>
+17. Contracted Help Info (screen-reader text) [button] ClickText    Contracted Help Info    partial_match=False
+18. Contracted [checkbox] ClickCheckbox    Contracted    <on|off>
+19. Primary Quote Help Info (screen-reader text) [button] ClickText    Primary Quote Help Info    partial_match=False
+20. Renewal Help Info (screen-reader text) [button] ClickText    Renewal Help Info    partial_match=False
+  not listed: 43 behind the open modal; 20 layout wrapper of an editable field; 37 hidden subtrees never captured
+GZ READ PAGE page 1 of 2 ref 2035a520 -- NEXT: Gz Read Page    page=2    (one control in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+GZ READ PAGE slockard|/lightning/o/Opportunity/new -- 34 controls to act on (same page as the last read)
+  3 of 34 calls passed live before (# verified, from the job's store); the rest are derived from this page
+  a modal is open: run UseModal    On before these calls and UseModal    Off once it closes
+21. Renewal [checkbox] ClickCheckbox    Renewal    <on|off>
+22. Create Contracted Prices Help Info (screen-reader text) [button] ClickText    Create Contracted Prices Help Info    partial_match=False
+23. Create Contracted Prices [checkbox] ClickCheckbox    Create Contracted Prices    <on|off>
+24. Renewed Contract Help Info (screen-reader text) [button] ClickText    Renewed Contract Help Info    partial_match=False
+25. Amended Contract Help Info (screen-reader text) [button] ClickText    Amended Contract Help Info    partial_match=False
+26. Cancel [button] ClickText    Cancel    partial_match=False
+27. Save & New [button] ClickText    Save & New    partial_match=False
+28. Save (1 of 2) [button] ClickText    Save    partial_match=False    # verified x7
+29. Close Date [date] TypeText    Close Date    <date>
+30. Account Name [lookup] ComboBox    Account Name    <record name>
+31. Price Book [lookup] ComboBox    Price Book    <record name>
+32. Primary Quote [lookup] ComboBox    Primary Quote    <record name>
+33. Renewed Contract [lookup] ComboBox    Renewed Contract    <record name>
+34. Amended Contract [lookup] ComboBox    Amended Contract    <record name>
+  not listed: 43 behind the open modal; 20 layout wrapper of an editable field; 37 hidden subtrees never captured
+GZ READ PAGE page 2 of 2 ref 7a773d44 -- END of the page plan (34 controls; one in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+--- Gz Show Account Name
+GZ SHOW "Account Name" -- 2 controls with this label on slockard|/lightning/o/Opportunity/new
+#1 [value, <records-record-layout-item>] label from label_span; not listed by Gz Read Page: layout wrapper of an editable field -- wraps row 92
+  rung 1 keyword     GetFieldValue    Account Name    (parser: GetFieldValue by its label (label_span))
+  rung 2 xpath       ClickElement    xpath\=//records-record-layout-item[@field-label\="Account Name"]    (relative xpath, unique in the capture (stable_attr))
+  rung 3 xpath       ClickElement    xpath\=(//*[normalize-space(text())\="Stage"]/following::records-record-layout-item)[1]    (relative xpath, unique in the capture (unique_preceding_text))
+  rung 4 xpath       ClickElement    xpath\=//records-record-layout-item[.//*[normalize-space(.)\="Account Name"]]    (relative xpath, unique in the capture (text_tag))
+  rung 5 xpath       ClickElement    xpath\=//records-record-layout-block//records-record-layout-item[@field-label\="Account Name"]    (relative xpath, unique in the capture (scoped_attr))
+  store: unknown-control -- the store knows this page but no output_field-family control labelled 'Account Name'
+  anchor candidates: --None--
+  caveat: 'Account Name' appears 2 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one (411 chars; whole text in the run artifact)
+#2 [lookup, <lightning-lookup>] label from label_span; listed
+  rung 1 keyword     ComboBox    Account Name    <record name>    (parser: ComboBox by its label (label_span))
+  rung 2 xpath       ClickElement    xpath\=(//*[normalize-space(text())\="Stage"]/following::lightning-lookup)[1]    (relative xpath, unique in the capture (unique_preceding_text))
+  rung 3 xpath       ClickElement    xpath\=//lightning-lookup[.//*[normalize-space(.)\="Account Name"]]    (relative xpath, unique in the capture (text_tag))
+  store: unknown-control -- the store knows this page but no lookup-family control labelled 'Account Name'
+  anchor candidates: --None--
+  caveat: 'Account Name' appears 2 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one (411 chars; whole text in the run artifact)
+GZ SHOW "Account Name": use ComboBox    Account Name    <record name>
+--- Gz Show Stage
+GZ SHOW "Stage" -- 2 controls with this label on slockard|/lightning/o/Opportunity/new
+#1 [value, <records-record-layout-item>] label from label_span; not listed by Gz Read Page: layout wrapper of an editable field -- wraps row 50
+  rung 1 keyword     GetFieldValue    Stage    (parser: GetFieldValue by its label (label_span))
+  rung 2 xpath       ClickElement    xpath\=//records-record-layout-item[@field-label\="Stage"]    (relative xpath, unique in the capture (stable_attr))
+  rung 3 xpath       ClickElement    xpath\=(//*[normalize-space(text())\="Opportunity Name"]/following::records-record-layout-item)[1]    (relative xpath, unique in the capture (unique_preceding_text))
+  rung 4 xpath       ClickElement    xpath\=//records-record-layout-block//records-record-layout-item[@field-label\="Stage"]    (relative xpath, unique in the capture (scoped_attr))
+  store: unknown-control -- the store knows this page but no output_field-family control labelled 'Stage'
+  anchor candidates: Opportunity Name
+  caveat: 'Stage' appears 2 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one elemen (404 chars; whole text in the run artifact)
+#2 [picklist, <button>] label from aria_label; listed
+  rung 1 keyword     PickList    Stage    <option>    (parser: PickList by its label (aria_label))
+  rung 2 clickitem   ClickItem    Stage    tag=button    partial_match=False    (parser: ClickItem by a stable attribute)
+  rung 3 xpath       ClickElement    xpath\=//button[@aria-label\="Stage"]    (relative xpath, unique in the capture (stable_attr))
+  rung 4 xpath       ClickElement    xpath\=(//*[normalize-space(text())\="Stage"]/following::button[@type\="button"])[1]    (relative xpath, unique in the capture (unique_preceding_text))
+  rung 5 xpath       ClickElement    xpath\=//sfa-input-stage-name//button[@aria-label\="Stage"]    (relative xpath, unique in the capture (scoped_attr))
+  store: unknown-control -- the store knows this page but no dropdown-family control labelled 'Stage'
+  anchor candidates: Opportunity Name
+  caveat: 'Stage' appears 2 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one elemen (404 chars; whole text in the run artifact)
+GZ SHOW "Stage": use PickList    Stage    <option>
+=== nightmare  https://slockard-dev-ed.lightning.force.com/lightning/n/Zoo_Nightmare_Inputs
+GZ READ PAGE slockard|/lightning/n/Zoo_Nightmare_Inputs -- 38 controls to act on (fresh read)
+  14 of 38 calls passed live before (# verified, from the job's store); the rest are derived from this page
+ 1. (no label) [field] TypeText    xpath\=//*[normalize-space(text())\="Contract Term"]/following-sibling::*//input[@type\="text"]    <value>
+ 2. Contract Term (1 of 2) [field] TypeText    Contract Term    <value>    # verified x1
+ 3. Renewal Notice (days) [field] TypeText    Renewal Notice (days)    <value>    # verified x1
+ 4. Amount (1 of 3) [field] TypeText    Amount    <value>
+ 5. Amount (2 of 3) [field] TypeText    Amount    <value>    anchor=2
+ 6. Amount (3 of 3) [field] TypeText    Amount    <value>    anchor=3    # verified x1
+ 7. Approved Budget (1 of 2) [field] TypeText    Approved Budget    <value>
+ 8. Approved Budget (2 of 2) [field] TypeText    Approved Budget    <value>    anchor=2
+ 9. (no label) [button] ClickElement    xpath\=(//*[normalize-space(text())\="Kickoff Workshop"]/following::button)[1]
+10. Start Date (1 of 4) [field] TypeText    Start Date    <value>
+11. End Date (1 of 4) [field] TypeText    End Date    <value>
+12. Billable to customer (1 of 4) [checkbox] ClickCheckbox    Billable to customer    <on|off>
+13. (no label) [button] ClickElement    xpath\=(//*[normalize-space(text())\="Discovery Review"]/following::button)[1]
+14. Start Date (2 of 4) [field] TypeText    Start Date    <value>    anchor=2
+15. End Date (2 of 4) [field] TypeText    End Date    <value>    anchor=2
+16. Billable to customer (2 of 4) [checkbox] ClickCheckbox    Billable to customer    <on|off>    anchor=2
+17. (no label) [button] ClickElement    xpath\=(//*[normalize-space(text())\="Integration Checkpoint"]/following::button)[1]
+18. Start Date (3 of 4) [field] TypeText    Start Date    <value>    anchor=3
+19. End Date (3 of 4) [field] TypeText    End Date    <value>    anchor=3
+20. Billable to customer (3 of 4) [checkbox] ClickCheckbox    Billable to customer    <on|off>    anchor=3
+  not listed: 41 chrome (Gz Read Page    include_chrome=True lists them); 5 with no call (Gz Show    <label> says why); 27 hidden subtrees never captured
+GZ READ PAGE page 1 of 2 ref 614a5266 -- NEXT: Gz Read Page    page=2    (one control in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+GZ READ PAGE slockard|/lightning/n/Zoo_Nightmare_Inputs -- 38 controls to act on (same page as the last read)
+  14 of 38 calls passed live before (# verified, from the job's store); the rest are derived from this page
+21. (no label) [button] ClickElement    xpath\=(//*[normalize-space(text())\="Go-Live Support"]/following::button)[1]
+22. Start Date (4 of 4) [field] TypeText    Start Date    <value>    anchor=4    # verified x1
+23. End Date (4 of 4) [field] TypeText    End Date    <value>    anchor=4    # verified x1
+24. Billable to customer (4 of 4) [checkbox] ClickCheckbox    Billable to customer    <on|off>    anchor=4    # verified x1
+25. Add Line (1 of 2) [button] ClickText    Add Line    partial_match=False
+26. Add Line (2 of 2) [button] ClickText    Add Line    partial_match=False    anchor=2    # verified x1
+27. Save (1 of 2) [button] ClickText    Save    partial_match=False
+28. Save & New [button] ClickText    Save & New    partial_match=False    # verified x1
+29. Save (2 of 2) [button] ClickText    Save    partial_match=False    anchor=2    # verified x1
+30. Territory (1 of 2) [picklist] DropDown    Territory    <option>    # verified x1
+31. Territory (2 of 2) [field] TypeText    Territory    <value>    anchor=2    # verified x1
+32. Coverage Owner [field] TypeText    Coverage Owner    <value>    # verified x1
+33. Product Lines Covered [field] TypeText    Product Lines Covered    <value>
+34. Support Tier [field] TypeText    Support Tier    <value>
+35. Escalation Regions [picklist] DropDown    Escalation Regions    <option>    # verified x1
+36. Dismiss [button] ClickElement    xpath\=(//*[normalize-space(text())\="Just so you know"]/following::button)[1]    # verified x1
+37. Entitled Services [dual list] MultiPickList    Entitled Services    <option>
+38. (no label) [field] TypeText    xpath\=(//*[normalize-space(text())\="More"]/following::c-zoo-nightmare-inputs)[1]    <value>
+  not listed: 41 chrome (Gz Read Page    include_chrome=True lists them); 5 with no call (Gz Show    <label> says why); 27 hidden subtrees never captured
+GZ READ PAGE page 2 of 2 ref 43af1e14 -- END of the page plan (38 controls; one in full: Gz Show    <label>; check a value: Gz Verify    <label>    <value>)
+--- Gz Show Amount
+GZ SHOW "Amount" -- 3 controls with this label on slockard|/lightning/n/Zoo_Nightmare_Inputs
+#1 [field, <input>] member 1 of 3; label from form_element_label; listed
+  rung 1 keyword     TypeText    Amount    <value>    (parser: TypeText by its label (form_element_label))
+  rung 2 xpath       TypeText    xpath\=//*[normalize-space(text())\="List Price"]/following-sibling::*//input[@type\="text"]    <value>    (relative xpath, unique in the capture (sibling_scope))
+  store (verified; the store's verified rung is for member 3 of this repeated label, this is member 1 -- derived): TypeText    Amount    anchor=3  VERIFIED-PASS x1 | ClickElement    xpath\=(//*[normalize-space(text())\="Amount"]/following::input[@type\="text"])[1]  VERIFIED-PASS x1 | ClickElement    xpath\=(//*[normalize-space(text())\="Amount"]/following::input[@type\="text"])[2]  VERIFIED-PASS x1 (positional, never offered) | +10 more rung(s) in the run artifact
+  anchor candidates: List Price, List Price
+  caveat: 'Amount' appears 3 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one eleme (405 chars; whole text in the run artifact)
+#2 [field, <input>] member 2 of 3; label from form_element_label; listed
+  rung 1 keyword     TypeText    Amount    <value>    anchor=2    (parser: TypeText by its label (form_element_label))
+  rung 2 xpath       TypeText    xpath\=//*[normalize-space(text())\="Negotiated Discount"]/following-sibling::*//input[@type\="text"]    <value>    (relative xpath, unique in the capture (sibling_scope))
+  store (verified; the store's verified rung is for member 3 of this repeated label, this is member 2 -- derived): TypeText    Amount    anchor=3  VERIFIED-PASS x1 | ClickElement    xpath\=(//*[normalize-space(text())\="Amount"]/following::input[@type\="text"])[1]  VERIFIED-PASS x1 | ClickElement    xpath\=(//*[normalize-space(text())\="Amount"]/following::input[@type\="text"])[2]  VERIFIED-PASS x1 (positional, never offered) | +10 more rung(s) in the run artifact
+  anchor candidates: Negotiated Discount, Negotiated Discount
+  caveat: 'Amount' appears 3 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one eleme (405 chars; whole text in the run artifact)
+#3 [field, <input>] member 3 of 3; label from form_element_label; listed
+  rung 1 keyword     TypeText    Amount    <value>    anchor=3    (parser: TypeText by its label (form_element_label))
+  rung 2 xpath       TypeText    xpath\=//*[normalize-space(text())\="Net to Customer"]/following-sibling::*//input[@type\="text"]    <value>    (relative xpath, unique in the capture (sibling_scope))
+  store (verified): TypeText    Amount    anchor=3  VERIFIED-PASS x1 | ClickElement    xpath\=(//*[normalize-space(text())\="Amount"]/following::input[@type\="text"])[1]  VERIFIED-PASS x1 | ClickElement    xpath\=(//*[normalize-space(text())\="Amount"]/following::input[@type\="text"])[2]  VERIFIED-PASS x1 (positional, never offered) | +10 more rung(s) in the run artifact
+  anchor candidates: Net to Customer, Net to Customer
+  caveat: 'Amount' appears 3 times on this page with an identical value. call_example carries index= (this member's 1-based position among the same-label matches in DOM order), which addresses exactly one eleme (405 chars; whole text in the run artifact)
+GZ SHOW "Amount": 3 members -- each one's rung 1 above is its call (anchor=<n> picks member n); check one: Gz Verify    Amount    <value>    index=<n>

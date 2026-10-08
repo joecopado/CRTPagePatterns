@@ -1,0 +1,41 @@
+OVERRIDE REPLAY EXCERPTS -- the recorder override's own output, offline, 2026-10-08
+Tool: tools/recorder/crt_override/replay.py run --org slockard --capture <capture> --out <dir> (brain repo, no org contact; a headless Chrome the tool owns).
+Library: build '2026-09-23n13 two-eyes' = the build shipped in this repo's resources/garzai_recorder_override.py.
+Captures: slockard /lightning/o/Opportunity/new (New Opportunity modal) and slockard New Case global-action panel on an Account page, both taken live 2026-10-08.
+The replay synthesizes the events a person makes per control, so 'Gz Replay Option' is the replay's stand-in for the option a person picks.
+Excerpts are verbatim, nothing re-typed.
+
+=== slockard New Opportunity: Stage picklist pick (row 50) and Account Name (rows 51, 92) ===
+    # gz-replay variant: click | row 49 | Stage
+    ClickText    Stage    partial_match=False    # unverified: parser proposal
+    Comment    backup: ClickElement    xpath\=//records-record-layout-item[@field-label\="Stage"]    # xpath form, unverified: parser proposal
+    # gz-replay variant: pick | row 50 | Stage
+    PickList    Stage    Gz Replay Option    # unverified: parser proposal
+    Comment    backup: ClickText    --None--    anchor=Stage    # stock recorder line, unverified
+    Comment    backup: ClickText    Stage    # keyword form, unverified: composed from the label
+    Comment    backup: ClickElement    xpath\=//label[normalize-space(.)\="Stage"]/following::*[@role\="combobox"][1]    # xpath form, unverified: composed from the label
+    Comment    backup: ClickText    Gz Replay Option    # stock recorder line, unverified
+    # gz-replay variant: open_only | row 50 | Stage
+    Comment    backup: ClickElement    xpath\=//label[normalize-space(.)\="Stage"]/following::*[@role\="combobox"][1]    # opened, no pick recorded -- not a step
+    # gz-replay variant: click | row 51 | Account Name
+    ClickText    Account Name    partial_match=False    # unverified: parser proposal
+
+(Row 92 is the Account Name lookup: the replay's click variant produced NO line for it (out is empty), and the replay has no lookup typing variant.)
+
+=== slockard New Case panel: Contact Name (Aura lookup, row 140) and Status (Aura picklist, row 141) ===
+    # gz-replay variant: open | row 140 | Contact Name
+    ClickElement    xpath\=//input[@title\="Search Contacts"]    # unverified: parser proposal
+    # gz-replay variant: sentinel_bare | row 140 | Contact Name
+    ClickElement    xpath\=//input[@title\="Search Contacts"]    # unverified: parser proposal
+    ${contact_name}=    FakerLibrary.Name
+    TypeText    Contact Name    ${contact_name}    gz_family=combobox    # unverified: parser proposal
+    Comment    backup: TypeText    xpath\=//input[@title\="Search Contacts"]    asdf    # xpath form, unverified: parser proposal
+    Comment    verify: Verify Combobox Selection    Contact Name    ${contact_name}
+    # gz-replay variant: sentinel_pick_grammar | row 140 | Contact Name
+    ClickElement    xpath\=//input[@title\="Search Contacts"]    # unverified: parser proposal
+    TypeText    Contact Name    @@pick    gz_family=combobox    # COULD-NOT-CHECK: no option known; a literal sentinel would land
+    Comment    backup: TypeText    xpath\=//input[@title\="Search Contacts"]    @@pick    # xpath form, unverified: parser proposal
+    Comment    verify: Verify Combobox Selection    Contact Name    @@pick
+    # gz-replay variant: click | row 141 | Status New
+    ClickText    Status New    partial_match=False    # unverified: parser proposal
+    Comment    backup: ClickElement    xpath\=(//*[normalize-space(text())\="Status"]/following::a)[1]    # xpath form, unverified: parser proposal

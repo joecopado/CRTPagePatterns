@@ -1,0 +1,28 @@
+LOCAL RUN RESULTS, 2026-10-08 (final run on the committed suite; parse_out.py over each run's Robot output.xml)
+
+#### final2-slockard
+=== 01 Lookup -- STOCK recorder lines (slockard, New Opportunity, Account  -> FAIL
+   FAILKW Click Element | Unable to find element for locator /html[1]/body[1]/div[4]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div[1]/div[1]/records-modal-lwc-detail-panel-wrapper[1]/records-record-layout-event-broker[1]/slot[1]/records-lwc
+   FAILKW Click Element | QWebElementNotFoundError: Unable to find element for locator /html[1]/body[1]/div[4]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div[1]/div[1]/records-modal-lwc-detail-panel-wrapper[1]/records-record-layout-event-bro
+   STATUS MSG: QWebElementNotFoundError: Unable to find element for locator /html[1]/body[1]/div[4]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div[1]/div[1]/records-modal-lwc-detail-panel-wrapper[1]/records-record-layout-event-broker[1]/slot
+=== 02 Lookup -- OURS, one line (slockard, New Opportunity, Account Name) -> PASS
+=== 04 Picklist -- ONE line (slockard, New Opportunity, Stage) -> PASS
+=== 05 Picklist -- WITH BACKUPS (slockard, New Opportunity, Stage) -> PASS
+=== 06 Aura picklist -- STOCK keyword line (slockard twin of the customer' -> PASS
+=== 07 Aura picklist -- OURS, one line (Aura PickList, slockard New Case,  -> PASS
+=== 08 Aura picklist -- override line, ONE line (slockard New Case, Status -> PASS
+   FAILKW Click Text | Unable to find element for locator Status New in 8.0 sec
+   FAILKW Click Text | QWebElementNotFoundError: Unable to find element for locator Status New in 8.0 sec
+=== 09 Aura picklist -- override line WITH BACKUP (slockard New Case, Stat -> PASS
+   FAILKW Click Text | Unable to find element for locator Status New in 8.0 sec
+   FAILKW Click Text | QWebElementNotFoundError: Unable to find element for locator Status New in 8.0 sec
+=== 10 Test Agent -- Zoo Nightmare Inputs (three Amount inputs with one la -> PASS
+    INFO GarzAI TypeText: 'Amount' held '136,100.00' -- emptied it before typing (the brain's type_text_clearing pre-clear).
+    INFO VERIFIED-PASS: GarzAI TypeText('Amount'): read back '25000' -- matches '25000'.
+=== 11 TypeText on a pre-filled field -- stock, then ours (slockard, Renew -> PASS
+    INFO GarzAI TypeText: 'Renewal Notice (days)' held '90' -- emptied it before typing (the brain's type_text_clearing pre-clear).
+    INFO VERIFIED-PASS: GarzAI TypeText('Renewal Notice (days)'): read back '24' -- matches '24'.
+
+#### final2-healthcloud
+=== 03 Lookup -- OURS, one line (healthcloud, New Contact, Account Name) -> PASS
+
