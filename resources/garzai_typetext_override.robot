@@ -39,6 +39,19 @@ Documentation     GarzAI TypeText override (2026-09-18): shadows the library's o
 ...               That rule is why the 25% -> 2,025% -> 202,525% growth is a fixable-by-not-retrying
 ...               bug, not a fixable-by-retrying one: retrying on a non-blank mismatch is exactly how
 ...               each retyped attempt landed on top of the last.
+...
+...               CORRECTED 2026-10-07 (ledger e05f886897, CRT job 205089, QWeb 3.8.3): this override
+...               used to MERGE clear_key={CONTROL + a} into every TypeText. Per QWeb's own
+...               input_handler.write, a clear_key switches the JavaScript clear OFF and only sends
+...               the chord -- and the chord does not select on these inputs, so on a PRE-FILLED
+...               field the override APPENDED in 5 of 5 cases (90 -> 9090, 148,500.00 -> 148,500.0024)
+...               where the stock TypeText, with no clear_key, REPLACED in 5 of 5. It was an incomplete
+...               port of the brain's `type_text_clearing` (tools/qforce-lite/qforce_lite.py), which
+...               empties a non-empty element itself with Selenium's `.clear()` BEFORE typing and
+...               leaves an empty one alone. `Gz Clear Before Type` is that pre-clear; the TypeText
+...               below no longer forces any clear_key (the caller's own still passes through). The
+...               pre-clear is part of the ACTION, not a repair, so D13 is untouched: a non-blank
+...               mismatch is still reported and the field is never re-typed.
 Library           QForce
 Library           Collections    # Set To Dictionary below; measured missing in Live Testing 2026-09-19 (every TypeText failed "No keyword with name 'Set To Dictionary' found")
 Library           ${CURDIR}/garzai_verdicts.py    # F192: the ONE session ledger every verdict line lands in, plus the listener that sees a step that raised or was stopped
@@ -58,9 +71,11 @@ ${GZ_ON_MISMATCH}    warn
 
 *** Keywords ***
 TypeText
-    [Documentation]    OVERRIDE of the library's own TypeText. clear (real TypeText's own
-    ...    clear_key\={CONTROL + a}, merged in unless the caller already passed a clear_key of their
-    ...    own) -> type -> read back (GetInputValue) -> lenient-equal pass; on a BLANK read-back only,
+    [Documentation]    OVERRIDE of the library's own TypeText. pre-clear (`Gz Clear Before Type`: a
+    ...    field that already holds a value is emptied with Selenium's `.clear()`; an empty field is
+    ...    left alone; NO clear_key is forced, so QWeb's own JavaScript clear still runs, and a
+    ...    clear_key the caller passed is passed through untouched) -> type -> read back
+    ...    (GetInputValue) -> lenient-equal pass; on a BLANK read-back only,
     ...    one two-step repair (the macOS clear_key variant, then a raw select-all+backspace+retype);
     ...    on a NON-blank mismatch, a loud FAIL naming expected vs actual -- never a re-type (D13).
     ...    Same signature QForce/QWeb's own TypeText publishes (locator, input_text, anchor=1,
@@ -73,8 +88,11 @@ TypeText
     # there is no repair pass: re-typing into a combobox is not a repair. The mark is popped
     # before the real TypeText sees the kwargs.
     ${gz_family}=    Evaluate    str($kwargs.pop('gz_family', '') or '').strip().lower()
-    IF    'clear_key' not in $kwargs
-        Set To Dictionary    ${kwargs}    clear_key={CONTROL + a}
+    # THE PRE-CLEAR (ledger e05f886897). Never for the combobox family: that control is judged by
+    # its selected option after blur, an element clear on it is unmeasured, and QWeb's own JS clear
+    # (no clear_key is forced any more) is what the stock keyword does there.
+    IF    '${gz_family}' != 'combobox'
+        Gz Clear Before Type    ${locator}    ${anchor}    &{kwargs}
     END
     QForce.TypeText    ${locator}    ${input_text}    anchor=${anchor}    timeout=${timeout}    &{kwargs}
     IF    '${gz_family}' == 'combobox'
@@ -151,6 +169,47 @@ Type Text Select All
         Set To Dictionary    ${kwargs}    clear_key={CONTROL + a}
     END
     QForce.TypeText    ${locator}    ${input_text}    anchor=${anchor}    timeout=${timeout}    &{kwargs}
+
+
+Gz Clear Before Type
+    [Documentation]    THE PRE-CLEAR, ported from the brain's `type_text_clearing` (qforce_lite.py,
+    ...    "use what works", 2026-09-10, ledger 576d7e8859): a field that already HOLDS a value is
+    ...    emptied with Selenium's `.clear()` on the element the TypeText below will resolve (the
+    ...    same QWeb input resolver, same anchor, same index), BEFORE the typing; a field that is
+    ...    empty is not touched. It is part of the action, not a repair, so D13 stands: it never
+    ...    runs after the type, and a value that lands wrong is reported, not re-typed.
+    ...    Best effort by design (the brain's `except Exception: pass`): a field that cannot be read
+    ...    or cleared here changes nothing, QWeb's own JavaScript clear (no clear_key is forced by
+    ...    the TypeText override) still runs inside the TypeText, and the read-back after it is the
+    ...    judge. The short timeout is for the same reason: a field that is not on the page yet is
+    ...    TypeText's to wait for, not this helper's. Measured 2026-10-07 (job 205089): without
+    ...    this the override appended to a pre-filled value in 5 of 5 cases.
+    [Arguments]    ${locator}    ${anchor}=1    &{kwargs}
+    ${resolver_kwargs}=    Evaluate    {k: v for k, v in $kwargs.items() if k not in ('clear_key', 'check', 'click', 'expected', 'key', 'gz_family', 'timeout')}
+    ${status}    ${held}=    Run Keyword And Ignore Error    GetInputValue    ${locator}    anchor=${anchor}    timeout=2
+    IF    '${status}' == 'FAIL'
+        RETURN
+    END
+    ${is_blank}=    Evaluate    $held in (None, '') or str($held) == ''
+    IF    ${is_blank}
+        RETURN
+    END
+    # all_frames=False is load-bearing: GetWebelement defaults it to True, which sets QWeb's
+    # continue_search, and the input resolver then gets a LIST back from the frame walker and raises
+    # `ValueError: not enough values to unpack (expected 2, got 0)` (measured live on slockard,
+    # QWeb 3.8.3, 2026-10-07: the first version of this helper never once cleared anything and said
+    # nothing). TypeText resolves with continue_search unset, so this is the same element.
+    ${status}    ${element}=    Run Keyword And Ignore Error    GetWebelement    ${locator}    anchor=${anchor}    element_type=input    timeout=2    all_frames=False    &{resolver_kwargs}
+    IF    '${status}' == 'FAIL'
+        Log    GarzAI TypeText: '${locator}' held '${held}' but its element could not be resolved for the pre-clear (${element}) -- QWeb's own clear covers the type.    console=True
+        RETURN
+    END
+    ${status}    ${message}=    Run Keyword And Ignore Error    Evaluate    ($element[0] if isinstance($element, list) else $element).clear()
+    IF    '${status}' == 'PASS'
+        Log    GarzAI TypeText: '${locator}' held '${held}' -- emptied it before typing (the brain's type_text_clearing pre-clear).    console=True
+    ELSE
+        Log    GarzAI TypeText: '${locator}' held '${held}' and the element clear did not run (${message}) -- QWeb's own clear covers the type.    console=True
+    END
 
 
 Verify Input Value
