@@ -1,9 +1,9 @@
 {
  "bundle": "resources/garzai_parser",
- "bytes": 2560835,
+ "bytes": 2561463,
  "entry": "tools/recorder/crt_override/compose_live.py",
  "files": 61,
- "generated": "2026-10-11T00:13:16",
+ "generated": "2026-10-11T08:40:19",
  "generator": "tools/recorder/crt_override/build_parser_bundle.py",
  "sha256": {
   "docs/recorder/patterns/library.json": "00fb6f3ce742bfaed94dcf991987e864df672f3bc60edce88f9169e7898218f1",
@@ -66,7 +66,7 @@
   "tools/recorder/pom/scope.py": "0b2c9ed5adab75ed3947c7651da20bfff82695bcae0e3be52645f006bc8fedfd",
   "tools/recorder/pom/store.py": "d2da5cb96392d23eda2515cdb2857818d06a6c3e0426174c9f86c4bbe69ea03e",
   "tools/recorder/pom_asset.py": "a9ecd8c9af999571572f76c66b081f8d1a78a0a4f4337403de76c1fedfb22d59",
-  "tools/recorder/review_table.py": "05cd16fa000e980a07909032eeb5abc0643ff04e443eca8261e4f0d4bd7d38c8"
+  "tools/recorder/review_table.py": "65ceb90a0c227a155bedd80a99fb4f89c59e664f80216e8128c5cd1440cdc0c6"
  },
  "variant": "traced"
 }

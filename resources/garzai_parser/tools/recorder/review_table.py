@@ -154,6 +154,16 @@ def _lit(s: str) -> str:
     return 'concat(' + ', \'"\', '.join('"%s"' % p for p in parts) + ')'
 
 
+def _attr_eq(k: str, v: str) -> str:
+    """`@k="v"`, or `normalize-space(@k)="v collapsed"` when the value holds a line break or a tab (2026-10-11: an
+    address aria-label, `47 West 13th Street\nNew York, NY 10011\nUnited States`, went into an exported
+    `ClickElement xpath=//a[@aria-label="..."]` verbatim and split the step over three lines -- CRTPagePatterns'
+    fsc-household-group.robot then failed to parse, `Test cannot be empty`). normalize-space matches the same node."""
+    if any(c in v for c in '\n\r\t'):
+        return 'normalize-space(@%s)=%s' % (k, _lit(' '.join(v.split())))
+    return '@%s=%s' % (k, _lit(v))
+
+
 def _norm_text(s: str) -> str:
     return PL.norm_text(s)
 
@@ -413,7 +423,7 @@ def identity_of(cap: "Capture", node) -> tuple[str, str]:
             # Checking only the value kept that predicate, and the Artifacts tab's identity xpath
             # then matched 0 elements live (measured 2026-09-12, robotic.copado.com).
             continue
-        preds.append('@%s=%s' % (k, _lit(v)))
+        preds.append(_attr_eq(k, v))
         if k in _STABLE_NAMING_ATTRS and v:
             stable.append(k)
         if k in _LABELLISH_ATTRS and v:
@@ -577,7 +587,7 @@ def xpath_ladder(cap: Capture, node, e: dict) -> dict:
     for k in STABLE_ATTRS:
         v = attrs.get(k)
         if v and not is_generated(v):
-            rungs.append(('stable_attr', '//%s[@%s=%s]' % (tag, k, _lit(v))))
+            rungs.append(('stable_attr', '//%s[%s]' % (tag, _attr_eq(k, v))))
     if src == 'standard_label' and label:
         rungs.append(('label_association',
                       '//label[normalize-space(.)=%s]/following::%s[1]' % (_lit(label), tag)))
@@ -658,7 +668,7 @@ def xpath_ladder(cap: Capture, node, e: dict) -> dict:
                 v = attrs.get(k)
                 if not v or is_generated(v):
                     continue
-                xp = '//%s//%s[@%s=%s]' % (p.name, tag, k, _lit(v))
+                xp = '//%s//%s[%s]' % (p.name, tag, _attr_eq(k, v))
                 m = cap.doc.xpath(xp)
                 if len(m) == 1 and _same_node(cap, m[0], node):
                     rungs.append(('scoped_attr', xp))
@@ -680,8 +690,8 @@ def xpath_ladder(cap: Capture, node, e: dict) -> dict:
             break
         for k in STABLE_ATTRS:
             v = pa.get(k)
-            if v and not is_generated(v) and cap.count('//%s[@%s=%s]' % (p.name, k, _lit(v))) == 1:
-                anc_xp = '//%s[@%s=%s]' % (p.name, k, _lit(v))
+            if v and not is_generated(v) and cap.count('//%s[%s]' % (p.name, _attr_eq(k, v))) == 1:
+                anc_xp = '//%s[%s]' % (p.name, _attr_eq(k, v))
                 break
         if anc_xp:
             break

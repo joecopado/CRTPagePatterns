@@ -118,9 +118,7 @@ XPath form -- /lightning/r/PartyRelationshipGroup/{id}/view
     # Edit Type
     ClickElement    xpath\=//button[@title\="Edit Type"]
     # 47 West 13th Street New York, NY 10011 United States
-    ClickElement    xpath\=//a[@aria-label\="47 West 13th Street
-New York, NY 10011
-United States"]
+    ClickElement    xpath\=//a[normalize-space(@aria-label)\="47 West 13th Street New York, NY 10011 United States"]
     # Map of 47 West 13th Street New York NY 10011 United States
     ClickElement    xpath\=//iframe[@title\="Map of 47 West 13th Street New York NY 10011 United States"]
     # 
