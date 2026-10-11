@@ -151,7 +151,7 @@ def _emit_grid_descendants(container, config, compiler, seen_node_ids):
             break
 
 
-def _emit_row_controls(container, config, compiler, seen_node_ids):
+def _emit_row_controls(container, config, compiler, seen_node_ids, roles=None):
     """PB2 2026-09-07 (row-select checkbox shape, docs/recorder/evidence/
     parser-battery-captures-2026-09-07.md): a lightning-datatable's header
     "select all" checkbox is compiled and emitted (it becomes the datatable
@@ -173,6 +173,8 @@ def _emit_row_controls(container, config, compiler, seen_node_ids):
     target_tags pass (which skips anything in `datatable_descendants`)
     never double-reports them."""
     signatures = getattr(config, "ROW_CONTROL_SIGNATURES", None) or []
+    if roles:                    # 2026-10-10: only these signature roles (nativeTableRowControls); None = every role
+        signatures = [sig for sig in signatures if sig.get("role") in roles]
     if not signatures:
         return
     row_tags = tuple({t for sig in signatures for t in (sig.get("tags") or [])})
@@ -397,10 +399,18 @@ def _classify_soup(soup, config, text_engine, classifier, compiler, is_frame_con
     # that gate used to mean a classic Aura-rendered table (no such
     # attributes, e.g. Salesforce Files' own list view) was silently
     # invisible to this parser entirely. Confirmed live 2026-07-29.
+    template_layout_tables = set()
+    swallowing_tables = []
     for tag in soup.find_all("table"):
         native_tables.add(id(tag))
         is_layout_table = is_frame_context and tag.find(["input", "select", "textarea", "button"]) is not None
+        # 2026-10-10 (template `layoutTableRules`, Revenue Cloud builder canvas): a table with no header cell and no grid
+        # role that holds component hosts is PAGE LAYOUT -- its controls are the page's, and it is no grid row itself.
+        if not is_layout_table and config._is_layout_table(tag):
+            is_layout_table = True
+            template_layout_tables.add(id(tag))
         if not is_layout_table:
+            swallowing_tables.append(tag)
             for child in tag.find_all(True):
                 datatable_descendants.add(id(child))
 
@@ -422,6 +432,17 @@ def _classify_soup(soup, config, text_engine, classifier, compiler, is_frame_con
         for element_data in _emit_row_controls(tag, config, compiler, seen_node_ids):
             elements.append(element_data)
 
+    # 2026-10-10 (template `nativeTableRowControls`, Revenue Cloud R14): the same row-selector emission for a NATIVE table that
+    # swallows its descendants (a Flow runtime datatable's radios were hidden behind its cells). Only the signature roles the
+    # template lists; a layout table (layoutTableRules) was never swallowed and is not visited.
+    _ntrc = getattr(config, "NATIVE_TABLE_ROW_CONTROLS", None) or {}
+    if _ntrc.get("enabled") and _ntrc.get("roles"):
+        for tag in swallowing_tables:
+            if id(tag) in seen_node_ids or config._is_noise(tag):
+                continue
+            for element_data in _emit_row_controls(tag, config, compiler, seen_node_ids, roles=set(_ntrc["roles"])):
+                elements.append(element_data)
+
     # interop T16 2026-09-07 -- GRID DESCENDANT EMISSION.
     # T14 measured v1 at 0/18 controls inside a `lightning-tree-grid` (fragment AND
     # full page): the swallow above hides every column header, cell, caret and
@@ -438,6 +459,8 @@ def _classify_soup(soup, config, text_engine, classifier, compiler, is_frame_con
             elements.append(element_data)
 
     for tag in soup.find_all("table"):
+        if id(tag) in template_layout_tables:
+            continue
         if id(tag) in native_tables and id(tag) not in seen_node_ids:
             element_data = compiler._extract_element_data(tag)
             if element_data:
@@ -473,8 +496,20 @@ def _classify_soup(soup, config, text_engine, classifier, compiler, is_frame_con
                 continue      # the base component's own inner structure: its host row already exists
             if any(tag.find(t) is not None for t in (rule.get('skipIfDescendantTags') or [])):
                 continue      # parser-one P8: the wrapper's own <input> is the control (hostFamilyRules claims it)
+            if not classifier.structural_extra_ok(tag, rule):
+                continue      # 2026-10-10: the rule's extra conditions (a read-only form element needs a label node)
             element_data = compiler._extract_element_data(tag, is_custom=True)
             if element_data and element_data.get("element_type") not in config.SKIP_ELEMENT_TYPES:
+                if rule.get("requireLabel") and not (element_data.get("identification") or {}).get("label_text"):
+                    continue  # 2026-10-10: a nameless read-only value (an empty layout cell) is not a field
+                rc = rule.get("readerCopy")
+                if isinstance(rc, dict) and rc.get("rung"):
+                    # 2026-10-10 (Dynamic Forms index): which reader rung reaches this copy, and the host that names it in
+                    # words. A PRIVATE marker: scope_record_page_readers reads it and pops it, so no output carries it.
+                    host = next((word for host_tag, word in (rc.get("hostTags") or {}).items()
+                                 if tag.find_parent(lambda p, t=host_tag.lower(): p.name and p.name.lower() == t) is not None),
+                                None)
+                    element_data["_reader_copy"] = {"rung": rc["rung"], "host": host}
                 seen_node_ids.add(id(tag))
                 elements.append(element_data)
 

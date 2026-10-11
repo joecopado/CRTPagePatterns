@@ -1598,6 +1598,13 @@
    "aria-hidden": "true"
   }
  ],
+ "labelExcludeClassFragments": [
+  "slds-checkbox_faux_container"
+ ],
+ "emptyLabelForClimbs": {
+  "enabled": true
+ },
+ "_why_labelExcludeClassFragments": "2026-10-10: the label policy the in-page recorder bundle bakes (tools/recorder/inject/build.js LABEL_KEYS) now carries the SAME two keys as salesforce-lightning.json -- a lightning toggle's state text (span.slds-checkbox_faux_container: On / Off) is decoration, not part of its name, and a label-hidden toggle's blank <label for> is named by the <label> that wraps it. v3.py does not read them; core.js and element_compiler.py do. Landing both resolvers together lifts the 2026-10-07 P8 hold.",
  "note_labelPrecedence": "labelPrecedence: `inner_text` is FIRST as of the wave-2 review close (stream P1, 2026-09-07, findings F6/R12). THE LABEL IS WHAT A PERSON SEES -- a title tooltip or an ARIA accessible name labels a control only when nothing visible does. Measured before the move: 110 elements across the 144-capture corpus carried a title_attr label while their own rendered_text said something else. `inner_text` only produces a value for button/a/role=button, so form controls are unaffected and an icon-only control still falls through to title_attr. `assistive_text` is last: never visible, but on a chevron-only button it is the only handle there is.",
  "assistiveTextClassFragments": [
   "slds-assistive-text",

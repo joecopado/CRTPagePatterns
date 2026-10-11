@@ -82,42 +82,166 @@ The frame's own `<iframe>` tag ALSO classifies as its own element (family
 `iframe`, dom_config.py's TARGET_TAGS + component_classifier.py) via the
 normal top-level pass, independent of this module -- this module only
 supplies what is INSIDE the frame.
+
+2026-10-09 (frames-capture; docs/DESIGN-FRAMES-CAPTURE-2026-10-09.md, F28/F36): the flat regex is
+replaced by a walk over the capture's <iframe> elements (balanced on nested frames), because the
+regex's non-greedy `</template>` stopped at the FIRST shadow root inside a spliced frame -- the
+customer QLE capture (docs/dom-captures/customer-cpq/qle-q15573-editlines-ctx-fixed.html: 52,019
+bytes, 39 form controls, 188 shadow roots) gave the classifier 812 bytes and 0 controls. A raw
+splice is no longer `html.unescape`d (that turned `&quot;` inside an attribute into a quote that
+ended it). Every frame is listed by `frame_census`, walked or not, with why. And the descent is
+FRAME-AGNOSTIC (the user, 2026-10-09): a SAME-ORIGIN frame the serializer walked inline is now
+classified like any other -- the 2026-09-07 out-of-scope note above is superseded -- so a classic
+Setup page's fields come from its vfFrame itself, never from the old splicer's copy of it (F28).
 """
 import html as _html
 import re
 
-# Matches exactly what tools/recorder/cdp_transport.py's
-# `splice_cross_origin_frames` writes (`_sub`, mode="context"|"session").
-# The marker leads with `<!-- frame: <src> -->` OUTSIDE the <template> on
-# purpose (per that function's own comment) -- kept here as one group so a
-# capture with src="" (measured live: both backpromote captures) still
-# matches, it's just an empty string.
-_CROSS_ORIGIN_RE = re.compile(
-    r'<!--\s*frame:\s*(?P<src>.*?)\s*-->'
-    r'<template\s+garzai-frame="[^"]*"\s+origin="cross"\s+mode="(?P<mode>[^"]*)"\s*>'
-    r'(?P<body>.*?)'
-    r'</template>',
+# The splice wrapper tools/recorder/cdp_transport.py's `splice_cross_origin_frames` writes (`_sub`,
+# mode="context"|"session"). The marker leads with `<!-- frame: <src> -->` OUTSIDE the <template> on
+# purpose (per that function's own comment); a capture with src="" (both backpromote captures, every
+# Aura-hosted VF frame) still matches, its src is just empty.
+_SPLICE_OPEN_RE = re.compile(
+    r'\s*(?:<!--\s*frame:\s*(?P<src>.*?)\s*-->)?\s*'
+    r'<template\s+garzai-frame="(?P<gsrc>[^"]*)"\s+origin="cross"\s+mode="(?P<mode>[^"]*)"\s*>',
     re.DOTALL,
 )
+# What cdp_capture.py's SERIALIZER writes as the first thing inside an <iframe> it walked INLINE (a
+# same-origin frame: Salesforce Setup's classic page in its vfFrame, a VF page's own inner frames).
+_INLINE_MARK = '<!--frame-content-->'
+_IFRAME_OPEN_RE = re.compile(r'<iframe\b([^>]*)>', re.IGNORECASE)
+_ATTR_RE = re.compile(r'([^\s=/"\'<>]+)\s*=\s*"([^"]*)"')
+_AURA_PLACEHOLDER_TITLE = 'accessibility title'
+#: frames inside frames are walked this deep (Setup: the vfFrame, then its sessionserver helper = 2)
+MAX_FRAME_DEPTH = 6
+
+
+def _iframe_spans(markup: str) -> list:
+    """Each OUTERMOST `<iframe ...>...</iframe>` of `markup`, in document order, as
+    (start, end, attrs, body). Balanced on nested iframe tags: a frame's content is serialized markup
+    that may hold frames of its own (Setup's vfFrame holds a sessionserver iframe). The serializer
+    escapes `<` in every text node and attribute value, so a literal `<iframe` is always a tag."""
+    out, pos, n = [], 0, len(markup)
+    low = markup.lower()
+    while True:
+        m = _IFRAME_OPEN_RE.search(markup, pos)
+        if not m:
+            break
+        depth, i, closed = 1, m.end(), False
+        while depth:
+            o = low.find('<iframe', i)
+            c = low.find('</iframe>', i)
+            if c < 0:
+                i = n                       # unterminated: the rest is its body
+                break
+            if 0 <= o < c:
+                if _IFRAME_OPEN_RE.match(markup, o):
+                    depth += 1
+                i = o + 7
+            else:
+                depth -= 1
+                i = c + 9
+                closed = depth == 0
+        body = markup[m.end():i - 9] if closed else markup[m.end():i]
+        out.append((m.start(), i, dict(_ATTR_RE.findall(m.group(1))), body))
+        pos = i
+    return out
+
+
+def _own_markup(body: str) -> str:
+    """`body` with every frame inside it cut out: a frame's OWN document, without its children's."""
+    spans = _iframe_spans(body)
+    if not spans:
+        return body
+    parts, pos = [], 0
+    for start, end, _attrs, _b in spans:
+        parts.append(body[pos:start])
+        pos = end
+    parts.append(body[pos:])
+    return ''.join(parts)
+
+
+def _frame_content(body: str):
+    """(origin, inner markup, mode, src) for one iframe's body:
+      same        walked inline by the serializer (`<!--frame-content-->`)
+      cross       spliced from the frame's own execution context or target (`<template garzai-frame ...>`)
+      unresolved  a `<!--cross-origin-frame -->` placeholder nobody filled (COULD-NOT-CHECK in the capture header)
+      hidden      a `<!--hidden-frame -->` marker: a helper frame no person sees, never spliced
+      empty       nothing inside (an unloaded frame, a frame captured by an older serializer)"""
+    s = body.lstrip()
+    if s.startswith(_INLINE_MARK):
+        return 'same', s[len(_INLINE_MARK):], None, ''
+    m = _SPLICE_OPEN_RE.match(body)
+    if m:
+        # the wrapper's own close is the LAST </template> of the body: a frame with shadow roots holds
+        # `<template shadowrootmode>` pairs of its own, and the first </template> closes one of THEM (the
+        # customer QLE capture: 188 shadow roots, the first close at byte 812 of 52,019)
+        close = body.rfind('</template>')
+        inner = body[m.end():close] if close >= m.end() else body[m.end():]
+        if '<' not in inner and '&lt;' in inner:
+            inner = _html.unescape(inner)   # an ESCAPED splice; a raw one is never unescaped (it would break
+            #                                 every attribute holding &quot; and turn &lt; text into a tag)
+        return 'cross', inner, (m.group('mode') or 'session'), (m.group('src') or m.group('gsrc') or '').strip()
+    head = s[:600]
+    if head.startswith('<!--hidden-frame'):
+        return 'hidden', '', None, ''
+    if head.startswith('<!--cross-origin-frame'):
+        return 'unresolved', '', None, ''
+    return 'empty', '', None, ''
+
+
+def frame_census(raw_html: str) -> list:
+    """EVERY frame of the capture, the ones the parser walks and the ones it does not, depth first in
+    document order: {"index", "depth", "parent", "name", "title", "src", "origin", "mode", "walked",
+    "why", "html"} -- `index` counts every frame listed; `walked` says whether `collect_frame_elements`
+    classifies it and `why` says why not. Never raises."""
+    rows = []
+
+    def visit(markup, depth, parent, parent_own):
+        if depth > MAX_FRAME_DEPTH:
+            return
+        for _start, _end, attrs, body in _iframe_spans(markup):
+            origin, inner, mode, src = _frame_content(body)
+            row = {"index": len(rows) + 1, "depth": depth, "parent": parent,
+                   "name": (attrs.get('name') or '').strip(), "title": (attrs.get('title') or '').strip(),
+                   "src": (src or attrs.get('src') or '').strip(), "origin": origin, "mode": mode,
+                   "walked": origin in ('same', 'cross'), "why": None, "html": inner}
+            if (origin == 'cross' and parent_own is not None and len(inner) > 0
+                    and _own_markup(inner) == parent_own):
+                # F28 (2026-10-08 overnight): the capture's old single-placeholder fallback filled a frame's hidden
+                # helper child (Setup's sessionserver) with the PARENT frame's own document. A document is never its
+                # own child: the parent is classified itself, so walking the copy would list every control twice.
+                # Stored captures carry it (25 of 25 product Setup captures); a capture taken since 2026-10-09 does not.
+                row["walked"] = False
+                row["why"] = ("a copy of its own parent frame's document (the old splicer's fallback, F28): "
+                              "not a frame of its own")
+            elif origin == 'unresolved':
+                row["why"] = "a cross-origin frame the capture could not reach (COULD-NOT-CHECK in its header)"
+            elif origin == 'hidden':
+                row["why"] = "a hidden helper frame (aria-hidden, off-screen or zero-size): no person sees it"
+            elif origin == 'empty':
+                row["why"] = "nothing captured inside it"
+            rows.append(row)
+            if row["walked"]:
+                visit(inner, depth + 1, row["index"], _own_markup(inner) if origin == 'same' else None)
+
+    try:
+        visit(raw_html, 0, None, None)
+    except Exception:                                                     # noqa: BLE001 -- never raises
+        return rows
+    return rows
 
 
 def extract_frame_blocks(raw_html: str) -> list:
-    """Returns one dict per same-app CROSS-ORIGIN frame spliced into this
-    capture (see module docstring for why the same-origin `<!--frame-
-    content-->` shape is deliberately not handled here), in document order:
-        {"index": 1-based int, "src": str, "mode": "context"|"session",
-         "html": unescaped inner markup}
-    Never raises -- a capture with no spliced frame (the common case) just
-    returns []."""
-    blocks = []
-    for i, m in enumerate(_CROSS_ORIGIN_RE.finditer(raw_html), start=1):
-        blocks.append({
-            "index": i,
-            "src": (m.group("src") or "").strip(),
-            "mode": m.group("mode") or "session",
-            "html": _html.unescape(m.group("body")),
-        })
-    return blocks
+    """Returns one dict per frame the parser walks -- FRAME-AGNOSTIC: a same-origin frame the serializer
+    walked inline (`origin` "same") and a cross-origin frame spliced into the capture (`origin` "cross"),
+    whatever app owns it -- depth first in document order, a frame inside a frame included (`depth`,
+    `parent`):
+        {"index": 1-based int over `frame_census`, "src": str, "mode": "context"|"session"|None,
+         "origin": "same"|"cross", "depth", "parent", "name", "title", "html": the frame's own markup}
+    `html` still holds the frame's own child frames as RAWTEXT, so a caller that sub-parses each block
+    sees each control once. Never raises -- a capture with no frame (the common case) returns []."""
+    return [b for b in frame_census(raw_html) if b["walked"]]
 
 
 def frame_label(block: dict, iframe_tag=None):
@@ -131,41 +255,39 @@ def frame_label(block: dict, iframe_tag=None):
          frame this pass, carries no per-frame identity).
       2. The enclosing <iframe>'s `name` (Aura's own per-frame id, e.g.
          "vfFrameId_1788705794491" -- always present, always unique).
-      3. The block's 1-based index among frames spliced into this capture.
-    """
-    if iframe_tag is not None:
-        title = (iframe_tag.get("title") or "").strip()
-        if title and title.lower() != "accessibility title":
-            return title
-        name = (iframe_tag.get("name") or "").strip()
-        if name:
-            return name
+      3. The block's 1-based index among the frames of this capture.
+    `iframe_tag` is the enclosing tag (anything with `.get`); without one the block's own `title` /
+    `name` (read off the same tag's markup by `frame_census`) are used."""
+    src = iframe_tag if iframe_tag is not None else block
+    title = (src.get("title") or "").strip()
+    if title and title.lower() != _AURA_PLACEHOLDER_TITLE:
+        return title
+    name = (src.get("name") or "").strip()
+    if name:
+        return name
     return block["index"]
 
 
 def collect_frame_elements(raw_html: str, main_soup, classify_soup_fn) -> list:
-    """Walks every same-app cross-origin frame spliced into `raw_html`,
-    classifying each with `classify_soup_fn(sub_soup) -> list[dict]` (the
-    caller's own full pass -- datatable/table/target-tags/interactive-roles/
-    c-*/lightning-* -- so behaviour matches the top-level document exactly)
-    and tagging every returned element with `frame` (see `frame_label`).
+    """Walks every frame `extract_frame_blocks` returns (same-origin frames walked inline and cross-origin
+    frames spliced in, at any depth), classifying
+    each with `classify_soup_fn(sub_soup) -> list[dict]` (the caller's own full pass --
+    datatable/table/target-tags/interactive-roles/c-*/lightning-* -- so behaviour matches the
+    top-level document exactly) and tagging every returned element with `frame` (see `frame_label`).
 
-    Matches each block back to its enclosing real `<iframe>` tag in
-    `main_soup`, in document order, by index -- the block itself carries no
-    positional link to the tag since bs4 never parsed the tag's contents.
-    A frame block whose sub-parse raises is skipped (not silently merged
-    with the main document, not fabricated) -- this only ever ADDS elements,
-    never removes any from the caller's own top-level pass.
-    """
+    Each block is sub-parsed on its OWN markup: its child frames stay RAWTEXT inside it and are walked
+    as blocks of their own, so no control is classified twice; a block that is a copy of its own
+    parent (F28) is never walked. A frame block whose sub-parse raises is skipped (not silently
+    merged with the main document, not fabricated) -- this only ever ADDS elements, never removes
+    any from the caller's own top-level pass. `main_soup` is kept for the callers' signature; the
+    enclosing tag's attributes are read off the capture's own markup."""
     blocks = extract_frame_blocks(raw_html)
     if not blocks:
         return []
     from bs4 import BeautifulSoup
-    iframe_tags = main_soup.find_all("iframe") if main_soup is not None else []
     out = []
     for block in blocks:
-        iframe_tag = iframe_tags[block["index"] - 1] if block["index"] - 1 < len(iframe_tags) else None
-        label = frame_label(block, iframe_tag)
+        label = frame_label(block)
         try:
             frame_soup = BeautifulSoup(block["html"], "html.parser")
         except Exception:

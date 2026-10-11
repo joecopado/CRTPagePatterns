@@ -19,7 +19,9 @@ THE RULE, and it is a TRI-STATE, never a boolean:
                       Since D27 (2026-10-07) a PROVEN rung answers first -- a recorded validation
                       (read-back, SOQL, judged screenshot, observed effect) passed -- and `why`
                       names it; a rung whose last validation failed is demoted; a bare live verdict
-                      says it carries no validation (`basis: legacy-verdict`).
+                      says it carries no validation (`basis: legacy-verdict`). Since D27a
+                      (2026-10-10) a BRAIN-CARRIED verdict answers next (`basis: brain-carried`),
+                      even for a caller that requires proof.
     known-unverified  the store holds the control with nothing verified. DERIVE, and say the
                       store knew the control but could not vouch for a call -- "known" is not
                       "verified" (CLAUDE.md's tri-state rule, and interop's own wording).
@@ -61,6 +63,27 @@ USABLE = (VERIFIED,)
 #: of slockard's 819 "verified" calls were ("found and acted without an error").
 BASIS_PROVEN = "proven"
 BASIS_LEGACY = "legacy-verdict"
+#: D27a (2026-10-10): a live verdict the BRAIN recorded, carried into v2's store with its provenance
+#: (match.carried_live). It answers `verified` even when the caller requires proof: the user's decision
+#: amends D27 for these, and only these -- a carried verdict is marked, re-stamped by v2's first validation
+#: and demoted after two clean failures; an unmarked legacy verdict still never leads a proof-only caller.
+BASIS_CARRIED = "brain-carried"
+
+
+def _carried_words(rung: dict) -> tuple[str, dict]:
+    """(why, carried) for a brain-carried rung: the brain's verdict, its date, its source and v2's failures so far."""
+    c = rung.get("carried") or {}
+    src = c.get("source") or {}
+    fails = [f for f in c.get("clean_failures") or [] if isinstance(f, dict)]
+    why = ("brain-carried (D27a): %s %s passed live %d time(s) in the brain, last %s on %s (%s %s); no v2 validation "
+           "yet -- the first one re-stamps it%s"
+           % (rung.get("kw"), list(rung.get("args") or []), int(c.get("n_verified") or 0), c.get("verdict"),
+              c.get("date"), src.get("partition"), src.get("page_key"),
+              ("; %d of %d clean failure(s) recorded in v2" % (len(fails), MATCH.CARRIED_DEMOTE_AFTER)) if fails else ""))
+    info = {"from": c.get("from"), "verdict": c.get("verdict"), "n_verified": int(c.get("n_verified") or 0),
+            "date": c.get("date"), "rung": c.get("rung"), "source": dict(src), "carried_at": c.get("carried_at"),
+            "clean_failures": len(fails)}
+    return why, info
 
 
 def _proof_words(rung: dict) -> tuple[str, dict]:
@@ -80,6 +103,12 @@ def _proof_words(rung: dict) -> tuple[str, dict]:
     return why, proof
 
 
+def _demoted_carried_words(rung: dict) -> str:
+    d = ((rung.get("carried") or {}).get("demoted")) or {}
+    return ("the store's brain-carried rung %s %s was demoted after %s clean failure(s) in v2 (last at %s: %s)"
+            % (rung.get("kw"), list(rung.get("args") or []), d.get("after"), d.get("at"), d.get("why")))
+
+
 def consult(record: dict | None, label: str | None, family: str | None = None,
             page_key: str | None = None, require_proof: bool = False) -> dict:
     """The tri-state answer for one control. Never raises, never returns None.
@@ -94,10 +123,13 @@ def consult(record: dict | None, label: str | None, family: str | None = None,
     `basis: legacy-verdict` and a `why` that says no validation is recorded -- unless
     `require_proof`, when it is `known-unverified`: acted is not proven.
 
-    Returns {'verdict', 'why', 'rung', 'element_id', 'label', 'family', 'page_key', 'basis', 'proof'}.
+    D27a (2026-10-10): with no proven rung, a BRAIN-CARRIED rung (match.best_carried_rung) answers
+    `verified` with `basis: brain-carried` -- under `require_proof` too -- and `carried` names its provenance.
+
+    Returns {'verdict', 'why', 'rung', 'element_id', 'label', 'family', 'page_key', 'basis', 'proof', 'carried'}.
     """
     out = {"verdict": UNKNOWN_PAGE, "why": "", "rung": None, "element_id": None,
-           "label": label, "family": family, "page_key": page_key, "basis": None, "proof": None}
+           "label": label, "family": family, "page_key": page_key, "basis": None, "proof": None, "carried": None}
     if not label or not str(label).strip():
         out["verdict"] = UNKNOWN_CONTROL
         out["why"] = "no label to match on -- an unlabelled control cannot be looked up"
@@ -124,17 +156,27 @@ def consult(record: dict | None, label: str | None, family: str | None = None,
         out["verdict"], out["rung"], out["basis"] = VERIFIED, proven, BASIS_PROVEN
         out["why"], out["proof"] = _proof_words(proven)
         return out
+    carried = MATCH.best_carried_rung(element)
+    if carried is not None:
+        out["verdict"], out["rung"], out["basis"] = VERIFIED, carried, BASIS_CARRIED
+        out["why"], out["carried"] = _carried_words(carried)
+        return out
     demoted = [r for r in element.get("ladder") or [] if MATCH.proven_failed(r)]
+    gone = [r for r in element.get("ladder") or [] if MATCH.carried_demoted(r)]
     rung = MATCH.best_verified_rung(element)
     if rung is not None and require_proof:
         out["verdict"] = KNOWN_UNVERIFIED
         out["why"] = ("the store's rung %s %s carries a live verdict with no validation recorded -- "
                       "acted is not proven (D27): deriving, and saying so"
                       % (rung.get("kw"), list(rung.get("args") or [])))
+        if gone:
+            out["why"] += "; " + _demoted_carried_words(gone[0])
         return out
     if rung is None:
         out["verdict"] = KNOWN_UNVERIFIED
-        if demoted:
+        if gone:
+            out["why"] = _demoted_carried_words(gone[0]) + " -- deriving, and saying so"
+        elif demoted:
             last = (demoted[0].get("proven") or {}).get("last") or {}
             out["why"] = ("the store's rung %s %s was demoted: its last validation (%s at %s) FAILED -- "
                           "deriving, and saying so"

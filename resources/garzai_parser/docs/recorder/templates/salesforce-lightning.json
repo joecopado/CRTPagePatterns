@@ -673,16 +673,68 @@
         "label"
       ],
       "_why": "parser-one P8 (2026-10-07; v3 `aura-lookup`): an Aura force:inputLookup with a record CHOSEN renders <label>Account Name</label> and a pill -- no <input> -- and v1 emitted nothing for the field (customer-cpq/02-new-opportunity-modal.html `Account Name`, v3-only). The wrapper is the lookup row, named by its own <label>; with no record chosen (an <input> inside) the input is the row instead (hostFamilyRules aura-lookup) and the wrapper is skipped."
+    },
+    {
+      "family": "output_field",
+      "containerClassFragments": [
+        "slds-form-element_readonly"
+      ],
+      "skipIfInsideTags": [
+        "records-record-layout-item",
+        "records-highlights-details-item",
+        "runtime_omnistudio_common-output-field",
+        "lightning-output-field"
+      ],
+      "skipIfDescendantTags": [
+        "input",
+        "select",
+        "textarea"
+      ],
+      "requiredDescendantClassFragments": [
+        "slds-form-element__label"
+      ],
+      "labelFromOwnClassFragments": [
+        "slds-form-element__label"
+      ],
+      "requireLabel": true,
+      "readerCopy": {
+        "rung": "slds_form_element",
+        "hostTags": {
+          "record_flexipage-record-field": "dynamic_forms"
+        },
+        "_why": "2026-10-10 (Dynamic Forms index, measured live on slockard's Zoo Case record page, docs/recorder/evidence/dynamic-forms-index-2026-10-10/): this field is a copy the record-page READER (qforce_lite.get_field_value / verify_field) reaches only through its SECOND rung, the slds-form-element container, never the first (records-record-layout-item). scope_record_page_readers reads this key to rank the copy the way the reader counts it: with a Details copy of the label on the page the reader reads the Details copy for every index it can resolve (index 1 and 2 read the Details copy, index 3 found nothing in 10.3 s), so this copy carries no index; with none, the reader's second rung counts these copies in page order. hostTags names the copy in words (a Dynamic Forms field)."
+      },
+      "_why": "2026-10-10 (Revenue Cloud crawl rows R3, R11, R12; tools/recorder/tests/templates/test_rc_crawl_parser_holes_2026_10_10.py): the SLDS READ-ONLY form element -- div.slds-form-element.slds-form-element_readonly holding a label node (slds-form-element__label) and a value holder (slds-form-element__static) -- is a read-only FIELD wherever it is rendered, and only records-record-layout-item (read mode) was ever read as one. Three hosts, one shape: an Aura record layout item (div.forcePageBlockItemView, 9 labels on a ProductCategory page, 0 rows), a custom LWC's own Information section (builder_industries_interaction_rule-expression-set-information-section, 4 labels), and a plain SLDS form grid (div.slds-form__item, 14 labels). Same family as the LWC layout item: output_field, read by GetFieldValue/VerifyField, never a click or a type. The label is the node's own label text, read as a sighted person reads it; a node with NO label text (an Aura blank-item placeholder) is not a field (requireLabel). A form element holding a real input/select/textarea is an editable control and is left to its own tag; the LWC wrappers that already yield the field are skipped (skipIfInsideTags) so the field is never read twice."
     }
   ],
-  "labelExcludeClassFragments": [],
+  "labelExcludeClassFragments": [
+    "slds-checkbox_faux_container"
+  ],
+  "emptyLabelForClimbs": {
+    "enabled": true,
+    "_why": "2026-10-10 (Revenue Cloud crawl R13, Revenue Settings): a lightning toggle in its label-hidden variant renders <label for=checkbox-toggle-N><span class=slds-form-element__label></span><input role=switch><span class=slds-checkbox_faux_container>Enabled</span></label> -- the primitive's own label is EMPTY once the state text is removed, and the field NAME sits in the <label class=slds-checkbox_toggle> that wraps the whole lightning-input (27 of 63 labels on the page had no control; the toggles were named 'Enabled' / 'Disabled'). A label[for] that is empty is named by the nearest enclosing <label> that has text; a field with no enclosing label is simply unnamed, as before."
+  },
+  "layoutTableRules": {
+    "enabled": true,
+    "headerCellTags": ["th"],
+    "gridRoles": ["grid", "treegrid", "table", "columnheader", "rowheader", "gridcell"],
+    "mustHoldComponentHost": true,
+    "_why": "2026-10-10 (Revenue Cloud crawl R11, the pricing procedure builder canvas): a native <table> with no header cell and no grid role that holds component hosts (custom elements, hyphenated tags) is PAGE LAYOUT, not a data grid. The canvas is 22 such tables; the grid swallow rule hid every control inside them behind one nameless native_table row each (26 checkboxes, among them 'Use cumulative pricing', and ~250 buttons beside them). A real data table has header cells or a grid role and is swallowed exactly as before. Pinned by tools/recorder/tests/templates/test_rc_crawl_parser_holes_2026_10_10.py; over the 1,331 stored captures only the pricing procedure builder holds such tables (22 of them)."
+  },
+  "nativeTableRowControls": {
+    "enabled": true,
+    "roles": ["row_radio"],
+    "_why": "2026-10-10 (Revenue Cloud crawl R14, the Browse Catalogs 'All Catalogs' Flow modal): a Flow runtime datatable is a NATIVE table[role=grid] (not a lightning-datatable), and the swallow rule hid its three row radios behind its cells: the parser emitted table_cell rows for 'Select Item 1..3' and no radio, so the page had no selector a step could drive. A lightning-datatable's row selectors were already emitted (PB2); this is the same emission for a native table that swallows its descendants, limited to the roles listed here (row_radio only -- a native table's row checkboxes keep their old behaviour until a measurement says otherwise). The row is addressed by its unique cell text in the SAME ROW (control_facts.anchor_candidates, kind row_cell), described and never baked into a call. A layout table (layoutTableRules) was never swallowed, so nothing it freed is hidden again."
+  },
+  "containerExemptRoles": ["button", "combobox"],
+  "_why_containerExemptRoles": "2026-10-10 (OCR witness, ocr-coverage-2026-10-09.md; the Data Template ERD object card <div role=button class=erd-object-card>): containerPatterns matches every <div>, so a div that DECLARES role=button was dropped as a layout container before any label was read -- 277 div[role=button] and 28 div[role=combobox] in the 1,329 mined captures, none ever emitted (the pricing builder's 'Lookup Table Details' lookup is one: div.slds-combobox[role=combobox][aria-label], a pill inside, no input). The ARIA role says what it is; it is named like every other control of that family. A node with a native input/select/textarea inside is left to that field.",
   "tableRowLabel": {
     "labelCellClassFragments": [
       "labelCol"
     ]
   },
   "note_tableRowLabel": "2026-10-07 (F19, the product's harness runs on dev1 New Permission Set and gzchores Add Picklist Values): a classic form row -- Visualforce pageBlockSectionItem, a classic Setup edit form -- puts the visible label in a cell whose class carries one of labelCellClassFragments and the control in the data cell after it; the row's <label for> often names a wrapper id, never the control. The `table_row_label` rung of labelPrecedence reads that cell (after the association rungs, before placeholder / title). `input_value` names an <input type=submit|button|reset> by its value, the text QWeb's ClickText matches.",
-  "_why_labelExcludeClassFragments": "parser-one P8 (2026-10-07; v3 `switch`), HELD -- deliberately EMPTY. A lightning toggle's <label for> holds the field name AND the toggle's state text (span.slds-checkbox_faux_container: On / Off), so v1 names Health Cloud's toggle `Show fields on cards On` -- a label carrying a VALUE. Listing `slds-checkbox_faux_container` here fixes it (measured: 5 labels, markup labels +0.1 pt) but the recorder's injected JS resolver (tools/recorder/inject/core.js) reads the same state text, and test_label_parity's ratchet fell 0.850 -> 0.833 with only the parser changed ('Reuse an existing credential' vs '... Set up a new credential' on 09-garzai-console). Port both resolvers in ONE change (core.js + this key + the bundle rebuild), never one side.",
+  "_why_labelExcludeClassFragments": "parser-one P8 (2026-10-07; v3 `switch`) listed the key EMPTY and HELD it: a lightning toggle's <label for> holds the field name AND the toggle's state text (span.slds-checkbox_faux_container: On / Off), so v1 named Health Cloud's toggle `Show fields on cards On` -- a label carrying a VALUE -- and the recorder's injected JS resolver (tools/recorder/inject/core.js) read the same state text, so fixing one side alone dropped test_label_parity's ratchet 0.850 -> 0.833. Landed 2026-10-10 TOGETHER with the core.js port (labelPolicy.labelExcludeClassFragments, the lite-node `decoration` flag) and the Revenue Cloud crawl's toggles (Pricing Setup 'Turn On Price Logs Capture Off', Revenue Settings 'Enabled'/'Disabled'): a switch is named by its NAME, never its state.",
   "targetTags": [
     "button",
     "a",
@@ -1445,6 +1497,7 @@
   "note_stableAttributeAllowlist_readonly": "2026-09-10 (Zoo_Nightmare_Inputs / Data Template): readonly, disabled and aria-disabled are kept so a reader can tell the readonly helper beside 'Contract Term' and the auto-generated 'API Name' from a typeable field; they are state, never a locator.",
   "note_assistiveTextClassFragments_2026_09_10": "tooltip-invisible (span[role=tooltip] behind an icon button, read as 'visible' inner_text on 4 industry pages) and slds-indicator_unsaved (the unsaved-changes '*': state, never a name) are screen-reader-only. Aura's camelCase assistiveText was tried and backed out the same night: it turned a datatable's fallback label into a bare '*' (the iframe label census); a Copado-page fix stream owns it.",
   "labelMaxLen": 100,
+  "labelOverflowReadMax": 400,
   "labelValueRejectPatterns": ["^\\[object \\w+\\]$"],
   "chromeContainers": {
     "_why": "2026-09-11 (fsc-action-plan, hc-um-case, hc-patient-console, fsc-household-group audits: 'the region is inverted' -- the console workspace tab strip, its Actions/Close buttons and the in-app guidance panel were region=page (20-32 rows per console page) while the record's highlights action bar and quick actions were region=chrome). Region is decided by the NEAREST ancestor that carries one of these class fragments or tag prefixes; page fragments and chrome fragments are both listed so the nearer one wins, never the outer.",
@@ -1454,5 +1507,5 @@
     "pageTagPrefixes": ["flexipage", "forcegenerated-", "records-", "force-record", "runtime_industries", "runtime_omnistudio", "vlocity"]
   },
   "note_labelValueRejectPatterns": "2026-09-11: lightning-datatable stamps data-cell-value with a stringified JS object for formatted cells (`[object Object]`, 22 cells on the health90 Contract page); a value matching one of these is never a label and the rung falls through to the cell's visible text.",
-  "note_labelMaxLen": "2026-09-10: the inner_text rung had a literal 60-char ceiling that returned NO label (and no call) for 74-86-char links on six industry pages; every rung now truncates at this length instead."
+  "note_labelMaxLen": "2026-09-10: the inner_text rung had a literal 60-char ceiling that returned NO label (and no call) for 74-86-char links on six industry pages; every rung now truncates at this length instead. 2026-10-10: that sentence was only half true -- the inner_text rung still READ the text with a 60-char ceiling, so a 72-char link had no label and a 108-char Guidance Center article link had none either. labelOverflowReadMax (400) is how far the rung reads a link or button's visible text; a title over labelMaxLen is cut at the last word boundary under it and the row says so (identification.label_truncated). Over the read ceiling the node is a card, not a name, and stays unnamed."
 }

@@ -279,6 +279,8 @@
  ],
  "containerChildThreshold": 3,
  "containerTextThreshold": 200,
+ "containerExemptRoles": ["button", "combobox"],
+ "_why_containerExemptRoles": "2026-10-10 (OCR witness, ocr-coverage-2026-10-09.md; Copado Data Template ERD object card <div role=button class=erd-object-card>): containerPatterns matches every <div>, so a div that DECLARES role=button was dropped as a layout container before any label was read. The ARIA role says it is a button; it is named by its visible text like every other button. Same key as salesforce-lightning.json.",
  "gridRoleValues": [
   "grid",
   "treegrid"

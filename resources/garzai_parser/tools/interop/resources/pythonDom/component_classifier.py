@@ -99,8 +99,24 @@ class ComponentClassifier:
                 found = tag.find_all(lambda n: getattr(n, 'name', None) and (n.get('role') or '').lower() == role)
                 if len(found) < need:
                     continue
+            if not self.structural_extra_ok(tag, rule):
+                continue
             return rule.get('family')
         return None
+
+    @staticmethod
+    def structural_extra_ok(tag, rule) -> bool:
+        """2026-10-10 (Revenue Cloud crawl): the conditions a `structuralContainerRules` rule may add beyond its class
+        fragment. Read by the classifier (the family) AND by capture_orchestration's candidate pass (which nodes are
+        visited), so the two cannot disagree. A rule that declares none of them passes every node, as before.
+          requiredDescendantClassFragments -- some descendant's class carries one of these (a read-only form element
+                                              with no label node is not a field: SLDS blank-item placeholders)
+        """
+        frags = [f for f in (rule.get('requiredDescendantClassFragments') or []) if f]
+        if frags and tag.find(lambda n: getattr(n, 'name', None)
+                              and any(f in ' '.join(n.get('class') or []) for f in frags)) is None:
+            return False
+        return True
 
     # ------------------------------------------------------------ parser-one step 3 P1/P2 (2026-10-07)
     def group_caption_rule(self, tag_name):

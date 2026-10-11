@@ -517,6 +517,39 @@ class DomConfiguration:
     # wrapper id, never the control. {labelCellClassFragments} -- template key `tableRowLabel`; empty here: inert.
     TABLE_ROW_LABEL = {}
 
+    # 2026-10-10 (Revenue Cloud crawl, docs/audit/revenue-cloud-readiness-co1790088700188-2026-10-09.md "CRAWL RESULTS"
+    # R11 builder canvas): a native <table> used as PAGE LAYOUT is not a data grid. The swallow rule (every descendant of
+    # a table is hidden behind one native_table row) hid 26 checkboxes and ~250 buttons in the pricing procedure
+    # builder, whose canvas is 22 layout tables of component hosts. {enabled, headerCellTags, gridRoles,
+    # mustHoldComponentHost}: a table with NO header cell and NO grid role, holding at least one custom-element host, is
+    # layout. Template key `layoutTableRules`; empty here: inert (a table is a grid, as before).
+    LAYOUT_TABLE_RULES = {}
+
+    # 2026-10-10 (OCR witness, docs/recorder/evidence/ocr-coverage-2026-10-09.md; Data Template ERD card
+    # `<div role="button" class="erd-object-card">`): the container-drop pattern '^(div|section|...)$' matches every div,
+    # so a div that DECLARES a widget role was dropped as a layout container -- 277 div[role=button] in the 1,329 mined
+    # captures, none ever emitted. A node whose ARIA role is listed here is the widget it says it is. Template key
+    # `containerExemptRoles`; empty here: inert.
+    CONTAINER_EXEMPT_ROLES = []
+
+    # 2026-10-10 (Revenue Cloud crawl R14, the Browse Catalogs Flow datatable): a native <table> that swallows its descendants
+    # (every data table that is not page layout) used to hide the per-row selector controls too -- only a lightning-datatable's
+    # were emitted (PB2). {enabled, roles}: which ROW_CONTROL_SIGNATURES roles a swallowing native table emits as their own
+    # rows (`row_radio`); a role not listed keeps its old behaviour (swallowed). Template key `nativeTableRowControls`; empty
+    # here: inert.
+    NATIVE_TABLE_ROW_CONTROLS = {}
+
+    # 2026-10-10: a label[for] that is EMPTY once its decoration is removed (a lightning toggle in its label-hidden
+    # variant: the primitive's own label is blank, the field NAME sits in the <label> that wraps the whole component)
+    # is named by the nearest enclosing <label> that has text. {enabled}. Template key `emptyLabelForClimbs`; inert here.
+    EMPTY_LABEL_FOR_CLIMBS = {}
+
+    # 2026-10-10: how far the inner_text rung READS a link/button's visible text before it cuts the label to LABEL_MAX_LEN
+    # at a word boundary (and says so: identification.label_truncated). Below this ceiling a long title is a name; above
+    # it the node is a card or a paragraph, not a name. Template key `labelOverflowReadMax`; 0 = the old behaviour
+    # (reject anything over 60 characters: the ceiling the call used to pass).
+    LABEL_OVERFLOW_READ_MAX = 400
+
     # 2026-09-10: every label rung truncates at this length (template `labelMaxLen`); the inner_text
     # rung used to REJECT anything over 60 characters outright (no label, no call).
     LABEL_MAX_LEN = 100
@@ -1049,7 +1082,11 @@ class DomConfiguration:
         },
         {
             'tags': ['select', 'div'],
-            'attributes': {'class': lambda c: c and ('sbqq' in c.lower() or 'sb-' in c.lower())},
+            # 2026-10-10: `tag.get('class')` is a LIST (bs4), and `list.lower` does not exist -- this lambda raised
+            # AttributeError for every select/div carrying a class that reached it, and _extract_element_data's
+            # blanket except turned the raise into "no element". Join the tokens first (a str passes through).
+            'attributes': {'class': lambda c: bool(c) and ('sbqq' in (c if isinstance(c, str) else ' '.join(c)).lower()
+                                                           or 'sb-' in (c if isinstance(c, str) else ' '.join(c)).lower())},
             'type': 'cpq_dropdown',
             'dynamic': True,
         },
@@ -1140,6 +1177,12 @@ class DomConfiguration:
         ("LABEL_PRECEDENCE", "labelPrecedence", list),
         # 2026-09-10 -- the one label length; the inner_text rung's literal 60 dropped long link labels.
         ("LABEL_MAX_LEN", "labelMaxLen", int),
+        ("LABEL_OVERFLOW_READ_MAX", "labelOverflowReadMax", int),
+        # 2026-10-10 -- Revenue Cloud crawl holes: layout tables, widget-role divs, label-hidden toggles.
+        ("LAYOUT_TABLE_RULES", "layoutTableRules", dict),
+        ("NATIVE_TABLE_ROW_CONTROLS", "nativeTableRowControls", dict),
+        ("CONTAINER_EXEMPT_ROLES", "containerExemptRoles", list),
+        ("EMPTY_LABEL_FOR_CLIMBS", "emptyLabelForClimbs", dict),
         ("LABEL_VALUE_REJECT_PATTERNS", "labelValueRejectPatterns", list),
         ("BOOLEAN_STATE_ATTRIBUTES", "booleanStateAttributes", list),
         # wave-2 review close, stream P1 2026-09-07 -- F11/F21, both data.
@@ -1309,12 +1352,49 @@ class DomConfiguration:
         if not tag or not hasattr(tag, 'name'):
             return False
         tag_name = tag.name.lower()
+        if self._exempt_by_role(tag):
+            return False
         for pattern in self.CONTAINER_PATTERNS:
             if re.match(pattern, tag_name):
                 if tag_name.startswith('c-'):
                     return self._validate_custom_container(tag)
                 return True
         return False
+
+    def _exempt_by_role(self, tag) -> bool:
+        """2026-10-10 (template `containerExemptRoles`): a node that DECLARES a widget role (div[role=button],
+        div[role=combobox]) is that widget, not a layout container -- unless a native form field sits inside it (the
+        ARIA 1.0 combobox wraps its <input>: the input is the control, and a second row for the wrapper would read the
+        same control twice)."""
+        if not self.CONTAINER_EXEMPT_ROLES or not tag or not getattr(tag, 'name', None):
+            return False
+        return ((tag.get('role') or '').strip().lower() in {r.lower() for r in self.CONTAINER_EXEMPT_ROLES}
+                and tag.find(['input', 'select', 'textarea']) is None)
+
+    def _is_layout_table(self, tag) -> bool:
+        """2026-10-10 (template `layoutTableRules`): True for a native <table> that is PAGE LAYOUT, not a data grid.
+
+        A grid has column or row HEADERS (a header cell tag anywhere inside) or declares a grid ROLE on itself or a
+        descendant; a layout table has neither and holds component hosts -- custom elements, whose tag carries a hyphen
+        (the Revenue Cloud pricing procedure builder: 22 tables of `builder_industries_interaction_rule-*` hosts, each
+        swallowing its checkboxes, buttons and comboboxes behind one nameless native_table row). A plain-HTML table of
+        cells (no custom element) stays a table whichever way it is marked up. Inert without the template key."""
+        spec = getattr(self, 'LAYOUT_TABLE_RULES', None) or {}
+        if not spec.get('enabled') or not tag or not getattr(tag, 'name', None):
+            return False
+        headers = [t.lower() for t in (spec.get('headerCellTags') or ['th'])]
+        if tag.find(headers) is not None:
+            return False
+        roles = {r.lower() for r in (spec.get('gridRoles') or [])}
+        if roles:
+            if (tag.get('role') or '').lower() in roles:
+                return False
+            if tag.find(attrs={'role': lambda r: bool(r) and r.lower() in roles}) is not None:
+                return False
+        if spec.get('mustHoldComponentHost', True):
+            return tag.find(lambda t: bool(getattr(t, 'name', None)) and '-' in t.name
+                            and t.name.lower() != 'template') is not None
+        return True
 
     def _validate_custom_container(self, tag) -> bool:
         if not tag:

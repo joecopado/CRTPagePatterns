@@ -39,6 +39,10 @@ Record schema -- docs/recorder/POM.md. The short version:
                        n_pass, n_fail, by_kind, last, result}}
              -- `proven` is written by `stamp_proven` alone (D27): which VALIDATION proved or failed the
              call, never a verdict that it merely acted. `n_verified` is a live verdict, not a proof.
+             carried?: {from: brain, verdict, n_verified, n_failed, date, rung, source, carried_at,
+                        clean_failures?, demoted?, restamped?} -- D27a: a brain verdict carried into
+             v2's store by `carry_verdicts`; lead_misses?/n_lead_misses?: store-led misses that were
+             COULD-NOT-CHECK (a guard unconfirmed), each with its reasons (`record_lead_miss`).
 Every `put` passes the record through the page-content scrub (`scrub_record`) first.
   rung_stats host/org-level {family: {kw: {won, failed}}} merged from lessons.jsonl
   patterns  names of library keywords that applied here
@@ -1010,7 +1014,9 @@ def stamp_proven(rec: dict, *, label: str, family: str | None, call: dict, kind:
     `proven`. Raises ValueError, writing nothing, on a kind that is not a validation (`acted` included), a
     result other than pass/fail, a failure-only kind given as a pass, no label, no session step, or a run
     context without org/user/profile keys. Returns {'stamped', 'why', 'key', 'element_id', 'rung_key',
-    'minted_element', 'minted_rung'}."""
+    'minted_element', 'minted_rung'}, plus -- D27a -- 'restamped' (the elements whose brain-carried rung this
+    passing validation re-stamped) or 'carried_failures' (a failed validation counted against a carried verdict)
+    when the call is a live brain-carried rung's call on any element with this label."""
     if kind not in VALIDATION_KINDS and kind not in FAILURE_ONLY_KINDS:
         raise ValueError("stamp_proven: %r is not a validation -- a call is proven only by %s; 'acted without an "
                          "error' never proves it (D27)" % (kind, ", ".join(VALIDATION_KINDS)))
@@ -1053,15 +1059,212 @@ def stamp_proven(rec: dict, *, label: str, family: str | None, call: dict, kind:
                 "failure_signal": None, "origin": ORIGIN_PROVEN}
         ladder.append(rung)
     at = at or _iso(now())
+    _write_stamp(rung, key, kind=kind, result=result, at=at, run=run, source=source, evidence=evidence)
+    carried = _carried_after_validation(rec, label, family, pc, kind=kind, result=result, at=at, source=source)
+    return {"stamped": True, "why": "%s %s" % (kind, result), "key": key, "element_id": eid, "rung_key": want,
+            "minted_element": minted_el, "minted_rung": minted_rung, **carried}
+
+
+def _write_stamp(rung: dict, key: str, *, kind: str, result: str, at: str, run: dict, source: dict,
+                 evidence: dict | None) -> None:
+    """One stamp onto one rung's `proven` block and the summary recomputed -- the write half of `stamp_proven`, shared
+    with `record_lead_miss` (which names the rung that led itself, so it never goes through `identify_control`)."""
     p = rung.setdefault("proven", {})
     stamps = p.setdefault("stamps", {})
     stamps[key] = {"kind": kind, "result": result, "at": at, "seq": len(stamps) + 1,
-                   "run": {k: run.get(k) for k in ("org", "user", "profile")},
+                   "run": {k: (run or {}).get(k) for k in ("org", "user", "profile")},
                    "source": {"session": source["session"], "step": source["step"]},
                    "evidence": dict(evidence or {})}
     p.update(_proven_summary(stamps))
-    return {"stamped": True, "why": "%s %s" % (kind, result), "key": key, "element_id": eid, "rung_key": want,
-            "minted_element": minted_el, "minted_rung": minted_rung}
+
+
+# ------------------------------------------------------------- BRAIN-CARRIED VERDICTS (D27a, 2026-10-10)
+# The user, 2026-10-10: "The brain verdict should carry over to V2 ... If it's behind ... it's wrong by design", and on
+# demotion: "The [de]motions have to be cautious, just because maybe the page wasn't loaded, maybe we were on the wrong
+# page, or maybe this control is applicable to a different page entirely." match.py holds the read side (carried_live,
+# best_carried_rung); the three writers are here:
+#   carry_verdicts      marks the rungs a seed carries (the brain's consult rule, frozen with its provenance);
+#   stamp_proven        a validation that PASSED re-stamps the carried call (D27 from then on); one that FAILED counts
+#                       as a clean failure (it acted on that page and was judged);
+#   record_lead_miss    a store-led call that could NOT act: a clean failure only when the page key and state were
+#                       confirmed, the readiness wait passed and the control's own context was showing; otherwise
+#                       COULD-NOT-CHECK for that rung with the reason, and nothing is demoted.
+# Two clean failures demote a carried verdict (match.CARRIED_DEMOTE_AFTER); one is recorded and it keeps leading.
+DEMOTION_GUARDS = ("page", "ready", "context")
+GUARD_WORDS = {"page": "the page key and state were confirmed", "ready": "the readiness wait passed",
+               "context": "the control's own context (modal, menu, tab, section) was showing"}
+#: the newest unconfirmed misses kept per rung (each with its reasons); `n_lead_misses` counts them all
+LEAD_MISS_CAP = 20
+
+
+def carry_verdicts(rec: dict, *, source: dict, at: str | None = None) -> dict:
+    """Mark every rung of `rec` the brain's consult rule calls verified -- passed live (`n_verified` > 0), its last
+    verdict VERIFIED-PASS or PASS-GUARDED, no failed validation and no v2 demotion -- with a `carried` block: the
+    verdict frozen as it is carried, its date (the rung's last live pass), its rung key and `source` (the brain
+    partition and page key, plus the element). A rung a validation already PROVED needs no carried verdict and is left
+    alone; a rung already carried keeps its block (its v2 history -- failures, a demotion, a re-stamp -- is v2's fact
+    and a re-seed never resets it). Pure (no disk). -> {carried, elements, kept, proven_skipped}."""
+    at = at or _iso(now())
+    n = kept = proven_skipped = 0
+    els = set()
+    for eid, el in (rec.get("elements") or {}).items():
+        for r in el.get("ladder") or []:
+            if isinstance(r.get("carried"), dict):
+                kept += 1
+                continue
+            if M.proven_passed(r):
+                proven_skipped += 1
+                continue
+            if M.proven_failed(r) or not (int(r.get("n_verified") or 0) > 0 and r.get("last_verdict") in VERIFIED):
+                continue
+            r["carried"] = {"from": M.CARRIED_FROM, "verdict": r.get("last_verdict"),
+                            "n_verified": int(r.get("n_verified") or 0), "n_failed": int(r.get("n_failed") or 0),
+                            "date": r.get("last_seen"), "rung": rung_key(r),
+                            "source": {**dict(source or {}), "element_id": eid}, "carried_at": at}
+            n += 1
+            els.add(eid)
+    return {"carried": n, "elements": len(els), "kept": kept, "proven_skipped": proven_skipped}
+
+
+def _same_locator(rung: dict, pc: dict) -> bool:
+    """True when the call `pc` (a proven_call) is this rung's call: the same keyword (any spelling), the same locator
+    cell, and every locator kwarg the rung carries carried by the call too. A store-led call is built FROM the rung
+    (consult.merged_call: the rung's kwargs win, the step adds its data and hints), so it is a superset of it."""
+    rc = proven_call(rung)
+    if M.flat_kw(rc.get("kw")) != M.flat_kw(pc.get("kw")) or (rc.get("args") or [])[:1] != (pc.get("args") or [])[:1]:
+        return False
+    have = {str(k): str(v) for k, v in (pc.get("kwargs") or {}).items()}
+    return all(have.get(str(k)) == str(v) for k, v in (rc.get("kwargs") or {}).items())
+
+
+def _carried_same_call(rec: dict, label: str, family: str | None, pc: dict) -> list[tuple[str, dict]]:
+    """(element id, rung) of every LIVE brain-carried rung whose call this is, on any element of the record with this
+    label (a seeded brain twin and v2's own element are two elements for one control)."""
+    want = M.norm_label(label)
+    out = []
+    for eid, el in (rec.get("elements") or {}).items():
+        if M.norm_label(el.get("label")) != want or not M.families_compatible(family, el.get("family")):
+            continue
+        for r in el.get("ladder") or []:
+            if M.carried_live(r) and _same_locator(r, pc):
+                out.append((eid, r))
+    return out
+
+
+def _count_clean_failure(rung: dict, key: str, *, at: str, kind: str, source: dict, why: str) -> dict:
+    """Record one clean failure on a carried rung (idempotent per `key`); demote at CARRIED_DEMOTE_AFTER."""
+    c = rung["carried"]
+    fails = c.setdefault("clean_failures", [])
+    if not any(f.get("key") == key for f in fails):
+        fails.append({"key": key, "at": at, "kind": kind,
+                      "source": {"session": source.get("session"), "step": source.get("step")}, "why": why})
+    if len(fails) >= M.CARRIED_DEMOTE_AFTER and not c.get("demoted"):
+        c["demoted"] = {"at": at, "after": len(fails), "why": why,
+                        "failures": [f.get("key") for f in fails]}
+    return {"clean_failures": len(fails), "demoted": bool(c.get("demoted"))}
+
+
+def _carried_after_validation(rec: dict, label: str, family: str | None, pc: dict, *, kind: str, result: str,
+                              at: str, source: dict) -> dict:
+    """D27a, the validation half: a validation of a carried call that PASSED re-stamps it (D27's rule from then on); one
+    that FAILED is a clean failure (the call acted and was judged). could_not_act is not a validation and changes
+    nothing here: a store-led miss is judged by `record_lead_miss`, whose guards a backfill cannot know."""
+    if kind not in VALIDATION_KINDS:
+        return {}
+    hits = _carried_same_call(rec, label, family, pc)
+    if not hits:
+        return {}
+    key = "%s#%s#%s" % (source["session"], source["step"], kind)
+    if result == "pass":
+        for eid, r in hits:
+            r["carried"]["restamped"] = {"at": at, "kind": kind, "key": key, "element_id": eid,
+                                         "source": {"session": source["session"], "step": source["step"]}}
+        return {"restamped": [eid for eid, _r in hits]}
+    out = []
+    for eid, r in hits:
+        c = _count_clean_failure(r, key, at=at, kind=kind, source=source,
+                                 why="a %s validation of this call FAILED in v2" % kind)
+        out.append({"element_id": eid, **c})
+    return {"carried_failures": out}
+
+
+def record_lead_miss(rec: dict, element_id: str, call: dict, *, guards: dict | None, run: dict, source: dict,
+                     at: str | None = None, evidence: dict | None = None) -> dict:
+    """A store-led call could NOT act: record it on the rung that led -- element `element_id`, the rung whose locator
+    identity is `call`'s (never a twin: no `identify_control`) -- CAUTIOUSLY (D27a). Pure (no disk).
+
+    `guards` is {"page" | "ready" | "context": {"ok": True | False | None, "why": "<words>"}}, judged by the caller at the
+    moment of the miss. The miss is a CLEAN failure only when all three are True:
+      page     the page key and state were confirmed (the page on screen is the record's page, in the state the card
+               describes);
+      ready    the readiness wait passed (the capture reported ready and the page still shows the captured state);
+      context  the control's own context (its modal, menu, tab or section) was showing.
+    Otherwise -- a guard False, None (could not tell) or missing -- it is COULD-NOT-CHECK for that rung: the reasons
+    are recorded on the rung (`lead_misses`) and nothing is demoted.
+
+    A CLEAN failure is stamped `could_not_act` on the rung (the evidence). On a live brain-carried rung it is also
+    counted, and the carried verdict is demoted only at the second (match.CARRIED_DEMOTE_AFTER); any other rung -- a v2
+    proof -- is demoted by the stamp itself, D27's rule.
+
+    -> {recorded, clean, demoted, verdict, why, guards, clean_failures}. Never raises on a missing element or rung."""
+    out = {"recorded": False, "clean": False, "demoted": False, "verdict": "COULD-NOT-CHECK", "why": "", "guards": {},
+           "clean_failures": None}
+    if not isinstance(source, dict) or not source.get("session") or source.get("step") in (None, ""):
+        raise ValueError("record_lead_miss: source needs {'session', 'step'} -- a miss is idempotent per session step")
+    el = (rec.get("elements") or {}).get(element_id)
+    if el is None:
+        out["why"] = ("COULD-NOT-CHECK: the element that led (%s) is not in the record; nothing written" % element_id)
+        return out
+    want = rung_key(proven_call(call or {}))
+    rung = next((r for r in el.get("ladder") or [] if rung_key(proven_call(r)) == want), None)
+    if rung is None:
+        out["why"] = "COULD-NOT-CHECK: the rung that led is no longer on its element; nothing written"
+        return out
+    g = {}
+    for name in DEMOTION_GUARDS:
+        v = (guards or {}).get(name)
+        v = v if isinstance(v, dict) else {}
+        g[name] = {"ok": v.get("ok") if v.get("ok") in (True, False) else None,
+                   "why": str(v.get("why") or "not judged by the caller")}
+    out["guards"] = g
+    at = at or _iso(now())
+    key = "%s#%s" % (source["session"], source["step"])
+    unconfirmed = [n for n in DEMOTION_GUARDS if g[n]["ok"] is not True]
+    if unconfirmed:
+        why = "; ".join("%s %s: %s" % (GUARD_WORDS[n], "NO" if g[n]["ok"] is False else "COULD NOT TELL", g[n]["why"])
+                        for n in unconfirmed)
+        lst = rung.setdefault("lead_misses", [])
+        if not any(x.get("key") == key for x in lst):
+            lst.append({"key": key, "at": at, "verdict": "COULD-NOT-CHECK", "why": why, "guards": g,
+                        "run": {k: (run or {}).get(k) for k in ("org", "user", "profile")},
+                        "evidence": dict(evidence or {})})
+            rung["n_lead_misses"] = int(rung.get("n_lead_misses") or 0) + 1
+            rung["lead_misses"] = lst[-LEAD_MISS_CAP:]
+        out.update(recorded=True, why="COULD-NOT-CHECK for this rung, no demotion (D27a): " + why)
+        return out
+    out["clean"] = True
+    out["verdict"] = "CAUGHT-BUG"
+    if key + "#could_not_act" in (((rung.get("proven") or {}).get("stamps")) or {}):
+        out.update(recorded=True, demoted=M.carried_demoted(rung) or (not M.carried_live(rung)
+                                                                      and M.proven_failed(rung)),
+                   why="already recorded: %s#could_not_act (a stamp is evidence, never overwritten)" % key)
+        return out
+    was_carried = M.carried_live(rung)
+    _write_stamp(rung, key + "#could_not_act", kind="could_not_act", result="fail", at=at, run=run, source=source,
+                 evidence={**dict(evidence or {}), "guards": "page, ready and context confirmed"})
+    if was_carried:
+        c = _count_clean_failure(rung, key, at=at, kind="could_not_act", source=source,
+                                 why="could not act on a confirmed, ready page with its context showing (%s)"
+                                     % ((evidence or {}).get("error") or "a locator error"))
+        out.update(recorded=True, demoted=c["demoted"], clean_failures=c["clean_failures"],
+                   why=("a clean failure of a brain-carried verdict, %d of %d: %s"
+                        % (c["clean_failures"], M.CARRIED_DEMOTE_AFTER,
+                           "DEMOTED, it no longer leads" if c["demoted"] else "recorded, it still leads")))
+        return out
+    out.update(recorded=True, demoted=True,
+               why="a clean failure: could_not_act stamped on the rung that led; its last validation FAILED, so it no "
+                   "longer leads (D27)")
+    return out
 
 
 # ---------------------------------------------------------------- the ONE slug rule (V-n14b 6a)

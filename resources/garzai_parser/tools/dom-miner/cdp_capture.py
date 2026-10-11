@@ -31,12 +31,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import json
 import os
 import re
 import subprocess
 import sys
 import urllib.request
+import zlib
 
 DEFAULT_PORT = 9333
 
@@ -324,6 +326,39 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
   var stats = {nodes:0, shadowRoots:0, hiddenSkipped:0, iframes:0, crossOriginFrames:0, depthCapped:[],
                labels:0, inputs:0, customElements:0, closedRootSuspects:0, shadowDepthCapped:0};
   var inShadow = 0;   // >0 while walk() is inside an open shadow root (completeness counters)
+  // GEOMETRY SIDECAR (offline resolution validator, 2026-10-10). One row per EMITTED element, in
+  // emission (= document pre-) order, so a reader aligns rows to the parsed capture by sequence:
+  //   [tagIndex, x, y, w, h, flags]   x,y = document coordinates (rect + scroll), 1 decimal
+  // flags: 1 computed visibility:hidden (only an INPUT survives the walk with it), 2 opacity<0.01,
+  // 4 NO OFFSET (offsetWidth<=0 and rect.width<=0 -- QWeb's own 'offset' check), 8 pointer-events:none,
+  // 16 position:fixed (its document coordinates move with the scroll), 32 inside a same-origin iframe.
+  // Recorded for every emitted element rather than a chosen subset: which node a text, an anchor or
+  // an xpath lands on is not known until a resolver runs, and a row missing for the node that
+  // mattered is exactly the silent hole this record exists to close. Nothing here touches the markup.
+  var GEO = {v:1, tags:[], rows:[], vw:0, vh:0, sx:0, sy:0, dpr:1, frames:0, errors:0};
+  var GEO_TAGIDX = {}, OX = 0, OY = 0, inFrame = 0, lastCs = null;
+  try{ GEO.vw=window.innerWidth||0; GEO.vh=window.innerHeight||0;
+       GEO.sx=window.scrollX||window.pageXOffset||0; GEO.sy=window.scrollY||window.pageYOffset||0;
+       GEO.dpr=window.devicePixelRatio||1; }catch(e){}
+  function r1(n){ return Math.round(n*10)/10; }
+  function geoRow(node, lower){
+    var ti = GEO_TAGIDX[lower];
+    if(ti===undefined){ ti = GEO.tags.length; GEO.tags.push(lower); GEO_TAGIDX[lower] = ti; }
+    try{
+      var r = node.getBoundingClientRect(), f = 0, cs = lastCs;
+      if(cs){
+        if(cs.visibility==='hidden') f |= 1;
+        var op = parseFloat(cs.opacity); if(op===op && op<0.01) f |= 2;
+        if(cs.pointerEvents==='none') f |= 8;
+        if(cs.position==='fixed') f |= 16;
+      }
+      var ow = node.offsetWidth;
+      if(!(ow>0 || r.width>0)) f |= 4;
+      if(inFrame) f |= 32;
+      var bx = inFrame ? OX : GEO.sx, by = inFrame ? OY : GEO.sy;
+      GEO.rows.push([ti, r1(r.left+bx), r1(r.top+by), r1(r.width), r1(r.height), f]);
+    }catch(e){ GEO.errors++; GEO.rows.push([ti]); }
+  }
   var SECRET = [
     /\b00D[A-Za-z0-9]{12,}(?:![A-Za-z0-9._\-]+|\b)/g,
     /(sid|sessionId|access_token|refresh_token|otp|token)=[^&"'\s<>]+/gi,
@@ -356,8 +391,10 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
     return a.join('');
   }
   function visible(el){
-    var cs; try{ cs=getComputedStyle(el);}catch(e){return true;}
+    var cs; lastCs = null;
+    try{ cs=getComputedStyle(el);}catch(e){return true;}
     if(!cs) return true;
+    lastCs = cs;
     if(cs.display==='none') return false;
     if(cs.visibility==='hidden' && el.tagName!=='INPUT') return false;
     return true;
@@ -395,17 +432,29 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
       var _sr0=null; try{ _sr0=node.shadowRoot; }catch(e){}
       if(!_sr0 && node.childNodes.length===0) stats.closedRootSuspects++;
     }
-    if(lower==='svg'){ buf.push('<svg'+attrs(node)+'></svg>'); return; }
+    if(lower==='svg'){ geoRow(node, lower); buf.push('<svg'+attrs(node)+'></svg>'); return; }
     if(lower==='iframe'){
       // Salesforce Setup is Classic-in-a-same-origin-iframe. QWeb searches
       // frames transparently (@frame.all_frames), so the frame's content is
       // part of the "page" a test sees -- capture it inline.
       stats.iframes++;
       var fIdx = stats.iframes;
+      geoRow(node, lower);
       buf.push('<iframe'+attrs(node)+'>');
       try{
         var d=node.contentDocument;
-        if(d&&d.body){ buf.push('<!--frame-content-->'); walk(d.body, depth+1, buf); }
+        if(d&&d.body){
+          buf.push('<!--frame-content-->');
+          // the frame's own coordinates are viewport-relative to the FRAME: shift them by where the
+          // frame sits in the top document so every row is in one coordinate system
+          var svF = [OX, OY, inFrame];
+          try{ var fr = node.getBoundingClientRect();
+               OX = fr.left + (node.clientLeft||0) + (inFrame ? svF[0] : GEO.sx);
+               OY = fr.top + (node.clientTop||0) + (inFrame ? svF[1] : GEO.sy); }catch(e){}
+          inFrame++; GEO.frames++;
+          try{ walk(d.body, depth+1, buf); }
+          finally{ OX = svF[0]; OY = svF[1]; inFrame = svF[2]; }
+        }
         else {
           // OOPIF: opaque from inside this page's JS. Tagged with idx+src so the OUT-OF-PAGE
           // Python caller (capture(), via tools/recorder/cdp_transport.FrameAttacher) can attach
@@ -421,6 +470,7 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
       buf.push('</iframe>');
       return;
     }
+    geoRow(node, lower);
     buf.push('<'+lower+attrs(node)+'>');
     var sr=null; try{ sr=node.shadowRoot; }catch(e){}
     if(sr){
@@ -439,6 +489,7 @@ def build_serializer(max_depth: int = DEFAULT_MAX_DEPTH) -> str:
   return JSON.stringify({
     html: buf.join(''),
     stats: stats,
+    geometry: GEO,
     title: document.title,
     // W3 2026-09-08: `path` is the LANDED location at serialize time, and it now carries
     // location.hash too -- a console/one-page-app route can live entirely in the fragment,
@@ -942,6 +993,7 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                          {"expression": serializer, "returnByValue": True, "timeout": 60000})
         payload = json.loads(r["result"]["value"])
         payload["stats"] = unprototype(payload.get("stats") or {})
+        geometry = unprototype(payload.get("geometry") or {})
 
         capped = payload["stats"].get("depthCapped") or []
         if capped:
@@ -958,6 +1010,10 @@ async def capture(url: str, out_path: str, port: int, settle: float,
     # PII redaction runs AFTER the frame splice so a spliced cross-origin (Visualforce) frame's
     # body is redacted too -- before this ordering was fixed, VF content bypassed the scrubber.
     html, redaction = _pii_redact(html, org, no_redact)
+    geo_status, geo_body = geometry_stamp(geometry)
+    geo_line = _stamp_line("geometry", geo_status, geo_body)
+    if geo_status in ("OK", "PARTIAL"):
+        html = html + "\n" + geometry_encode(geometry)
 
     # What the caller asked for, as a bare path, so it compares to `payload['path']`.
     if in_place:
@@ -1025,7 +1081,9 @@ async def capture(url: str, out_path: str, port: int, settle: float,
         # crawl fix 3: the settle the CALLER ran before this capture (`--settle-json`), when given
         + settle_line
         # crawl fix 5: the full-page screenshot the caller took of THIS state, its region boxed
-        + shot_line +
+        + shot_line
+        # the geometry sidecar's own stamp (the data is the LAST line of the file)
+        + geo_line +
         f"<!-- cross-origin-frames: {json.dumps(frame_stats)} -->\n"
         f"<!-- redaction: {json.dumps(redaction, sort_keys=True)} -->\n"
         "<!-- serialization: open shadow roots emitted as "
@@ -1042,8 +1100,48 @@ async def capture(url: str, out_path: str, port: int, settle: float,
                       "path_matches": path_matches, "lazy_wait": lazy,
                       "state": state_name, "entered_via": entered_via_name,
                       "host_url": state_host_url, "expand": expand, "settle": settle_stamp,
-                      "screenshot": shot_stamp,
+                      "screenshot": shot_stamp, "geometry": {"status": geo_status, **geo_body},
                       "redaction": redaction, **payload["stats"]}))
+
+
+GEOMETRY_TAG = "gz-geometry"
+GEOMETRY_VERSION = 1
+
+
+def geometry_encode(geo: dict) -> str:
+    """The geometry sidecar as ONE comment line: `<!-- gz-geometry v1 zlib+base64: <blob> -->`.
+
+    A sidecar, not attributes on the markup (decided 2026-10-10): `review_table.identity_of` builds a
+    control's identity xpath from EVERY attribute on the node, so a per-element `data-gz-box` would have
+    become part of the identity of every control on every new capture, and a box changes with the layout.
+    The blob goes in AFTER the PII redactor has run (base64 can contain a run the secret/phone patterns
+    would eat) and carries no text at all: tag names and numbers only. Base64's alphabet has no hyphen,
+    so the comment cannot end early. Reader and alignment: tools/recorder/capture_geometry.py."""
+    compact = json.dumps({"v": GEOMETRY_VERSION, "tags": geo.get("tags") or [], "rows": geo.get("rows") or [],
+                          "vw": geo.get("vw"), "vh": geo.get("vh"), "sx": geo.get("sx"),
+                          "sy": geo.get("sy"), "dpr": geo.get("dpr")}, separators=(",", ":"))
+    blob = base64.b64encode(zlib.compress(compact.encode("utf-8"), 9)).decode("ascii")
+    # 12-character words, space separated: the repo's PII / secret scanners (tools/guards/capture_pii.py)
+    # match runs of 15-24+ alphanumerics (record ids, a 00D<org> prefix, JWT-shaped tokens), and one
+    # unbroken base64 run of 20 KB would eventually look like one. No run here is longer than 12.
+    blob = " ".join(blob[i:i + 12] for i in range(0, len(blob), 12))
+    return f"<!-- {GEOMETRY_TAG} v{GEOMETRY_VERSION} zlib+base64: {blob} -->\n"
+
+
+def geometry_stamp(geo) -> tuple:
+    """(status, body) for the header line `<!-- geometry: STATUS {json} -->`. A capture that recorded no
+    geometry says so (COULD-NOT-CHECK, with the reason) rather than carry no line at all."""
+    if not isinstance(geo, dict) or not geo.get("rows"):
+        return "COULD-NOT-CHECK", {"why": "the serializer returned no geometry rows (an older in-page "
+                                          "serializer, or a page with no body)"}
+    rows = geo["rows"]
+    boxed = sum(1 for r in rows if isinstance(r, list) and len(r) >= 6)
+    status = "OK" if boxed == len(rows) else "PARTIAL"
+    return status, {"v": GEOMETRY_VERSION, "rows": len(rows), "boxed": boxed, "errors": geo.get("errors", 0),
+                    "vw": geo.get("vw"), "vh": geo.get("vh"), "sx": geo.get("sx"), "sy": geo.get("sy"),
+                    "dpr": geo.get("dpr"), "frames_walked": geo.get("frames", 0),
+                    "note": "rows align to the parsed capture by element sequence; a spliced cross-origin "
+                            "frame's elements carry no row"}
 
 
 def _stamp_line(key: str, status: str, body) -> str:

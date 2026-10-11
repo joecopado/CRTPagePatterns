@@ -189,34 +189,117 @@ def typed_value(typed: str, actual: str | None, *, field: str = "",
     raise SilentWrongValue(f"typed {typed!r} into {field or 'field'}{why}.")
 
 
+#: What may sit in front of an amount WITHOUT being part of its value: one currency SYMBOL, or an ISO-4217 code
+#: Salesforce renders in a multi-currency org ('USD 1,500,000.00'). Anything else in front of the digits
+#: ('INV-', 'PO-', 'Suite ', 'Total: ') is LETTERS OF THE VALUE and is kept. Error 2c0cd360c5: the numeric reading
+#: used to strip EVERY leading non-digit run, so 'INV-2024' and 'PO-2024' both became Decimal('-2024') and graded
+#: equal, as did 'ABC-1'/'XYZ-1' and 'Suite 5'/'Unit 5'.
+_CURRENCY_SYMBOLS = {"$": "USD", "\u20ac": "EUR", "\u00a3": "GBP", "\u00a5": "JPY", "\u20b9": "INR", "\u20a9": "KRW",
+                     "\u20bd": "RUB", "\u20ba": "TRY", "\u20aa": "ILS", "\u20ab": "VND", "\u0e3f": "THB",
+                     "\u20b1": "PHP", "\u20b4": "UAH", "\u20a6": "NGN"}
+_CURRENCY_CODES = frozenset(
+    "USD EUR GBP JPY CNY CAD AUD NZD CHF SEK NOK DKK PLN CZK HUF RON BGN ISK RUB UAH TRY ILS AED SAR QAR KWD BHD OMR EGP "
+    "ZAR NGN KES GHS MAD INR PKR BDT LKR THB VND IDR MYR SGD PHP HKD TWD KRW MXN BRL ARS CLP COP PEN UYU".split())
+#: A plain RENDERED number: optional sign, optional currency marker, digits with valid thousands groups (or none) and an
+#: optional fraction, optional ONE percent sign. '1,5', '1_000', '1e5', 'Inf' are not plain numbers.
+_PLAIN_NUMBER_RE = re.compile(
+    r"^(?P<s1>[+-])?\s*(?:(?P<sym>[" + "".join(_CURRENCY_SYMBOLS) + r"])|(?P<code>[A-Za-z]{3}))?\s*(?P<s2>[+-])?\s*"
+    r"(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,2}(?:,\d{2})+,\d{3}(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*(?P<pct>%)?$")
+#: A float's own repr ('1e+16', '7.5e-05'): what SOQL hands back for a typed numeric field, never a rendered value.
+_SCIENTIFIC_RE = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$")
+_ISO_DATE_WHOLE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_ISO_DATETIME_WHOLE_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$")
+#: A phone, an SSN or a masked input: digits and the separators of those, nothing else.
+_FORMATTED_ID_RE = re.compile(r"\+?[0-9()./\- ]+")
+
+
+def _plain_number(s: str):
+    """`(Decimal, unit)` for a RENDERED plain number, else None. `unit` is None, ('cur', <ISO code or symbol>) or ('pct',).
+    Formatting only: a sign, ONE currency marker (symbol or a known ISO code), valid thousands commas, a fraction, ONE
+    percent sign. Never letters of the value, a mis-grouped comma ('1,5'), an exponent or a '_' digit separator."""
+    m = _PLAIN_NUMBER_RE.match(s)
+    if not m or (m.group("s1") and m.group("s2")):
+        return None
+    code, sym = m.group("code"), m.group("sym")
+    if code and code.upper() not in _CURRENCY_CODES:
+        return None
+    if (code or sym) and m.group("pct"):
+        return None
+    sign = m.group("s1") or m.group("s2") or ""
+    value = Decimal(sign + m.group("num").replace(",", ""))
+    if code:
+        return value, ("cur", code.upper())
+    if sym:
+        return value, ("cur", _CURRENCY_SYMBOLS[sym])
+    return value, (("pct",) if m.group("pct") else None)
+
+
+def _whole_date(s: str):
+    """A RENDERED date or datetime, the WHOLE string and nothing else, as a comparable value; else None. ISO and US
+    `m/d/yyyy` dates compare as dates; an ISO datetime compares as its UTC minute. A date that merely STARTS a longer
+    value ('2026-10-08 Kickoff') is that longer value, not a date."""
+    m = _ISO_DATE_WHOLE_RE.match(s)
+    if m:
+        y, mo, d = (int(x) for x in m.groups())
+    else:
+        m = _US_DATE_RE.match(s)
+        if m:
+            mo, d, y = (int(x) for x in m.groups())
+        elif _ISO_DATETIME_WHOLE_RE.match(s):
+            when = _to_utc_minute(s)
+            return ("datetime", when) if isinstance(when, _datetime) else None
+        else:
+            return None
+    try:
+        return ("date", _datetime(y, mo, d).date())
+    except ValueError:
+        return None
+
+
+def _formatted_digits(s: str):
+    """The digit sequence of a formatted identifier (digits plus phone/SSN separators, no letter anywhere), else None."""
+    if _FORMATTED_ID_RE.fullmatch(s) and re.search(r"[0-9]", s):
+        return re.sub(r"[^0-9]", "", s)
+    return None
+
+
 def lenient_equal(expected, actual, describe_type: str | None = None) -> bool:
     """Meaning-equality for a RENDERED value against what was asked (user, 2026-09-08).
 
-    With a describe_type: `normalise()` for that type. Without one: equal if both sides parse
-    as the same date, or as the same number, or match after normalize-space + casefold.
-    Never rescues a blank actual (that is could-not-check, handled by the caller) and never
-    a genuinely different value: '10/08/2026' == '10/8/2026' and '25000' == '25,000.00',
-    but 'Save' != 'Save & New' and '25' != '202,525%'.
+    With a describe_type: `normalise()` for that type. Without one: equal if both sides are the same plain number
+    (currency and percent are formatting), the same whole date, the same formatted identifier, or match after
+    normalize-space + casefold. Never rescues a blank actual (that is could-not-check, handled by the caller) and never
+    a genuinely different value: '10/08/2026' == '10/8/2026' and '25000' == '25,000.00', but 'Save' != 'Save & New',
+    '25' != '202,525%'.
+
+    ANY VALUE WITH LETTERS KEEPS ITS LETTERS (error 2c0cd360c5, 2026-10-10): 'INV-2024' != 'PO-2024', 'Suite 5' !=
+    'Unit 5', 'A-1' != 'B-1', 'Acme' != 'Acme Corp'. Only a currency symbol or an ISO code in front of an amount, a
+    percent sign behind it, valid thousands commas, the digit separators of a phone and the timestamp of a datetime are
+    formatting. Two currencies, or a currency against a percent, are different values.
     """
     if describe_type:
         return normalise(expected, describe_type) == normalise(actual, describe_type)
     e, a = _norm(str(expected)), _norm(str(actual))
     if e.casefold() == a.casefold():
         return True
-    ne, na = normalise(e, "double"), normalise(a, "double")
-    if isinstance(ne, Decimal) and isinstance(na, Decimal):
-        return ne == na
-    de, da = normalise(e, "date"), normalise(a, "date")
-    if _ISO_DATE_RE.match(str(de)) and _ISO_DATE_RE.match(str(da)):   # both parsed as dates
+    ne, na = _plain_number(e), _plain_number(a)
+    if ne is not None and na is not None:
+        return ne[0] == na[0] and (ne[1] is None or na[1] is None or ne[1] == na[1])
+    de, da = _whole_date(e), _whole_date(a)
+    if de is not None and da is not None:
         return de == da
     # A FORMATTED IDENTIFIER (a phone, an SSN, a masked input: digits with -, /, ( ) or spaces
     # and no letters) is equal when the digit sequences are; a mask placeholder such as
     # '(___) ___-____' has no digits and never matches. Measured 2026-09-19 on fsc7f: the
     # OmniStudio masked phone input re-renders '(555) 111-2244' and the Robot twin of this
     # function read it as a mismatch. Parity with `Values Match` in
-    # CRTPagePatterns resources/garzai_typetext_override.robot, tier 3.
+    # CRTPagePatterns resources/garzai_typetext_override.robot, tier 3. BOTH sides must be
+    # formatted identifiers: a letter on either side ('A555-111-2244', '555-111-2244 ext 5') is
+    # part of the value (error 2c0cd360c5).
     if re.search(r"[0-9]", e) and not re.search(r"[A-Za-z]", e) and re.search(r"[-/() ]", e):
-        return re.sub(r"[^0-9]", "", e) == re.sub(r"[^0-9]", "", a) and re.sub(r"[^0-9]", "", e) != ""
+        ed, ad = _formatted_digits(e), _formatted_digits(a)
+        return ed is not None and ad is not None and ed == ad
     return False
 
 
@@ -394,13 +477,18 @@ def normalise(value, describe_type: str | None):
     t = (describe_type or "").lower()
 
     if t in _NUMERIC_TYPES:
-        s = str(value).strip().replace(",", "")
-        s = re.sub(r"^[^\d+\-.]+", "", s)   # strip a leading currency symbol ($, USD, etc.)
-        s = s.rstrip("%").strip()
-        try:
-            return Decimal(s)
-        except InvalidOperation:
-            return _norm(str(value))
+        s = str(value).strip()
+        plain = _plain_number(s)          # sign, ONE currency marker (symbol / ISO code), thousands commas, ONE percent
+        if plain is not None:
+            return plain[0]
+        if _SCIENTIFIC_RE.match(s):       # a float's own repr from SOQL ('1e+16'): the field is numeric by metadata
+            try:
+                return Decimal(s)
+            except InvalidOperation:
+                pass
+        # Not a number: keep the text, letters and all. (The old rule stripped every leading non-digit run, so
+        # 'INV-2024' and 'PO-2024' both read as Decimal('-2024') -- error 2c0cd360c5.)
+        return _norm(str(value))
 
     if t == "date":
         s = str(value).strip()

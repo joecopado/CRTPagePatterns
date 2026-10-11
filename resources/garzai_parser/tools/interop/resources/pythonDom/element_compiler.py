@@ -235,6 +235,10 @@ class DomElementCompiler:
             element_type = self.classifier._classify_element_type(tag)
             if element_type in self.config.SKIP_ELEMENT_TYPES:
                 return None
+            # 2026-10-10: a div let through only because it DECLARES a widget role (containerExemptRoles) that the
+            # classifier still cannot place (a jqx dropdown: role=combobox, no label) stays dropped, as before
+            if element_type == 'unknown' and self.config._exempt_by_role(tag):
+                return None
 
             identification = self._get_identification(tag)
             label_text = identification.get('label_text', '')
@@ -476,13 +480,26 @@ class DomElementCompiler:
                 # _get_safe_text, which happily concatenated an
                 # slds-assistive-text span onto the visible text
                 # ('* More Show more navigation items', L2-R13).
-                inner = self._visible_inner_text(tag)
+                cap = int(getattr(self.config, 'LABEL_MAX_LEN', None) or 100)
+                # 2026-10-10 (OCR witness; Revenue Cloud crawl): the 2026-09-10 note below said this rung "now
+                # truncates at labelMaxLen" but the CALL still passed _visible_inner_text its default ceiling of 60,
+                # so a 72-char article link and a 108-char Guidance Center link had NO label (the OCR witness found
+                # the 108-char one on two Health Cloud pages as a nameless `button`). The rung READS up to the
+                # template's `labelOverflowReadMax` and cuts a title longer than `labelMaxLen` at a word boundary,
+                # saying so (identification.label_truncated). The class default is 400; a template that sets it to 0 restores the old
+                # 60-char behaviour byte for byte.
+                read_max = int(getattr(self.config, 'LABEL_OVERFLOW_READ_MAX', None) or 0)
+                inner = self._visible_inner_text(tag, max_len=read_max) if read_max > 60 else self._visible_inner_text(tag)
                 # 2026-09-10 (six of seventeen industry-page audits): a literal 60-char ceiling here
                 # returned None for links whose visible text is 74-86 chars (learning cards, long
                 # record links) -- no label and no call at all. Every other rung truncates at 100;
                 # this one now does the same. Template `labelMaxLen` (default 100).
-                cap = int(getattr(self.config, 'LABEL_MAX_LEN', None) or 100)
                 if inner and 0 < len(inner):
+                    if read_max > 60 and len(inner) > cap:
+                        cut = inner[:cap + 1]
+                        cut = cut[:cut.rfind(' ')] if ' ' in cut[1:] else cut[:cap]
+                        self._cut_label = cut.rstrip(' ,;:-—–')
+                        return self._cut_label
                     return inner[:cap]
             return None
         if source == 'assistive_text':
@@ -639,6 +656,21 @@ class DomElementCompiler:
                 if text:
                     return text[:100]
                 return None
+            own_cls = rule.get('labelFromOwnClassFragments')
+            if own_cls and any(f.lower() in classes for f in (rule.get('containerClassFragments') or [])):
+                # a host the rule SKIPS (lightning-output-field carries the same read-only class on itself) keeps
+                # whatever label the rest of the chain gives it -- the rule names only the nodes it classifies
+                inside = {t.lower() for t in (rule.get('skipIfInsideTags') or [])}
+                if inside and ((tag.name or '').lower() in inside
+                               or tag.find_parent(lambda p: p.name and p.name.lower() in inside) is not None):
+                    continue
+                # 2026-10-10 (Revenue Cloud crawl): a read-only form element is named by its OWN label node -- the first
+                # descendant carrying one of these class fragments (`slds-form-element__label`), read as a sighted person
+                # reads it (screen-reader-only text out). No label text, no name: the rule's `requireLabel` drops the row.
+                own = tag.find(lambda n: getattr(n, 'name', None)
+                               and any(f in ' '.join(n.get('class') or []) for f in own_cls))
+                text = self._visible_inner_text(own, max_len=100) if own is not None else ''
+                return text[:100] if text else None
             frag_label = rule.get('labelFromPrecedingClassFragment')
             if not frag_label or not any(f.lower() in classes for f in (rule.get('containerClassFragments') or [])):
                 continue
@@ -663,12 +695,16 @@ class DomElementCompiler:
         # The winner is chosen by the TEMPLATE's precedence; it is then emitted
         # at the physical position of its own rung below, exactly where the
         # pre-T10 hard-coded chain put it.
+        self._cut_label = None            # 2026-10-10: set by the inner_text rung when it cut a long title
         won_text, won_source = self._resolve_label(tag)
 
         def _claim(source):
             if won_source == source and 'label_text' not in result:
                 result['label_text'] = won_text
                 result['label_source'] = source
+                # 2026-10-10: a title cut to labelMaxLen says so -- nothing is elided silently
+                if source == 'inner_text' and won_text and won_text == getattr(self, '_cut_label', None):
+                    result['label_truncated'] = True
 
         _claim('group_caption')           # parser-one P1 2026-10-07: a groupCaptions host's <legend>
         _claim('form_element_label')      # 2026-09-10: a structural control's declared label source
@@ -1004,15 +1040,30 @@ class DomElementCompiler:
         cache = getattr(self, '_label_for_cache', None)
         if cache is None or cache[0] is not root:
             index = {}
+            climbs = bool((getattr(self.config, 'EMPTY_LABEL_FOR_CLIMBS', None) or {}).get('enabled'))
             for lab in root.find_all('label'):
                 target = lab.get('for')
                 if target and target not in index:
                     text = self._visible_label_text(lab)
+                    if not text and climbs:
+                        text = self._enclosing_label_text(lab)
                     if text:
                         index[target] = text
             cache = (root, index)
             self._label_for_cache = cache
         return cache[1].get(el_id, '')
+
+    def _enclosing_label_text(self, lab) -> str:
+        """2026-10-10 (template `emptyLabelForClimbs`): the name a label-hidden control gets from the nearest <label>
+        ABOVE its own that has visible text. A lightning toggle in its label-hidden variant renders an EMPTY
+        <label for=checkbox-toggle-N> (the primitive's own, decoration already removed) inside a <label
+        class=slds-checkbox_toggle> that holds the field NAME -- Revenue Settings, 28 toggles. '' when no enclosing
+        label has text, so a control with no name stays unnamed rather than borrowing a neighbour's."""
+        for anc in lab.find_parents('label'):
+            text = self._visible_label_text(anc)
+            if text:
+                return text
+        return ''
 
     def _find_table_row_label(self, tag) -> str:
         """2026-10-07 (F19): the label of a control laid out in a classic form ROW -- the nearest preceding cell of the
@@ -1089,7 +1140,11 @@ class DomElementCompiler:
         SLDS dueling list)? Its label then belongs to that control, never to a wrapper above."""
         if fe.find(['input', 'select', 'textarea']) is not None:
             return True
+        # a READ-ONLY structural family (output_field: the SLDS read-only form element) is a value, not a control -- it
+        # must not turn a form wrapper into a "multi-control container" that loses its label (2026-10-10)
+        read_only = self.classifier.OUTPUT_ONLY_TYPES
         frags = [f for rule in (getattr(self.config, 'STRUCTURAL_CONTAINER_RULES', None) or [])
+                 if rule.get('family') not in read_only
                  for f in (rule.get('containerClassFragments') or [])]
         if frags and fe.find(lambda n: any(f in ' '.join(n.get('class') or []) for f in frags)) is not None:
             return True
@@ -4162,6 +4217,14 @@ class DomElementCompiler:
         def tag_of(el):
             return ((el.get('element_details') or {}).get('tag') or '').lower()
 
+        # 2026-10-10 (Dynamic Forms index): a copy the structural pass marked `_reader_copy` (the SLDS read-only form element:
+        # a Dynamic Forms field, an Aura layout item) is reached by the reader's SECOND rung only, the slds-form-element
+        # container. The marker is private: popped here, whatever the group decides.
+        form_copy = {}
+        for el in elements:
+            if isinstance(el, dict) and el.get('_reader_copy') is not None:
+                form_copy[id(el)] = el.pop('_reader_copy') or {}
+
         groups = {}
         for el in elements:
             if not isinstance(el, dict) or el.get('element_type') != 'output_field':
@@ -4172,6 +4235,11 @@ class DomElementCompiler:
         for members in groups.values():
             high = [e for e in members if tag_of(e) in self._HIGHLIGHTS_TAGS]
             read = [e for e in members if tag_of(e) in self._RECORD_LAYOUT_TAGS]
+            form = [e for e in members if id(e) in form_copy]
+            other = [e for e in members if e not in high and e not in read and e not in form]
+            if form and (read or not other):
+                self._scope_form_copies(high, read, form, form_copy)
+                continue
             if not high and not read:
                 continue
             # the reader's own count: a same-label LINK or button elsewhere on the page (a related-list filter
@@ -4192,6 +4260,63 @@ class DomElementCompiler:
                     dis['scope_index'] = 'unique among the copies the reader resolves (the highlights copy is not one)'
                     e['disambiguation'] = dis
         return elements
+
+    _FORM_COPY_WORDS = {'dynamic_forms': 'Dynamic Forms copy (record_flexipage-record-field)'}
+
+    def _scope_form_copies(self, high, read, form, form_copy):
+        """2026-10-10 (Dynamic Forms index; measured live on slockard's Zoo Case record page, which renders `Zoo Account`
+        three times -- highlights panel, Details layout item, Dynamic Forms field -- docs/recorder/evidence/
+        dynamic-forms-index-2026-10-10/measure.json). qforce_lite.get_field_value walks two rungs and takes the first
+        that resolves `[index]`: (1) records-record-layout-item copies, (2) slds-form-element containers holding the label
+        -- the Dynamic Forms copy AND the Details copy, in page order (the highlights copy is in neither). Measured:
+        index=1 read the Details copy (rung 1, 70 ms), index=2 read the Details copy AGAIN (rung 2's second match, after a
+        2 s wait on rung 1), index=3 found nothing (None after 10.3 s). The parser gave the Dynamic Forms copy the page-wide
+        rank (index=2 for a field shown twice, index=3 for one the highlights panel also shows): the first read the wrong
+        copy, the second read nothing.
+
+        So the index is the READER's rank:
+          * a Details copy of the label exists -> the reader reads it for every index it can resolve; a form-element copy
+            (the same field of the same record) carries NO index, `reader_count` 0, and says so -- the Details copies keep
+            their own rank among themselves, the highlights copy keeps none;
+          * no Details copy -> the reader's second rung counts the form-element copies in page order (the structural pass
+            meets them in page order): one -> no index, several -> their rank among themselves; the highlights copy keeps
+            none and names the copy the reader reads."""
+        for i, e in enumerate(read, 1):
+            self._restamp_index(e, i if len(read) > 1 else None, size=len(read))
+            if len(read) <= 1:
+                dis = e.get('disambiguation') or {}
+                dis['scope_index'] = 'unique among the copies the reader resolves (the highlights copy is not one)'
+                e['disambiguation'] = dis
+        hosts = {(form_copy.get(id(e)) or {}).get('host') for e in form}
+        words = self._FORM_COPY_WORDS.get(next(iter(hosts)) if len(hosts) == 1 else None,
+                                          'read-only form element copy (slds-form-element_readonly)')
+        reader_reads = ('the Details tab copy of this field (records-record-layout-item)' if read
+                        else 'the %s of this field' % words)
+        for e in high:
+            self._restamp_index(e, None, size=0)
+            dis = e.get('disambiguation') or {}
+            dis['region'] = 'highlights_panel'
+            dis['scope_index'] = 'highlights panel copy: get_field_value/verify_field read %s, never this one' % reader_reads
+            e['disambiguation'] = dis
+        if read:
+            for e in form:
+                self._restamp_index(e, None, size=0)
+                dis = e.get('disambiguation') or {}
+                dis['scope_index'] = ('%s: get_field_value/verify_field read the Details tab copy of this field '
+                                      '(records-record-layout-item) for every index they resolve -- the same field of the '
+                                      'same record, so the value read is this copy\'s; an index never reaches this copy '
+                                      '(measured 2026-10-10: index 1 and 2 read the Details copy, index 3 found nothing)'
+                                      % words)
+                e['disambiguation'] = dis
+            return
+        for i, e in enumerate(form, 1):
+            dis = e.get('disambiguation')
+            if not isinstance(dis, dict):
+                continue                  # the label occurs once on the page: nothing to rank, nothing to say
+            self._restamp_index(e, i if len(form) > 1 else None, size=len(form))
+            dis['scope_index'] = ('%s: get_field_value/verify_field reach it through their slds-form-element rung, which '
+                                  'counts these copies in page order (the highlights copy, and a same-label control that '
+                                  'is no read-only field, are not ones)%s' % (words, '' if len(form) > 1 else '; unique among them'))
 
     @staticmethod
     def _restamp_index(el, new, size=None):

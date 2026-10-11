@@ -5,6 +5,7 @@ Usage:
   python3 tools/recorder/review_table.py correct   --review <review.json> --row N --column <label|family|keyword|index|xpath|not_interactive|needs_xpath|could_not_map> --to VALUE [--raw-had ATTR] [--note TEXT]
   python3 tools/recorder/review_table.py accept    --review <review.json> --rows <N,N,..|all|live-pass> [--note TEXT]
   python3 tools/recorder/review_table.py writeback --review <review.json> [--state-root DIR]
+  python3 tools/recorder/review_table.py repair-writeback [--state-root DIR] [--reviews GLOB] [--out PLAN.json] [--apply]
   python3 tools/recorder/review_table.py score     --review <review.json> [--scores PATH] [--no-append]
   python3 tools/recorder/review_table.py render    --review <review.json>
   python3 tools/recorder/review_table.py drive     --review <review.json> --org <alias> [--values '{"Industry":"Technology"}']
@@ -1176,8 +1177,11 @@ def robot_call(row: dict) -> dict:
                           _rf(kw, label, value), _rf('VerifyText', value, timeout='5')]
         out['verify'] = [_rf('VerifyText', label, partial_match='False', timeout='5')]
     elif kw == 'ClickCheckbox':
+        # 2026-10-10 (shape validation, finding 1): the read-back of a checked box is VerifyCheckboxValue <label> on|off.
+        # QWeb's VerifyCheckboxStatus takes enabled|disabled and raised `Unkown status: "on"` on slockard, so every
+        # exported checkbox story ending in it failed on a real run. on/off, never true (D33: true UNCHECKS in CRT).
         out['primary'] = [_rf('ClickCheckbox', label, 'on', anchor=anchor),
-                          _rf('VerifyCheckboxStatus', label, 'on', anchor=anchor)]
+                          _rf('VerifyCheckboxValue', label, 'on', anchor=anchor)]
         out['verify'] = []      # the xpath line in section 1 is the existence check; state is unknown until driven
     elif kw:
         out['primary'] = [_rf(kw, label, anchor=anchor)]
@@ -2144,6 +2148,85 @@ def cmd_accept(a) -> int:
     return 0
 
 
+# ----------------------------------------------------------------------------- what a review row PROVES
+# DEFECT (2026-10-09, found by the shape-census dedupe b2da60d7): `writeback` stamped an ACCEPTED row's
+# keyword rung VERIFIED-PASS without reading the row's live keyword verdict -- 41 brain-store rungs said
+# verified while their own check read CAUGHT-BUG (rows 135-141 of the cicd-demo Revenue Cloud modal, accepted
+# for their xpath while PickList/ClickText failed live) -- and wrote a bucket member's INHERITED verdict as if
+# the member had been probed itself (323 more). consult's `verified` tier then led a step with a call nothing
+# had ever run on that node. Acceptance by a person approves the CALL; it is not a live pass. `repair-writeback`
+# reverses what the store already holds (dry run first; each touched record backed up under <state root>/backups/).
+#: a correction to one of these columns changes the KEYWORD (resp. XPATH) call: a check older than it
+#: measured the call before the correction, never this one.
+_KW_CALL_COLS = frozenset({'keyword', 'call', 'label', 'index', 'anchor', 'attribute', 'tag'})
+_XP_CALL_COLS = frozenset({'xpath', 'xpath_call'})
+
+
+def row_live_evidence(row: dict, form: str) -> dict:
+    """What `row`'s OWN live check says about the rung it writes in `form` ('keyword' | 'xpath').
+
+    Returns {'state', 'verdict', 'at', 'inherited_from', 'row', 'form', 'why'}; `state` is TRI-STATE:
+      pass        the row's own probe of this form read VERIFIED-PASS (`cmd_live`: resolved to the row's node,
+                  or read the value back) -- the only state that may make a store rung `verified`
+      fail        the row's own probe read CAUGHT-BUG -- the rung is written FAILED, so consult skips it
+      unverified  anything else: no probe, COULD-NOT-CHECK, a verdict INHERITED from the bucket's representative
+                  (a copy of another row's execution proves nothing about this node, pass or fail), or a
+                  probe older than a correction to this form's call (it measured the call before it)."""
+    lv = (row.get('live') or {}).get(form)
+    out = {'state': 'unverified', 'verdict': None, 'at': None, 'inherited_from': None,
+           'row': row.get('n'), 'form': form, 'why': ''}
+    if not isinstance(lv, dict) or not lv.get('verdict'):
+        out['why'] = 'row %s has no live %s check' % (row.get('n'), form)
+        return out
+    out.update(verdict=lv['verdict'], at=lv.get('at'), inherited_from=lv.get('inherited_from'))
+    if lv.get('inherited_from') is not None:
+        out['why'] = ('row %s carries row %s\'s %s verdict (%s) -- a copy of another execution, not its own check'
+                      % (row.get('n'), lv['inherited_from'], form, lv['verdict']))
+        return out
+    cols = _KW_CALL_COLS if form == 'keyword' else _XP_CALL_COLS
+    later = [ch for ch in ((row.get('review') or {}).get('changes') or [])
+             if ch.get('column') in cols and lv.get('at') and str(ch.get('at') or '') > str(lv['at'])]
+    if later:
+        out['why'] = ('row %s\'s %s check (%s) predates its %s correction at %s -- it measured the call before it'
+                      % (row.get('n'), form, lv['at'], later[-1].get('column'), later[-1].get('at')))
+        return out
+    if lv['verdict'] == 'VERIFIED-PASS':
+        out.update(state='pass', why='row %s\'s own live %s check passed: %s' % (row.get('n'), form, lv.get('detail') or ''))
+    elif lv['verdict'] == 'CAUGHT-BUG':
+        out.update(state='fail', why='row %s\'s own live %s check failed: %s' % (row.get('n'), form, lv.get('detail') or ''))
+    else:
+        out['why'] = 'row %s\'s own live %s check read %s' % (row.get('n'), form, lv['verdict'])
+    return out
+
+
+def _review_check(ev: dict) -> dict:
+    """The provenance a review rung carries: the row, the form, the check's own verdict and time, and the
+    representative it was copied from (None when it is the row's own)."""
+    return {k: ev.get(k) for k in ('row', 'form', 'verdict', 'at', 'inherited_from', 'state')}
+
+
+def stamp_review_rung(rung: dict, ev: dict, stamp: str, created: bool) -> None:
+    """Apply one review row's evidence `ev` (`row_live_evidence`) to a ladder rung -- the ONE rule writeback
+    uses. pass -> verified; fail -> failed (consult skips it); unverified -> a NEW rung is created
+    known-unverified (the capture writer's shape) and an EXISTING rung's verdict is left alone: a copy or a
+    missing check says nothing new about it. A check older than another writer's last verdict on the same
+    rung never overrides it."""
+    rung['review_check'] = _review_check(ev)
+    if ev['state'] in ('pass', 'fail') and not created and rung.get('origin') != 'review' and rung.get('last_seen') \
+            and ev.get('at') and str(ev['at']) < str(rung['last_seen']):
+        return
+    if ev['state'] == 'pass':
+        rung.update({'n_verified': max(1, int(rung.get('n_verified') or 0)), 'confidence': 'verified',
+                     'last_verdict': 'VERIFIED-PASS', 'last_seen': stamp, 'verdict_pending': False})
+    elif ev['state'] == 'fail':
+        rung.update({'n_failed': max(1, int(rung.get('n_failed') or 0)), 'confidence': 'unverified',
+                     'last_verdict': 'CAUGHT-BUG', 'last_seen': stamp, 'verdict_pending': False,
+                     'failure_signal': 'review: %s' % ev['why']})
+    elif created:
+        rung.update({'n_verified': 0, 'n_failed': 0, 'n_unverified': 1, 'confidence': 'unverified',
+                     'last_verdict': 'COULD-NOT-CHECK', 'last_seen': stamp, 'verdict_pending': True})
+
+
 # ----------------------------------------------------------------------------- write-back
 def cmd_writeback(a) -> int:
     review = json.load(open(a.review))
@@ -2186,13 +2269,18 @@ def cmd_writeback(a) -> int:
         # same fold as pom_asset: a reviewed control absorbs any `capture-stamp` placeholder
         # another page's state stamp left for it, so one control is never two records
         STORE_MOD.absorb_stamp_placeholder(rec, eid, label)
+        kw_ev, xp_ev = row_live_evidence(r, 'keyword'), row_live_evidence(r, 'xpath')
+        xp = r.get('xpath_corrected') or ((r.get('xpath') or {}).get('value')
+                                          if ((r.get('xpath') or {}).get('live') or {}).get('verdict') == 'VERIFIED-PASS' else None)
         el.update({
             'family': family, 'label': label, 'container': r.get('container'),
             'attrs': stable_attrs(r.get('attrs')), 'tag': r.get('tag'),
             'source': 'reviewed',
             'evidence': sorted(set((el.get('evidence') or []) + [review['capture']])),
-            'verdict': ('VERIFIED-PASS' if st in ('accepted', 'corrected') or (st == 'needs_xpath' and (
-                r.get('xpath_corrected') or ((r.get('xpath') or {}).get('live') or {}).get('verdict') == 'VERIFIED-PASS'))
+            # the element is VERIFIED-PASS only when a call this row writes passed the row's OWN live check;
+            # an accepted row with no own pass is approved, not verified (2026-10-09)
+            'verdict': ('VERIFIED-PASS' if (st in ('accepted', 'corrected') and kw_ev['state'] == 'pass')
+                        or (xp and st in ('accepted', 'corrected', 'needs_xpath') and xp_ev['state'] == 'pass')
                         else 'COULD-NOT-CHECK'),
             'verdict_by': 'review',
             'verdict_date': stamp,
@@ -2209,18 +2297,16 @@ def cmd_writeback(a) -> int:
             idx = r.get('index_corrected') if 'index_corrected' in r else r.get('index')
             if kw:
                 rung = next((x for x in ladder if x.get('kw') == kw and (x.get('args') or [None])[0] == label), None)
-                if rung is None:
+                created = rung is None
+                if created:
                     rung = {'kw': kw, 'args': [label], 'kwargs': {'index': idx} if idx else {},
                             'why': 'reviewed %s' % stamp, 'read_back': PA.read_back_for(kw, {'label': label}),
                             'anchor': None, 'anchor_candidates': r.get('anchor_candidates') or [],
-                            'score': None, 'n_failed': 0, 'n_unverified': 0, 'failure_signal': None,
+                            'score': None, 'n_verified': 0, 'n_failed': 0, 'n_unverified': 0, 'failure_signal': None,
                             'origin': 'review', 'rank': -2}
                     ladder.insert(0, rung)
-                rung.update({'n_verified': max(1, rung.get('n_verified') or 0), 'confidence': 'verified',
-                             'last_verdict': 'VERIFIED-PASS', 'last_seen': stamp, 'verdict_pending': False,
-                             'kwargs': {'index': idx} if idx else {}})
-        xp = r.get('xpath_corrected') or ((r.get('xpath') or {}).get('value')
-                                          if ((r.get('xpath') or {}).get('live') or {}).get('verdict') == 'VERIFIED-PASS' else None)
+                rung['kwargs'] = {'index': idx} if idx else {}
+                stamp_review_rung(rung, kw_ev, stamp, created)
         if st == 'needs_xpath':
             kw = _kw(r)
             for x in ladder:
@@ -2230,12 +2316,15 @@ def cmd_writeback(a) -> int:
                               'failure_signal': 'review: keyword did not reach this member live'})
         if xp and st in ('accepted', 'corrected', 'needs_xpath'):
             rung = next((x for x in ladder if x.get('xpath_backup') and (x.get('args') or [None])[0] == xp), None)
-            if rung is None:
+            created = rung is None
+            if created:
                 rung = {'kw': 'ClickElement', 'args': [xp], 'kwargs': {}, 'why': 'xpath backup (reviewed)',
-                        'read_back': None, 'anchor': None, 'score': None, 'n_verified': 1, 'n_failed': 0,
-                        'n_unverified': 0, 'last_verdict': 'VERIFIED-PASS', 'last_seen': stamp,
-                        'confidence': 'verified', 'origin': 'review', 'rank': 9, 'xpath_backup': True}
+                        'read_back': None, 'anchor': None, 'score': None, 'n_verified': 0, 'n_failed': 0,
+                        'n_unverified': 0, 'last_verdict': None, 'last_seen': stamp,
+                        'origin': 'review', 'rank': 9, 'xpath_backup': True}
                 ladder.append(rung)
+            # a person's xpath correction is a candidate; only the row's own xpath probe verifies it
+            stamp_review_rung(rung, xp_ev, stamp, created)
             if st == 'needs_xpath':
                 rung['rank'] = -3
                 ladder.remove(rung)
@@ -2266,6 +2355,202 @@ def cmd_writeback(a) -> int:
     print('wrote %d reviewed control(s) -> %s' % (written, path))
     for sr in stamp_results:
         print('  state stamp: %s' % json.dumps(sr, default=str))
+    return 0
+
+
+# ----------------------------------------------------------------------------- repair-writeback
+#: the reviews `repair-writeback` traces a rung back to (the same default the shape census reads)
+REVIEWS_GLOB = os.path.join(_ROOT, 'docs', 'recorder', 'review', '**', 'review.json')
+
+
+def _writeback_xpath(r: dict):
+    """The xpath `cmd_writeback` writes for row `r` (None when it writes none) -- one expression, so a
+    trace finds the row by exactly what was written."""
+    return r.get('xpath_corrected') or ((r.get('xpath') or {}).get('value')
+                                        if ((r.get('xpath') or {}).get('live') or {}).get('verdict') == 'VERIFIED-PASS' else None)
+
+
+def _org_label(url_or_host) -> str:
+    """The first DNS label of a host (or a URL's host): the part that names the org."""
+    h = str(url_or_host or '')
+    h = h.split('://', 1)[-1].split('/', 1)[0]
+    return h.split('.', 1)[0].lower()
+
+
+def trace_review_rung(rec: dict, el: dict, rung: dict, reviews_by_capture: dict) -> tuple:
+    """(row, source) -- the review row whose check an `origin: review` rung re-records, or (None, why).
+
+    1. The element's own `review` snapshot -- exactly what writeback had when it wrote -- when the LATEST
+       writeback stamped this rung (`last_seen == verdict_date`) and the snapshot is provably its row: the
+       label for a keyword rung; for an xpath rung, the snapshot's own xpath check ran this xpath or the row's
+       xpath correction set it.
+    2. Otherwise the review.json on disk holding the capture the record's `reviews` list names at the rung's
+       stamp: a keyword rung by (keyword, label), an xpath rung by the xpath writeback wrote. A review whose
+       live session ran on ANOTHER org is no evidence for this record. Several rows prefer the snapshot's row
+       number; rows that disagree are COULD-NOT-CHECK. A review rebuilt since (its xpath for the row changed)
+       leaves the rung untraced -- COULD-NOT-CHECK, never a guess."""
+    form = 'xpath' if rung.get('xpath_backup') else 'keyword'
+    at = rung.get('last_seen')
+    arg0 = (rung.get('args') or [None])[0]
+    snap = el.get('review') if isinstance(el.get('review'), dict) else {}
+    live = snap.get('live') if isinstance(snap.get('live'), dict) else {}
+    if at and at == el.get('verdict_date') and snap.get('row') is not None:
+        if form == 'keyword':
+            mine = arg0 == el.get('label')
+        else:
+            ex = str((live.get('xpath') or {}).get('executed') or '')
+            mine = (arg0 in ex or repr(arg0) in ex or any(ch.get('column') == 'xpath' and ch.get('to') == arg0
+                                                         for ch in snap.get('changes') or []))
+        if mine:
+            return ({'n': snap.get('row'), 'live': live, 'review': {'changes': snap.get('changes') or []}},
+                    'element review snapshot, row %s' % snap.get('row'))
+    caps = [x.get('review') for x in rec.get('reviews') or [] if x.get('at') == at]
+    if not caps:
+        return None, 'COULD-NOT-CHECK: no writeback at %s in the record\'s reviews list' % at
+    host = _org_label((rec.get('page') or {}).get('host'))
+    hits = []
+    for cap in caps:
+        for path, rv in reviews_by_capture.get(cap, []):
+            ran = _org_label((rv.get('live_session') or {}).get('url'))
+            if host and ran and ran != host:
+                continue
+            for r in rv.get('rows') or []:
+                st = (r.get('review') or {}).get('status')
+                if form == 'keyword':
+                    ok = (st in ('accepted', 'corrected') and (r.get('keyword_corrected') or _kw(r)) == rung.get('kw')
+                          and (r.get('label_corrected') or r.get('label') or '') == arg0)
+                else:
+                    ok = st in ('accepted', 'corrected', 'needs_xpath') and _writeback_xpath(r) == arg0
+                if ok:
+                    hits.append((os.path.relpath(path, _ROOT), r))
+    if not hits:
+        return None, 'COULD-NOT-CHECK: no row of the review(s) of %s writes this %s rung today (rebuilt since?)' % (caps[0], form)
+    mine = [h for h in hits if h[1].get('n') == snap.get('row')]
+    pick = mine or hits
+    states = {row_live_evidence(r, form)['state'] for _, r in pick}
+    if len(states) > 1:
+        return None, 'COULD-NOT-CHECK: %d review rows match and disagree (%s)' % (len(pick), sorted(states))
+    return pick[0][1], '%s row %s' % (pick[0][0], pick[0][1].get('n'))
+
+
+def cmd_repair_writeback(a) -> int:
+    """Reverse the false greens `writeback` wrote before 2026-10-09: every `origin: review` rung the store
+    holds as verified whose review row's OWN live check did not pass. Dry run by default; `--apply` backs up
+    each touched record under <state root>/backups/ first. Never touches a rung another writer made, a
+    rung a D27 validation stamped, or one with more than one counted pass (writeback never counts past 1,
+    so a second pass came from another writer)."""
+    import glob as _glob
+    store = Store(state_root=a.state_root, docs_root=a.state_root)
+    by_cap: dict = {}
+    for p in sorted(_glob.glob(a.reviews, recursive=True)):
+        try:
+            rv = json.load(open(p))
+        except (OSError, ValueError):
+            continue
+        by_cap.setdefault(rv.get('capture'), []).append((p, rv))
+    stamp = time.strftime('%Y-%m-%dT%H:%M:%S')
+    counts, changes, touched = collections.Counter(), [], {}
+    pats = [os.path.join(store.org_map_dir, '*', 'pom', '*.json'), os.path.join(store.apps_dir, '*', 'pom', '*.json')]
+    for path in sorted(p for pat in pats for p in _glob.glob(pat)):
+        try:
+            rec = json.load(open(path))
+        except (OSError, ValueError):
+            counts['unreadable record'] += 1
+            continue
+        rel = os.path.relpath(path, store.state_root)
+        for eid, el in (rec.get('elements') or {}).items():
+            for i, rung in enumerate(el.get('ladder') or []):
+                if rung.get('origin') != 'review':
+                    if (el.get('verdict_by') == 'review' and rung.get('last_seen') == el.get('verdict_date')
+                            and rung.get('last_verdict') == 'VERIFIED-PASS'):
+                        counts['left: another writer\'s rung stamped by a review writeback (never touched)'] += 1
+                    continue
+                if not (int(rung.get('n_verified') or 0) > 0 and rung.get('last_verdict') in ('VERIFIED-PASS', 'PASS-GUARDED')):
+                    continue
+                if not isinstance(el.get('review'), dict):
+                    counts['left: origin review, no review block on the element (not a writeback rung)'] += 1
+                    continue
+                if rung.get('proven'):
+                    counts['left: a D27 validation stamped it'] += 1
+                    continue
+                if int(rung.get('n_verified') or 0) > 1:
+                    counts['left: more than one counted pass (another writer verified it)'] += 1
+                    continue
+                row, src = trace_review_rung(rec, el, rung, by_cap)
+                if row is None:
+                    counts['left: could not trace the review row (each listed above)'] += 1
+                    changes.append({'record': rel, 'element': eid, 'rung': i, 'kw': rung.get('kw'), 'args': rung.get('args'),
+                                    'action': 'none', 'why': src})
+                    continue
+                form = 'xpath' if rung.get('xpath_backup') else 'keyword'
+                ev = row_live_evidence(row, form)
+                if ev['state'] == 'pass':
+                    counts['kept: backed by the row\'s own passing check'] += 1
+                    continue
+                kind = ('inherited' if ev['inherited_from'] is not None else ev['state'] if ev['state'] == 'fail'
+                        else 'no own pass (%s)' % (ev['verdict'] or 'no check'))
+                counts['repair %s rung: %s' % (form, kind)] += 1
+                changes.append({'record': rel, 'element': eid, 'rung': i, 'kw': rung.get('kw'), 'args': rung.get('args'),
+                                'form': form, 'row': row.get('n'), 'source': src, 'own_verdict': ev['verdict'],
+                                'inherited_from': ev['inherited_from'], 'to': 'failed' if ev['state'] == 'fail' else 'known-unverified',
+                                'action': 'repair', 'why': ev['why']})
+                if not a.apply:
+                    continue
+                was = {k: rung.get(k) for k in ('n_verified', 'n_failed', 'n_unverified', 'last_verdict', 'confidence', 'verdict_pending')}
+                if ev['state'] == 'fail':
+                    rung.update({'n_verified': 0, 'n_failed': max(1, int(rung.get('n_failed') or 0)), 'last_verdict': 'CAUGHT-BUG',
+                                 'confidence': 'unverified', 'verdict_pending': False, 'failure_signal': 'review: %s' % ev['why']})
+                else:
+                    rung.update({'n_verified': 0, 'n_unverified': max(1, int(rung.get('n_unverified') or 0)),
+                                 'last_verdict': 'COULD-NOT-CHECK', 'confidence': 'unverified', 'verdict_pending': True})
+                rung['review_check'] = _review_check(ev)
+                rung['repaired'] = {'at': stamp, 'by': 'review_table repair-writeback',
+                                    'defect': 'writeback stamped verified without the row\'s own passing live check',
+                                    'was': was}
+                touched[path] = rec
+        if path in touched:
+            from pom import match as _MATCH
+            for el in (rec.get('elements') or {}).values():
+                if (el.get('verdict_by') == 'review' and el.get('verdict') == 'VERIFIED-PASS'
+                        and _MATCH.best_verified_rung(el) is None and _MATCH.best_proven_rung(el) is None):
+                    el['verdict_repaired'] = {'at': stamp, 'was': 'VERIFIED-PASS',
+                                              'why': 'no rung of this element holds a passing check any more'}
+                    el['verdict'] = 'COULD-NOT-CHECK'
+                    counts['element verdict VERIFIED-PASS -> COULD-NOT-CHECK'] += 1
+    for c in changes:
+        if c['action'] == 'repair':
+            print('%s  %s  rung %d %s %s  row %s own %s verdict=%s -> %s  [%s]' % (
+                c['record'], c['element'], c['rung'], c['kw'], json.dumps(c['args'])[:80], c['row'], c['form'],
+                c['own_verdict'] if c['inherited_from'] is None else '%s (inherited from row %s)' % (c['own_verdict'], c['inherited_from']),
+                c['to'], c['source']))
+        else:
+            print('%s  %s  rung %d %s %s  LEFT: %s' % (c['record'], c['element'], c['rung'], c['kw'],
+                                                       json.dumps(c['args'])[:80], c['why']))
+    print('--')
+    for k, v in sorted(counts.items()):
+        print('%6d  %s' % (v, k))
+    if a.out:
+        json.dump({'at': stamp, 'applied': bool(a.apply), 'state_root': store.state_root, 'counts': dict(counts),
+                   'changes': changes}, open(a.out, 'w'), indent=1)
+        print('plan:', a.out)
+    if not a.apply:
+        print('DRY RUN: %d rung(s) would change in %d record(s); --apply writes them (backing each record up first)'
+              % (sum(1 for c in changes if c['action'] == 'repair'), len({c['record'] for c in changes if c['action'] == 'repair'})))
+        return 0
+    bdir = os.path.join(store.state_root, 'backups', 'review-writeback-repair-%s' % stamp.replace(':', ''))
+    for path in sorted(touched):
+        dest = os.path.join(bdir, os.path.relpath(path, store.state_root))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(path, dest)
+    json.dump({'at': stamp, 'records': sorted(os.path.relpath(p, store.state_root) for p in touched), 'counts': dict(counts),
+               'restore': 'copy each file back to the same relative path under %s' % store.state_root,
+               'changes': changes},
+              open(os.path.join(bdir, 'MANIFEST.json'), 'w'), indent=1)
+    for path, rec in sorted(touched.items()):
+        rec['_path'] = path
+        store.put(rec)
+    print('APPLIED: %d rung(s) in %d record(s); backup %s' % (
+        sum(1 for c in changes if c['action'] == 'repair'), len(touched), bdir))
     return 0
 
 
@@ -2357,6 +2642,8 @@ _ROBOT_KW = {
     'DropDown': ('QWeb.keywords.dropdown', 'drop_down'), 'VerifySelectedOption': ('QWeb.keywords.dropdown', 'verify_selected_option'),
     'Open Console Subtab': ('keywords_console', 'open_console_subtab'),   # qforce-lite (tools/qforce-lite/keywords_console.py), on the holder's path
     'ClickCheckbox': ('QWeb.keywords.checkbox', 'click_checkbox'), 'VerifyCheckboxStatus': ('QWeb.keywords.checkbox', 'verify_checkbox_status'),
+    # 2026-10-10 (shape validation): the checkbox read-back QWeb really has (on|off); VerifyCheckboxStatus is enabled/disabled
+    'VerifyCheckboxValue': ('QWeb.keywords.checkbox', 'verify_checkbox_value'),
     # 2026-09-11: the table keywords, so a repeat whose instance is a ROW can be driven as exported
     # (UseTable <header> ;; GetCellText r?<row key>/c?<header> ;; ClickCell ...)
     'UseTable': ('QWeb.keywords.table', 'use_table'), 'VerifyTable': ('QWeb.keywords.table', 'verify_table'),
@@ -2611,6 +2898,10 @@ def main(argv=None) -> int:
     ac.add_argument('--note'); ac.set_defaults(fn=cmd_accept)
     w = sub.add_parser('writeback'); w.add_argument('--review', required=True); w.add_argument('--state-root')
     w.set_defaults(fn=cmd_writeback)
+    rw = sub.add_parser('repair-writeback', help='reverse rungs writeback stamped verified without the row\'s own passing live check (dry run unless --apply)')
+    rw.add_argument('--state-root'); rw.add_argument('--reviews', default=REVIEWS_GLOB)
+    rw.add_argument('--apply', action='store_true'); rw.add_argument('--out', help='write the plan (every rung, its row, its verdict) as JSON')
+    rw.set_defaults(fn=cmd_repair_writeback)
     s = sub.add_parser('score'); s.add_argument('--review', required=True); s.add_argument('--scores')
     s.add_argument('--no-append', action='store_true'); s.add_argument('--include-chrome', action='store_true'); s.set_defaults(fn=cmd_score)
     r = sub.add_parser('render'); r.add_argument('--review', required=True); r.set_defaults(fn=cmd_render)

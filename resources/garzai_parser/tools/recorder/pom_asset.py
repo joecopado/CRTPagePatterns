@@ -558,9 +558,14 @@ def consult(capture: str, org: str | None = None, state_root: str | None = None)
 
 # --------------------------------------------------------------------------- commands
 def resolve_captures(spec: str) -> list[str]:
+    # FILES only (2026-10-10): the mining library files a page under a folder named after its path, so a web page whose
+    # path ends in `.html` is a FOLDER `examples_core_api_multi_filter.html/`; `**/*.html` matched it and the build died
+    # with IsADirectoryError, leaving the whole org unbuilt.
     if os.path.isdir(spec):
-        return sorted(_glob.glob(os.path.join(spec, '**', '*.html'), recursive=True))
-    return sorted(_glob.glob(spec, recursive=True))
+        found = _glob.glob(os.path.join(spec, '**', '*.html'), recursive=True)
+    else:
+        found = _glob.glob(spec, recursive=True)
+    return sorted(p for p in found if os.path.isfile(p))
 
 
 def cmd_build(a) -> int:

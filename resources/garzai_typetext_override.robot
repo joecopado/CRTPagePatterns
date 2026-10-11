@@ -293,25 +293,35 @@ Read Input Value Or Blank
 
 
 Values Match
-    [Documentation]    Lenient-equal (D13, CLAUDE.md), four tiers, first that applies decides:
-    ...    1. both sides are ONE number (digits with , . $ % + - and spaces): compare the parsed
-    ...       floats, so '25000' == '25,000.00' and '$ 7,876.00' == '$7,876.00';
-    ...    2. both sides are a three-part date (digits split by - or /): compare the parts as
-    ...       integers, so '09-01-2025' == '09/01/2025' and '1/1/1990' == '01/01/1990';
-    ...    3. the expected value is a FORMATTED IDENTIFIER (digits with -, /, (, ) or spaces and
-    ...       no letters: a phone, an SSN, a masked input): compare the digit sequences, so
-    ...       '(555) 111-2244' == '555-111-2244' and a mask placeholder '(___) ___-____' fails;
-    ...    4. trimmed string equality.
-    ...    Measured 2026-09-19 on fsc7f (the Digital Lending OmniScript): the earlier two-tier
-    ...    version raised ValueError on a dashed date ('09-01-2025' parsed as a float) and read a
-    ...    re-rendered phone as a mismatch. Never rescues a blank actual -- TypeText routes a blank
-    ...    read-back to the repair pass instead of calling this.
+    [Documentation]    Lenient-equal (D13, CLAUDE.md): the Robot twin of `confirm.lenient_equal`. The first tier that
+    ...    applies decides. ANY VALUE WITH LETTERS KEEPS ITS LETTERS (error 2c0cd360c5, 2026-10-10): only the
+    ...    formatting of a number, a currency, a percent, a date or a phone is lenient.
+    ...    0. equal after normalize-space + casefold ('Acme  Corp' == 'acme corp');
+    ...    1. both sides are ONE plain number (`Gz Plain Number`: sign, ONE currency marker, valid thousands commas, a
+    ...       fraction, ONE percent sign): compare the values, so '25000' == '25,000.00' and '$ 7,876.00' == '$7,876.00',
+    ...       but 'INV-2024' != 'PO-2024', 'Suite 5' != 'Unit 5', '1,5' != '15', 'USD 5' != 'EUR 5', '$25' != '25%';
+    ...    2. both sides are a three-part date (digits split by - or /): compare the parts as integers, so
+    ...       '09-01-2025' == '09/01/2025' and '1/1/1990' == '01/01/1990';
+    ...    3. the expected value is a FORMATTED IDENTIFIER (digits with -, /, (, ) or spaces and no letters: a phone, an
+    ...       SSN, a masked input) AND so is the actual: compare the digit sequences, so '(555) 111-2244' ==
+    ...       '555-111-2244', while a mask placeholder '(___) ___-____', '555-111-2244' vs 'A555-111-2244' and vs
+    ...       '555-111-2244 ext 5' do not match (a letter on EITHER side is part of the value);
+    ...    4. anything else is a mismatch.
+    ...    Measured 2026-09-19 on fsc7f (the Digital Lending OmniScript): the earlier two-tier version raised ValueError
+    ...    on a dashed date ('09-01-2025' parsed as a float) and read a re-rendered phone as a mismatch. Never rescues a
+    ...    blank actual -- TypeText routes a blank read-back to the repair pass instead of calling this.
     [Arguments]    ${expected}    ${actual}
     ${e}=    Evaluate    str($expected).strip()
     ${a}=    Evaluate    str($actual).strip()
-    ${both_numbers}=    Evaluate    bool(re.fullmatch(r'[\s$+-]*[0-9][0-9,]*(\.[0-9]+)?\s*%?', $e) and re.fullmatch(r'[\s$+-]*[0-9][0-9,]*(\.[0-9]+)?\s*%?', $a))    modules=re
+    ${same}=    Evaluate    ' '.join($e.split()).casefold() == ' '.join($a.split()).casefold()
+    IF    ${same}
+        RETURN    ${True}
+    END
+    ${ne}=    Gz Plain Number    ${e}
+    ${na}=    Gz Plain Number    ${a}
+    ${both_numbers}=    Evaluate    $ne is not None and $na is not None
     IF    ${both_numbers}
-        ${result}=    Evaluate    float(re.sub(r'[^0-9.+-]', '', $e)) == float(re.sub(r'[^0-9.+-]', '', $a))    modules=re
+        ${result}=    Evaluate    $ne[0] == $na[0] and ($ne[1] is None or $na[1] is None or $ne[1] == $na[1])
         RETURN    ${result}
     END
     ${both_dates}=    Evaluate    bool(re.fullmatch(r'[0-9]{1,4}[-/][0-9]{1,2}[-/][0-9]{1,4}', $e) and re.fullmatch(r'[0-9]{1,4}[-/][0-9]{1,2}[-/][0-9]{1,4}', $a))    modules=re
@@ -319,13 +329,34 @@ Values Match
         ${result}=    Evaluate    [int(x) for x in re.split(r'[-/]', $e)] == [int(x) for x in re.split(r'[-/]', $a)]    modules=re
         RETURN    ${result}
     END
-    ${formatted}=    Evaluate    bool(re.search(r'[0-9]', $e) and not re.search(r'[A-Za-z]', $e) and re.search(r'[-/() ]', $e))    modules=re
+    ${formatted}=    Evaluate    bool(re.search(r'[0-9]', $e) and re.search(r'[-/() ]', $e) and re.fullmatch(r'\\+?[0-9()./ -]+', $e) and re.fullmatch(r'\\+?[0-9()./ -]+', $a))    modules=re
     IF    ${formatted}
         ${result}=    Evaluate    re.sub(r'[^0-9]', '', $e) == re.sub(r'[^0-9]', '', $a)    modules=re
         RETURN    ${result}
     END
-    ${result}=    Evaluate    $e == $a
-    RETURN    ${result}
+    RETURN    ${False}
+
+
+Gz Plain Number
+    [Documentation]    The Robot twin of confirm._plain_number: (Decimal value, unit) for a RENDERED plain number, else
+    ...    None. A plain number is an optional sign, optionally ONE currency marker (a symbol, or an ISO-4217 code
+    ...    from the list below), digits with valid thousands commas (US '1,234,567' or en_IN '12,34,567') or none, an
+    ...    optional fraction, and optionally ONE percent sign. The unit is None, ('cur', <ISO code; a symbol is mapped to its code>) or ('pct',).
+    ...    Letters other than a currency code are the VALUE and make it not a number ('INV-2024', 'Suite 5', 'Total: 5'),
+    ...    and so do a mis-grouped comma ('1,5'), an exponent ('1e5') and an underscore ('1_000').
+    [Arguments]    ${text}
+    ${m}=    Evaluate    re.fullmatch(r'(?P<s1>[+-])?\\s*(?:(?P<sym>[$€£¥₹₩₽₺₪₫฿₱₴₦])|(?P<code>[A-Za-z]{3}))?\\s*(?P<s2>[+-])?\\s*(?P<num>\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d{1,2}(?:,\\d{2})+,\\d{3}(?:\\.\\d+)?|\\d+(?:\\.\\d+)?|\\.\\d+)\\s*(?P<pct>%)?', $text)    modules=re
+    IF    $m is None
+        RETURN    ${None}
+    END
+    ${codes}=    Set Variable    USD EUR GBP JPY CNY CAD AUD NZD CHF SEK NOK DKK PLN CZK HUF RON BGN ISK RUB UAH TRY ILS AED SAR QAR KWD BHD OMR EGP ZAR NGN KES GHS MAD INR PKR BDT LKR THB VND IDR MYR SGD PHP HKD TWD KRW MXN BRL ARS CLP COP PEN UYU
+    ${bad}=    Evaluate    ($m.group('s1') and $m.group('s2')) or ($m.group('code') and $m.group('code').upper() not in $codes.split()) or (($m.group('code') or $m.group('sym')) and $m.group('pct'))
+    IF    ${bad}
+        RETURN    ${None}
+    END
+    ${value}=    Evaluate    decimal.Decimal(($m.group('s1') or $m.group('s2') or '') + $m.group('num').replace(',', ''))    modules=decimal
+    ${unit}=    Evaluate    ('cur', $m.group('code').upper()) if $m.group('code') else (('cur', dict(zip('$€£¥₹₩₽₺₪₫฿₱₴₦', 'USD EUR GBP JPY INR KRW RUB TRY ILS VND THB PHP UAH NGN'.split()))[$m.group('sym')]) if $m.group('sym') else (('pct',) if $m.group('pct') else None))
+    RETURN    ${value}    ${unit}
 
 
 Gz Report Mismatch

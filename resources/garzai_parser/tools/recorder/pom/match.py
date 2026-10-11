@@ -51,8 +51,15 @@ def families_compatible(want: str | None, have: str | None) -> bool:
 def find_control(record: dict | None, label: str, family: str | None = None) -> dict | None:
     """The stored element whose label (rung 1) or stable label-like attribute (rung 2) equals
     `label` after normalisation, family-compatible with `family`. Exact only; None on a miss.
-    When several elements tie on the label (a repeated control), the one with the most verified
-    rungs wins, then the most recently seen."""
+
+    When several elements tie on the label (a repeated control, or a seeded twin), the tie-break is
+    D27's own order of what a store may lead with: the most PROVEN rungs (a recorded validation
+    passed and none failed since), then the most live BRAIN-CARRIED rungs (D27a), then the most
+    legacy live verdicts (`n_verified`), then the most recently seen. Until 2026-10-10 it ranked
+    `n_verified` then `last_seen` alone, so a seeded brain twin -- newer, unproven -- outranked the
+    element a v2 validation had proven, and 3 of 20 `[proven]` marks demoted on the seed dry run
+    (docs/audit/pom-rebuild-2026-10-10.md, section 6). A record with no proven and no carried rung
+    (every brain record) ranks exactly as it did."""
     if not record or not label:
         return None
     want = norm_label(label)
@@ -75,8 +82,11 @@ def find_control(record: dict | None, label: str, family: str | None = None) -> 
 
     def rank(item):
         eid, el = item
-        nv = sum(int(r.get("n_verified") or 0) for r in el.get("ladder") or [])
-        return (nv, el.get("last_seen") or "", eid)
+        ladder = el.get("ladder") or []
+        pv = sum(1 for r in ladder if proven_passed(r))
+        cv = sum(1 for r in ladder if carried_live(r))
+        nv = sum(int(r.get("n_verified") or 0) for r in ladder)
+        return (pv, cv, nv, el.get("last_seen") or "", eid)
 
     eid, el = sorted(pool, key=rank, reverse=True)[0]
     out = dict(el)
@@ -90,11 +100,12 @@ def best_verified_rung(element: dict | None) -> dict | None:
     `locator: live`, never a store rung it cannot vouch for (tri-state rule).
 
     A rung whose LAST VALIDATION FAILED (`proven_failed`, D27) is skipped here too: a recorded
-    validation that said no is a newer and stronger fact than a live verdict that said yes."""
+    validation that said no is a newer and stronger fact than a live verdict that said yes. So is a
+    brain-carried rung v2 DEMOTED (D27a: two clean failures) -- the same reasoning, one door over."""
     if not element:
         return None
     for r in element.get("ladder") or []:
-        if proven_failed(r):
+        if proven_failed(r) or carried_demoted(r):
             continue
         if int(r.get("n_verified") or 0) > 0 and r.get("last_verdict") in ("VERIFIED-PASS", "PASS-GUARDED"):
             return r
@@ -128,6 +139,55 @@ def best_proven_rung(element: dict | None) -> dict | None:
         return None
     return max(hits, key=lambda r: (int(r["proven"].get("n_pass") or 0),
                                     str((r["proven"].get("last") or {}).get("at") or "")))
+
+
+# ------------------------------------------------------------- BRAIN-CARRIED VERDICTS (D27a, 2026-10-10)
+# The user, 2026-10-10: "The brain verdict should carry over to V2 ... If it's behind, if it doesn't have
+# the same things that the brain allows it to operate with effectively, it's wrong by design." A rung the
+# brain's consult rule calls verified (passed live, did not fail last) is SEEDED into v2's store with a
+# `carried` block (store.carry_verdicts writes it and nothing else does): the brain's verdict frozen as it
+# was carried -- {"from": "brain", "verdict", "n_verified", "n_failed", "date" (the rung's last live pass),
+# "rung" (its rung key), "source" (partition, page key, element), "carried_at"}. It LEADS in v2 the way the
+# brain's verified rung leads in the brain, until one of two newer facts ends it:
+#   * `restamped` -- v2's first validation that PASSED on this call (store.stamp_proven writes it): D27's
+#     rule from then on, the proof leads (basis `proven`), and a later failure demotes it as any proof;
+#   * `demoted` -- TWO clean failures in v2 (store.record_lead_miss / store.stamp_proven count them): a
+#     could-not-act miss counts only when the page key and state were confirmed, the readiness wait passed
+#     and the control's own context was showing; a validation that ran and FAILED (a wrong value read back,
+#     a SOQL mismatch, a judged screenshot) counts as it is (the call acted on that page and was judged).
+# The carried verdict is read from the block alone, never from the rung's own counters, so a capture
+# sighting v2 later merges onto the rung (a COULD-NOT-CHECK `last_verdict`) cannot silently drop it.
+CARRIED_FROM = "brain"
+#: two clean failures demote a carried verdict (D27a); one is recorded and the verdict keeps leading
+CARRIED_DEMOTE_AFTER = 2
+_LIVE_VERDICTS = ("VERIFIED-PASS", "PASS-GUARDED")
+
+
+def carried_demoted(rung: dict | None) -> bool:
+    """True when v2 demoted this brain-carried rung (two clean failures)."""
+    return bool(((rung or {}).get("carried") or {}).get("demoted"))
+
+
+def carried_live(rung: dict | None) -> bool:
+    """True when this rung holds a brain-carried verdict that still LEADS: the brain called it verified when it was
+    carried (passed live, did not fail last), v2 has neither re-stamped it with a validation nor demoted it."""
+    c = (rung or {}).get("carried")
+    if not isinstance(c, dict) or c.get("from") != CARRIED_FROM:
+        return False
+    if c.get("demoted") or c.get("restamped"):
+        return False
+    return c.get("verdict") in _LIVE_VERDICTS and int(c.get("n_verified") or 0) > 0
+
+
+def best_carried_rung(element: dict | None) -> dict | None:
+    """The first rung in ladder order whose brain-carried verdict still leads (`carried_live`) -- the brain's own
+    `best_verified_rung` order, so v2 leads with the rung the brain would lead with. None when there is none."""
+    if not element:
+        return None
+    for r in element.get("ladder") or []:
+        if carried_live(r):
+            return r
+    return None
 
 
 # --------------------------------------------------------------- which call cells are DATA (one list)
